@@ -13,8 +13,11 @@ import { autoUpdater } from 'electron-updater';
 import { UpdateController, type UpdateBackend } from './update-controller';
 import { UpdateNoticeWindow, UPDATE_NOTICE_URL } from './update-notice';
 import { EventEmitter } from 'node:events';
+import { windowsAppDetails } from './windows-identity';
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
+const taskbarDetails = windowsAppDetails(app.isPackaged, process.execPath, app.getAppPath(), process.resourcesPath, path.join(__dirname, '../assets/amatime.ico'));
+if (process.platform === 'win32') app.setAppUserModelId(taskbarDetails.appId!);
 const testing = !app.isPackaged && process.env.AMA_E2E === '1';
 if (testing && process.env.AMA_TEST_USER_DATA) app.setPath('userData', process.env.AMA_TEST_USER_DATA);
 
@@ -32,11 +35,13 @@ async function createWindow() {
     });
   }
   const window = new BrowserWindow({
+    icon: path.join(__dirname, '../assets/amatime.ico'),
     width: 1280, height: 820, minWidth: 900, minHeight: 600,
     show: false, title: 'AMATIME · Portal Operacional', backgroundColor: '#020617',
     titleBarStyle: 'hidden', titleBarOverlay: { color: '#0b1222', symbolColor: '#94a3b8', height: SHELL_LAYOUT.headerHeight - 1 },
     webPreferences: { preload: path.join(__dirname, '../preload/index.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, zoomFactor: 1 },
   });
+  if (process.platform === 'win32') window.setAppDetails(taskbarDetails);
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', event => event.preventDefault());
   window.webContents.on('will-attach-webview', event => event.preventDefault());

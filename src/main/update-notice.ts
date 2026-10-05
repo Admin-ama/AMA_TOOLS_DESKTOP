@@ -31,6 +31,7 @@ export class UpdateNoticeWindow {
     this.state = state;
     if (state.updates.noticeVisible && !this.window) {
       const notice = this.window = new BrowserWindow({
+        icon: path.join(__dirname, '../assets/amatime.ico'),
         parent: this.parent, modal: false, frame: false, show: false, skipTaskbar: true,
         width: 400, height: 216, resizable: false, minimizable: false, maximizable: false,
         backgroundColor: '#0b1222', title: 'Actualización de AMATIME Tools',
