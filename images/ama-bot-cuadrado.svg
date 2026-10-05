@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 1280" width="1280" height="1280" role="img" aria-labelledby="ama-bot-title">
+  <title id="ama-bot-title">Bot AMA</title>
+  <rect id="body" x="264" y="300" width="728" height="712" rx="170" fill="#00534F"/>
+  <g id="eyes" fill="#FFFFFF">
+    <g id="eye-left" style="transform-box:fill-box;transform-origin:center">
+      <rect x="449" y="560" width="90" height="196" rx="45"/>
+    </g>
+    <g id="eye-right" style="transform-box:fill-box;transform-origin:center">
+      <rect x="715" y="560" width="90" height="196" rx="45"/>
+    </g>
+  </g>
+</svg>

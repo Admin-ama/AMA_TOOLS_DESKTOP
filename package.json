@@ -1,0 +1,73 @@
+{
+  "name": "amatime-tools-desktop",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Contenedor de escritorio para las herramientas operacionales AMATIME",
+  "author": "AMATIME",
+  "license": "UNLICENSED",
+  "main": "dist/main/index.cjs",
+  "scripts": {
+    "start": "npm run build && electron .",
+    "dev": "npm start",
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "npm run build && playwright test",
+    "smoke:live": "npm run build && node scripts/smoke-live.mjs",
+    "check": "npm run typecheck && npm test && npm run build",
+    "dist": "npm run check && electron-builder --win nsis",
+    "pack": "npm run check && electron-builder --dir",
+    "release:verify": "node scripts/verify-release.mjs"
+  },
+  "build": {
+    "appId": "com.amatime.tools.desktop",
+    "productName": "AMATIME Tools",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Admin-ama",
+        "repo": "AMA_TOOLS_DESKTOP",
+        "releaseType": "draft"
+      }
+    ],
+    "artifactName": "AMATIME-Tools-Setup-${version}-${arch}.${ext}"
+  },
+  "devDependencies": {
+    "@fontsource-variable/plus-jakarta-sans": "5.3.0",
+    "@playwright/test": "1.63.0",
+    "@tabler/icons-react": "3.48.0",
+    "@types/node": "26.6.4",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "electron": "44.5.1",
+    "electron-builder": "26.15.3",
+    "electron-updater": "6.8.9",
+    "esbuild": "0.28.2",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.2",
+    "vitest": "5.0.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Admin-ama/AMA_TOOLS_DESKTOP.git"
+  }
+}
