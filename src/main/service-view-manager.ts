@@ -1,6 +1,6 @@
 import { WebContentsView, session, type BrowserWindow } from 'electron';
 import { type ApplicationTab, type Service, type ServiceId, type ServiceState, type Snapshot, type Preferences } from '../shared/contracts';
-import { allowedNavigation, contentBounds, partitionFor, remotePreferences } from './policy';
+import { allowedNavigation, sameServiceOrigin, contentBounds, partitionFor, remotePreferences } from './policy';
 import { ApplicationTabs } from './application-tabs';
 import { isZoomPercent, PAGE_ZOOM } from '../shared/zoom';
 import { allowInternalCertificate } from './certificate-policy';
@@ -51,7 +51,7 @@ export class ServiceViewManager {
 
   openTab(serviceId: ServiceId = this.active, url?: string, focus = true) {
     const service = this.services.find(item => item.id === serviceId)!;
-    if (url && !allowedNavigation(url, service)) throw new Error('Destino de pestaña inválido');
+    if (url && !sameServiceOrigin(url, service)) throw new Error('Destino de pestaña inválido');
     const tab = this.tabs.open(serviceId, focus);
     if (focus) this.panel = 'service';
     this.ensureView(tab, url);
@@ -135,7 +135,7 @@ export class ServiceViewManager {
     web.setWindowOpenHandler(details => {
       if (entry.disposed) return { action: 'deny' };
       // Los enlaces internos que abren ventana crean otra pestaña de esta aplicación.
-      if (allowedNavigation(details.url, service)) this.openTab(service.id, details.url, service.id === this.active && this.panel === 'service');
+      if (sameServiceOrigin(details.url, service)) this.openTab(service.id, details.url, service.id === this.active && this.panel === 'service');
       else this.update(id, { ...this.tabs.all.find(item => item.id === id)!.state, message: 'Ventana externa bloqueada. Consulta Ayuda.' });
       return { action: 'deny' };
     });

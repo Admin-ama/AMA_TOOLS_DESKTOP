@@ -6,15 +6,23 @@ export const SERVICES: Service[] = [
   { id: 'n8n', name: 'n8n Automations', shortName: 'n8n', url: 'http://172.16.8.73:5678/' },
   { id: 'librechat', name: 'LibreChat AI', shortName: 'LibreChat', url: 'https://172.16.8.73/' },
   { id: 'portal', name: 'Portal de Operaciones', shortName: 'Portal Ops', url: 'https://app.amatime.com/' },
-  { id: 'emailai', name: 'Email Category AI', shortName: 'Email AI', url: 'https://email-category-ama-ia.netlify.app/' },
+  { id: 'emailai', name: 'Email Category AI', shortName: 'Email AI', url: 'https://email-category-ama-ia.netlify.app/', authOrigins: ['https://login.microsoftonline.com', 'https://login.live.com'] },
 ];
 export function isServiceId(value: unknown): value is ServiceId {
   return typeof value === 'string' && SERVICE_IDS.some(id => id === value);
 }
-export function allowedNavigation(destination: string, service: Service): boolean {
+export function sameServiceOrigin(destination: string, service: Service): boolean {
   try {
     const url = new URL(destination);
     return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password && url.origin === new URL(service.url).origin;
+  } catch { return false; }
+}
+// Navegación de la vista: su origen o el login externo declarado (p. ej. MSAL loginRedirect).
+export function allowedNavigation(destination: string, service: Service): boolean {
+  if (sameServiceOrigin(destination, service)) return true;
+  try {
+    const url = new URL(destination);
+    return url.protocol === 'https:' && !url.username && !url.password && (service.authOrigins ?? []).includes(url.origin);
   } catch { return false; }
 }
 export function partitionFor(id: ServiceId, persistent: boolean): string {

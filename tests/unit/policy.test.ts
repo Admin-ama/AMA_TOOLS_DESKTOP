@@ -19,6 +19,15 @@ describe('registro y aislamiento', () => {
       expect(allowedNavigation(url, SERVICES[0])).toBe(false);
     }
   });
+  it('permite el login de Microsoft solo a Email Category AI, por HTTPS y origen exacto', () => {
+    const email = SERVICES.find(s => s.id === 'emailai')!;
+    expect(allowedNavigation('https://login.microsoftonline.com/common/oauth2/v2.0/authorize?x=1', email)).toBe(true);
+    expect(allowedNavigation('https://login.live.com/oauth20_authorize.srf', email)).toBe(true);
+    for (const url of ['http://login.microsoftonline.com/', 'https://evil.login.microsoftonline.com/', 'https://login.microsoftonline.com.evil.test/', 'https://user:pw@login.microsoftonline.com/']) {
+      expect(allowedNavigation(url, email)).toBe(false);
+    }
+    expect(allowedNavigation('https://login.microsoftonline.com/', SERVICES[0])).toBe(false);
+  });
   it('separa las sesiones persistentes y temporales por servicio', () => {
     expect(partitionFor('huly', true)).toBe('persist:amatime-huly');
     expect(partitionFor('huly', false)).toBe('amatime-huly');

@@ -3,7 +3,7 @@ export type ServiceId = typeof SERVICE_IDS[number];
 export const STARTUP_SERVICE: ServiceId = 'librechat';
 export type Theme = 'dark' | 'light';
 export type PageStatus = 'idle' | 'loading' | 'ready' | 'error';
-export interface Service { id: ServiceId; name: string; shortName: string; url: string }
+export interface Service { id: ServiceId; name: string; shortName: string; url: string; authOrigins?: string[] }
 export interface ServiceState { status: PageStatus; message?: string }
 export interface ApplicationTab { id: string; serviceId: ServiceId; number: number; title: string; state: ServiceState }
 export interface Preferences { theme: Theme; remember: Record<ServiceId, boolean> }

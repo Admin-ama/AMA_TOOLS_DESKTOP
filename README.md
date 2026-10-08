@@ -47,6 +47,8 @@ El instalador de desarrollo no tiene firma corporativa. Configurar certificado d
 | Portal de Operaciones | `https://app.amatime.com/` |
 | Email Category AI | `https://email-category-ama-ia.netlify.app/` |
 
+Email Category AI puede navegar también a `https://login.microsoftonline.com` y `https://login.live.com` (login MSAL por redirect). Solo navegación de esa vista, origen exacto y HTTPS; no abre pestañas ni ventanas hacia esos dominios.
+
 Las direcciones se definen en [`src/main/policy.ts`](src/main/policy.ts). Editarlas y volver a compilar; no se aceptan URLs arbitrarias desde la interfaz.
 
 **HTTP no cifra credenciales.** Configurar HTTPS antes de producción; el contenedor no cambia la infraestructura. Por petición explícita, LibreChat admite únicamente el error de autoridad no confiable en `https://172.16.8.73/`. Esta excepción reduce la protección frente a suplantación; úsala solo en la red interna de confianza y configura una CA confiable para producción. Los demás certificados y errores siguen validándose.
