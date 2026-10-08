@@ -365,8 +365,12 @@ test('carga directa sin tarjetas, formularios ni gates intermedios', async () =>
   await expect(page.getByRole('button', { name: 'Continuar en red interna' })).toHaveCount(0);
   await expect(page.getByText('Conectando con tu aplicación…')).toHaveCount(0);
   await expect(page.getByRole('textbox')).toHaveCount(0);
-  const visible = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children.filter(view => view.getVisible()).map(view => view.getBounds()));
-  expect(visible).toEqual([{ x: 64, y: 52, width: 1216, height: 768 }]);
+  // La ventana se ajusta al área de trabajo del runner; se compara con su tamaño real.
+  const { visible, size } = await app.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows()[0];
+    return { visible: window.contentView.children.filter(view => view.getVisible()).map(view => view.getBounds()), size: window.getContentSize() };
+  });
+  expect(visible).toEqual([{ x: 64, y: 52, width: size[0] - 64, height: size[1] - 52 }]);
 });
 
 test('barra superior agrupa múltiples pestañas de la aplicación seleccionada', async ({}, testInfo) => {
