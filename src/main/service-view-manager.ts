@@ -127,6 +127,10 @@ export class ServiceViewManager {
       if (entry.disposed) return;
       if (!allowedNavigation(url, service)) {
         event.preventDefault();
+        // Solo el origen: ruta y query pueden llevar códigos o tokens de login.
+        let origin = 'URL inválida';
+        try { origin = new URL(url).origin; } catch { /* se registra como inválida */ }
+        console.warn(`[${service.id}] navegación bloqueada hacia ${origin}`);
         this.update(id, { ...this.tabs.all.find(item => item.id === id)!.state, message: 'Navegación externa bloqueada. Consulta Ayuda.' });
       }
     };
@@ -136,7 +140,12 @@ export class ServiceViewManager {
       if (entry.disposed) return { action: 'deny' };
       // Los enlaces internos que abren ventana crean otra pestaña de esta aplicación.
       if (sameServiceOrigin(details.url, service)) this.openTab(service.id, details.url, service.id === this.active && this.panel === 'service');
-      else this.update(id, { ...this.tabs.all.find(item => item.id === id)!.state, message: 'Ventana externa bloqueada. Consulta Ayuda.' });
+      else {
+        let origin = 'URL inválida';
+        try { origin = new URL(details.url).origin; } catch { /* se registra como inválida */ }
+        console.warn(`[${service.id}] ventana bloqueada hacia ${origin}`);
+        this.update(id, { ...this.tabs.all.find(item => item.id === id)!.state, message: 'Ventana externa bloqueada. Consulta Ayuda.' });
+      }
       return { action: 'deny' };
     });
     web.on('did-start-loading', () => {
