@@ -47,7 +47,7 @@ El instalador de desarrollo no tiene firma corporativa. Configurar certificado d
 | Portal de Operaciones | `https://app.amatime.com/` |
 | Email Category AI | `https://email-category-ama-ia.netlify.app/` |
 
-Email Category AI puede navegar también a `https://login.microsoftonline.com` y `https://login.live.com` (login MSAL por redirect). Solo navegación de esa vista, origen exacto y HTTPS; no abre pestañas ni ventanas hacia esos dominios.
+Email Category AI puede navegar también a `https://login.microsoftonline.com`, `https://login.live.com` y `https://mysignins.microsoft.com` (login MSAL por redirect y pantalla de registro de seguridad de Microsoft). Solo navegación de esa vista, origen exacto y HTTPS; no abre pestañas ni ventanas hacia esos dominios.
 
 Las direcciones se definen en [`src/main/policy.ts`](src/main/policy.ts). Editarlas y volver a compilar; no se aceptan URLs arbitrarias desde la interfaz.
 

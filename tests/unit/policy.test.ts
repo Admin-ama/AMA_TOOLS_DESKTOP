@@ -23,6 +23,7 @@ describe('registro y aislamiento', () => {
     const email = SERVICES.find(s => s.id === 'emailai')!;
     expect(allowedNavigation('https://login.microsoftonline.com/common/oauth2/v2.0/authorize?x=1', email)).toBe(true);
     expect(allowedNavigation('https://login.live.com/oauth20_authorize.srf', email)).toBe(true);
+    expect(allowedNavigation('https://mysignins.microsoft.com/register', email)).toBe(true);
     for (const url of ['http://login.microsoftonline.com/', 'https://evil.login.microsoftonline.com/', 'https://login.microsoftonline.com.evil.test/', 'https://user:pw@login.microsoftonline.com/']) {
       expect(allowedNavigation(url, email)).toBe(false);
     }
