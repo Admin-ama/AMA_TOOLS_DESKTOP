@@ -1,5 +1,5 @@
 import { useEffect, useState, type KeyboardEvent, type CSSProperties } from 'react';
-import { IconCalendarEvent, IconGitBranch, IconMessageCircle2, IconServerCog, IconSettings, IconHelpHexagon, IconMoon, IconSun, IconRefresh, IconShieldCheck, IconAlertTriangle, IconChevronLeft, IconTrash, IconActivity, IconPlus, IconMinus, IconX } from '@tabler/icons-react';
+import { IconCalendarEvent, IconGitBranch, IconMessageCircle2, IconServerCog, IconMailAi, IconSettings, IconHelpHexagon, IconMoon, IconSun, IconRefresh, IconShieldCheck, IconAlertTriangle, IconChevronLeft, IconTrash, IconActivity, IconPlus, IconMinus, IconX } from '@tabler/icons-react';
 import type { ServiceId, Snapshot } from '../shared/contracts';
 import { SHELL_LAYOUT } from '../shared/layout';
 import { PAGE_ZOOM } from '../shared/zoom';
@@ -10,9 +10,9 @@ import amaAppLogo from '../../images/icon_144x144.png';
 import amaDigitalLogo from '../../images/AMA-TIME-digital.png';
 import { AmaBot } from './AmaBot';
 
-const icons = { huly: IconCalendarEvent, n8n: IconGitBranch, librechat: IconMessageCircle2, portal: IconServerCog };
-const sidebarLogos: Record<ServiceId, string> = { huly: hulyLogo, n8n: n8nLogo, librechat: amaBotLogo, portal: amaAppLogo };
-const sidebarOrder: ServiceId[] = ['librechat', 'portal', 'huly', 'n8n'];
+const icons = { huly: IconCalendarEvent, n8n: IconGitBranch, librechat: IconMessageCircle2, portal: IconServerCog, emailai: IconMailAi };
+const sidebarLogos: Record<Exclude<ServiceId, 'emailai'>, string> = { huly: hulyLogo, n8n: n8nLogo, librechat: amaBotLogo, portal: amaAppLogo };
+const sidebarOrder: ServiceId[] = ['librechat', 'portal', 'huly', 'n8n', 'emailai'];
 const updateLabels = { disabled: 'Las actualizaciones están disponibles en la app instalada de Windows.', idle: 'Puedes buscar una nueva versión.', checking: 'Buscando actualizaciones…', available: 'Hay una nueva versión disponible.', current: 'Tienes la última versión disponible.', downloading: 'Descargando actualización…', downloaded: 'La actualización está lista para instalar.', installing: 'Instalando actualización…', error: 'No se pudo actualizar. Revisa la conexión a GitHub y vuelve a intentar.' };
 
 export function App() {
@@ -67,7 +67,7 @@ export function App() {
       <nav className="service-nav" aria-label="Servicios">
         {sidebarOrder.map(id => state.services.find(item => item.id === id)!).map(item => {
           return <button key={item.id} className={`nav-item ${state.active === item.id && state.panel === 'service' ? 'active' : ''}`} aria-label={`Abrir ${item.name}`} aria-current={state.active === item.id && state.panel === 'service' ? 'page' : undefined} onClick={() => activate(item.id)}>
-            {item.id === 'librechat' ? <AmaBot className="service-logo service-logo-librechat" /> : <img className={`service-logo service-logo-${item.id}`} src={sidebarLogos[item.id]} alt="" draggable={false} />}<span className="nav-tooltip">{item.name}</span>
+            {item.id === 'librechat' ? <AmaBot className="service-logo service-logo-librechat" /> : item.id === 'emailai' ? <IconMailAi className="service-logo service-logo-emailai" size={26} stroke={1.65} /> : <img className={`service-logo service-logo-${item.id}`} src={sidebarLogos[item.id]} alt="" draggable={false} />}<span className="nav-tooltip">{item.name}</span>
             {state.states[item.id].status === 'ready' && <span className="nav-dot" />}
           </button>;
         })}
@@ -133,7 +133,7 @@ export function App() {
 
       {state.panel === 'help' && <section className="settings-page help-page">
         <button className="back-button" onClick={() => panel('service')}><IconChevronLeft size={17} />Volver al servicio</button>
-        <div className="page-heading"><span className="eyebrow">AMATIME TOOLS · {state.updates.currentVersion}</span><h1>Tus herramientas, conectadas</h1><p>Un contenedor de escritorio. Cuatro aplicaciones independientes.</p></div>
+        <div className="page-heading"><span className="eyebrow">AMATIME TOOLS · {state.updates.currentVersion}</span><h1>Tus herramientas, conectadas</h1><p>Un contenedor de escritorio. Cinco aplicaciones independientes.</p></div>
         <div className="settings-card"><IconActivity className="help-icon" /><h2>Navegación sin perder contexto</h2><p>La barra lateral cambia de aplicación. La barra superior muestra solo sus pestañas: usa + para abrir otra y × para cerrarla. Cada pestaña conserva su página y comparte la sesión de su aplicación. Las flechas del teclado recorren las pestañas; al volver a una aplicación se restaura la última seleccionada.</p></div>
         <div className="settings-card"><IconShieldCheck className="help-icon" /><h2>Cada aplicación gestiona su acceso</h2><p>El portal no tiene formulario de login, no comprueba credenciales y no asegura que una página cargada sea una sesión autenticada. Usa el login y logout propios del servicio.</p></div>
         <div className="settings-card"><IconAlertTriangle className="help-icon" /><h2>Red, permisos y seguridad</h2><p>Huly, n8n y LibreChat necesitan acceso a la red interna o VPN. Huly y n8n todavía usan HTTP: configura HTTPS antes de un despliegue de producción. LibreChat usa HTTPS. LibreChat admite una excepción de autoridad no confiable únicamente en https://172.16.8.73/; úsala solo en red interna de confianza. Los demás destinos y errores TLS siguen validándose.</p><p>La navegación a otros orígenes, ventanas externas, descargas y permisos del dispositivo están bloqueados. Si un SSO requiere otro dominio, su integración debe revisarse antes de habilitarlo.</p></div>

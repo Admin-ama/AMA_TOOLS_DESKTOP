@@ -42,7 +42,7 @@ test.beforeEach(async ({}, testInfo) => {
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('Missing server port');
-  const config = Object.fromEntries(['huly', 'n8n', 'librechat', 'portal'].map(id => [id, `http://127.0.0.1:${address.port}/${id}`]));
+  const config = Object.fromEntries(['huly', 'n8n', 'librechat', 'portal', 'emailai'].map(id => [id, `http://127.0.0.1:${address.port}/${id}`]));
   await writeFile(path.join(directory, 'services.json'), JSON.stringify(config));
   app = await electron.launch({ args: ['.'], env: { ...process.env, AMA_E2E: '1', AMA_TEST_UPDATES: testInfo.title.includes('[updates]') ? '1' : '0', AMA_TEST_CONFIG: path.join(directory, 'services.json'), AMA_TEST_USER_DATA: path.join(directory, 'data') } });
   page = await app.firstWindow();
@@ -195,7 +195,7 @@ test('ojos del bot siguen el cursor aunque esté sobre la vista remota', async (
 });
 
 test('sidebar carga los logos locales de las aplicaciones', async ({}, testInfo) => {
-  await expect(page.getByRole('navigation', { name: 'Servicios' }).getByRole('button')).toHaveText(['LibreChat AI', 'Portal de Operaciones', 'Huly Workspace', 'n8n Automations']);
+  await expect(page.getByRole('navigation', { name: 'Servicios' }).getByRole('button')).toHaveText(['LibreChat AI', 'Portal de Operaciones', 'Huly Workspace', 'n8n Automations', 'Email Category AI']);
   await expect(page.getByRole('button', { name: 'Abrir LibreChat AI', exact: true }).locator('svg .bot-eye')).toHaveCount(2);
   for (const name of ['Huly Workspace', 'n8n Automations', 'Portal de Operaciones']) {
     const logo = page.getByRole('button', { name: `Abrir ${name}`, exact: true }).locator('img');

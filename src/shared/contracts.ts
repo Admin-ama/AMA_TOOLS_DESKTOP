@@ -1,4 +1,4 @@
-export const SERVICE_IDS = ['huly', 'n8n', 'librechat', 'portal'] as const;
+export const SERVICE_IDS = ['huly', 'n8n', 'librechat', 'portal', 'emailai'] as const;
 export type ServiceId = typeof SERVICE_IDS[number];
 export const STARTUP_SERVICE: ServiceId = 'librechat';
 export type Theme = 'dark' | 'light';

@@ -44,6 +44,7 @@ button { transition:background .18s, color .18s, border-color .18s; }
 .bot-eye { transform-box:fill-box; transform-origin:center; animation:bot-blink 4.5s infinite; }
 @keyframes bot-blink { 0%, 92%, 100% { transform:scaleY(1); } 95% { transform:scaleY(.1); } }
 .service-logo-portal { width:28px; height:28px; border-radius:7px; }
+.service-logo-emailai { color:var(--accent); }
 :root[data-theme='light'] .service-logo-huly { filter:brightness(0); }
 .sidebar-bottom { margin-top:auto; border-top:1px solid var(--line); padding:.75rem 0; }
 .header { display:flex; align-items:center; gap:.7rem; background:var(--surface); border-bottom:1px solid var(--line); padding:0 145px 0 .75rem; -webkit-app-region:drag; min-width:0; }

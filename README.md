@@ -1,10 +1,10 @@
 # AMATIME Tools Desktop
 
-Contenedor Electron para **Huly, n8n, LibreChat y Portal de Operaciones**. La sidebar selecciona la aplicación; la barra superior permite abrir varias pestañas de esa aplicación. **Cada aplicación usa su propio login:** este proyecto no captura credenciales ni implementa autenticación.
+Contenedor Electron para **Huly, n8n, LibreChat, Portal de Operaciones y Email Category AI**. La sidebar selecciona la aplicación; la barra superior permite abrir varias pestañas de esa aplicación. **Cada aplicación usa su propio login:** este proyecto no captura credenciales ni implementa autenticación.
 
 Las pestañas muestran el título de su página y se actualizan cuando cambia. Si la página no tiene título, muestran el nombre de la aplicación, sin numeración.
 
-Los logos de la sidebar se empaquetan desde `images/`, en este orden: Bot AMA (LibreChat), app AMA (Portal de Operaciones, `icon_144x144.png`), Huly y n8n.
+Los logos de la sidebar se empaquetan desde `images/`, en este orden: Bot AMA (LibreChat), app AMA (Portal de Operaciones, `icon_144x144.png`), Huly, n8n y Email Category AI (icono Tabler `IconMailAi`).
 La marca superior usa `AMA-TIME-digital.png`, sin el icono de cuadrícula anterior.
 
 En el header, **− / porcentaje / +** ajusta el zoom de la aplicación entre 50% y 200%. Haz clic en el porcentaje para volver al 100%. Cada aplicación mantiene su zoom durante la ejecución y lo comparte entre sus pestañas; la interfaz del escritorio no cambia de tamaño.
@@ -29,7 +29,7 @@ La versión **0.2.0** incorpora actualizaciones desde GitHub Releases: busca, de
 ```powershell
 npm run check      # Tipos, pruebas unitarias y build
 npm run test:e2e   # Pruebas reales de Electron con servidor local aislado
-npm run smoke:live # Solo carga de los cuatro destinos reales; sin login
+npm run smoke:live # Solo carga de los cinco destinos reales; sin login
 npm run dist       # Instalador Windows en release/
 ```
 
@@ -45,6 +45,7 @@ El instalador de desarrollo no tiene firma corporativa. Configurar certificado d
 | n8n Automations | `http://172.16.8.73:5678/` |
 | LibreChat AI | `https://172.16.8.73/` |
 | Portal de Operaciones | `https://app.amatime.com/` |
+| Email Category AI | `https://email-category-ama-ia.netlify.app/` |
 
 Las direcciones se definen en [`src/main/policy.ts`](src/main/policy.ts). Editarlas y volver a compilar; no se aceptan URLs arbitrarias desde la interfaz.
 

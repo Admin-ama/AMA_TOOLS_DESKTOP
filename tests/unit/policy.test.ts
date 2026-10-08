@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { SERVICES, isServiceId, allowedNavigation, partitionFor, contentBounds, remotePreferences } from '../../src/main/policy';
 
 describe('registro y aislamiento', () => {
-  it('registra las cuatro direcciones reales', () => {
+  it('registra las cinco direcciones reales', () => {
     expect(SERVICES.map(s => s.url)).toEqual([
       'http://172.16.8.73:8087/', 'http://172.16.8.73:5678/',
       'https://172.16.8.73/', 'https://app.amatime.com/',
+      'https://email-category-ama-ia.netlify.app/',
     ]);
   });
   it('solo acepta IDs conocidos, nunca URLs ni propiedades heredadas', () => {
