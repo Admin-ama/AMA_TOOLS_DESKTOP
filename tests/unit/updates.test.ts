@@ -31,7 +31,7 @@ it('comprueba sin descargar y exige descarga completa antes de instalar', async 
   expect(controller.snapshot.progress).toBe(42);
   backend.emit('update-downloaded', { version: '0.3.0' });
   controller.install();
-  expect(backend.quitAndInstall).toHaveBeenCalledWith(false, true);
+  expect(backend.quitAndInstall).toHaveBeenCalledWith(true, true); // instalación silenciosa y reapertura
 });
 it('evita búsquedas simultáneas y expone errores sin filtrar detalles internos', async () => {
   const { controller, backend } = fixture();

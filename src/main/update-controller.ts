@@ -65,7 +65,8 @@ export class UpdateController {
   install() {
     if (this.state.status !== 'downloaded' || this.disposed) throw new Error('La actualización no está descargada');
     this.set({ ...this.state, status: 'installing' });
-    this.backend.quitAndInstall(false, true);
+    // Silencioso: NSIS reutiliza la carpeta instalada, sin asistente, y reabre la app.
+    this.backend.quitAndInstall(true, true);
   }
   dispose() {
     this.disposed = true;

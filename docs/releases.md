@@ -52,7 +52,7 @@ Publica el borrador cuando el workflow termine. No edites una etiqueta publicada
 
 1. La app Windows empaquetada busca versiones al arrancar y cada seis horas. En desarrollo no consulta GitHub.
 2. En **Ajustes → Actualizaciones**, usa **Buscar actualizaciones** y luego **Descargar actualización**.
-3. Tras la descarga, guarda el trabajo pendiente y pulsa **Instalar y reiniciar**. Un diálogo pide confirmación; cancelar deja la app abierta.
+3. Tras la descarga, guarda el trabajo pendiente y pulsa **Instalar y reiniciar**. Un diálogo pide confirmación; cancelar deja la app abierta. Al confirmar, el instalador corre en modo silencioso (sin asistente), reutiliza la carpeta instalada y vuelve a abrir la app.
 
 La descarga e instalación no son automáticas y no se instala nada solo por cerrar la app. Se usan versiones estables, sin downgrade. Las preferencias y particiones de sesión mantienen el mismo `appId`; no se borran como parte de actualizar. Comprueba una actualización real entre dos versiones antes de distribuir ampliamente.
 
