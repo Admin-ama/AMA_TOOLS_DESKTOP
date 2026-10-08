@@ -26,7 +26,18 @@ jobs:
         run: npm run check
       - name: Electron integration tests
         run: npx playwright test
-      - name: Build and upload draft release
-        run: npx electron-builder --win nsis --x64 --publish always
+      - name: Build installer
+        run: npx electron-builder --win nsis --x64 --publish never
+      # Un solo draft con los tres archivos; electron-builder --publish always
+      # creaba drafts duplicados al subir en paralelo.
+      - name: Create draft release
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" --draft --verify-tag \
+            --title "AMATIME Tools $GITHUB_REF_NAME" \
+            "release/AMATIME-Tools-Setup-${version}-x64.exe" \
+            "release/AMATIME-Tools-Setup-${version}-x64.exe.blockmap" \
+            release/latest.yml
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
