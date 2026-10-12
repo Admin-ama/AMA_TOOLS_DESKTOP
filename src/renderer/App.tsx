@@ -1,5 +1,5 @@
 import { useEffect, useState, type KeyboardEvent, type CSSProperties } from 'react';
-import { IconCalendarEvent, IconGitBranch, IconMessageCircle2, IconServerCog, IconMailAi, IconSettings, IconHelpHexagon, IconMoon, IconSun, IconRefresh, IconShieldCheck, IconAlertTriangle, IconChevronLeft, IconTrash, IconActivity, IconPlus, IconMinus, IconX } from '@tabler/icons-react';
+import { IconCalendarEvent, IconGitBranch, IconMessageCircle2, IconServerCog, IconMailAi, IconFileTypePdf, IconSettings, IconHelpHexagon, IconMoon, IconSun, IconRefresh, IconShieldCheck, IconAlertTriangle, IconChevronLeft, IconTrash, IconActivity, IconPlus, IconMinus, IconX } from '@tabler/icons-react';
 import type { ServiceId, Snapshot } from '../shared/contracts';
 import { SHELL_LAYOUT } from '../shared/layout';
 import { PAGE_ZOOM } from '../shared/zoom';
@@ -7,12 +7,18 @@ import hulyLogo from '../../images/Huly-logo.svg';
 import n8nLogo from '../../images/n8n-logo.svg';
 import amaBotLogo from '../../images/ama-bot-cuadrado.svg';
 import amaAppLogo from '../../images/icon_144x144.png';
+import stirlingLogo from '../../images/stirling.png';
 import amaDigitalLogo from '../../images/AMA-TIME-digital.png';
 import { AmaBot } from './AmaBot';
 
-const icons = { huly: IconCalendarEvent, n8n: IconGitBranch, librechat: IconMessageCircle2, portal: IconServerCog, emailai: IconMailAi };
-const sidebarLogos: Record<Exclude<ServiceId, 'emailai'>, string> = { huly: hulyLogo, n8n: n8nLogo, librechat: amaBotLogo, portal: amaAppLogo };
-const sidebarOrder: ServiceId[] = ['librechat', 'portal', 'huly', 'n8n', 'emailai'];
+const icons = { huly: IconCalendarEvent, n8n: IconGitBranch, librechat: IconMessageCircle2, portal: IconServerCog, emailai: IconMailAi, stirling: IconFileTypePdf };
+const sidebarLogos: Record<Exclude<ServiceId, 'emailai'>, string> = { huly: hulyLogo, n8n: n8nLogo, librechat: amaBotLogo, portal: amaAppLogo, stirling: stirlingLogo };
+// LibreChat es el centro de mando; después operación y, al final, automatización/herramientas.
+const sidebarGroups: { label: string; ids: ServiceId[] }[] = [
+  { label: 'Control', ids: ['librechat'] },
+  { label: 'Operación', ids: ['portal', 'huly'] },
+  { label: 'Automatización y herramientas', ids: ['n8n', 'emailai', 'stirling'] },
+];
 const updateLabels = { disabled: 'Las actualizaciones están disponibles en la app instalada de Windows.', idle: 'Puedes buscar una nueva versión.', checking: 'Buscando actualizaciones…', available: 'Hay una nueva versión disponible.', current: 'Tienes la última versión disponible.', downloading: 'Descargando actualización…', downloaded: 'La actualización está lista para instalar.', installing: 'Instalando actualización…', error: 'No se pudo actualizar. Revisa la conexión a GitHub y vuelve a intentar.' };
 
 export function App() {
@@ -65,12 +71,14 @@ export function App() {
     <aside className="sidebar" aria-label="Navegación principal">
       <div className="brand" title="AMATIME · Portal Operacional"><img className="brand-logo" src={amaDigitalLogo} alt="AMA Time Digital" draggable={false} /></div>
       <nav className="service-nav" aria-label="Servicios">
-        {sidebarOrder.map(id => state.services.find(item => item.id === id)!).map(item => {
+        {sidebarGroups.map(group => <div className="nav-group" role="group" aria-label={group.label} key={group.label}>
+        {group.ids.map(id => state.services.find(item => item.id === id)!).map(item => {
           return <button key={item.id} className={`nav-item ${state.active === item.id && state.panel === 'service' ? 'active' : ''}`} aria-label={`Abrir ${item.name}`} aria-current={state.active === item.id && state.panel === 'service' ? 'page' : undefined} onClick={() => activate(item.id)}>
             {item.id === 'librechat' ? <AmaBot className="service-logo service-logo-librechat" /> : item.id === 'emailai' ? <IconMailAi className="service-logo service-logo-emailai" size={26} stroke={1.65} /> : <img className={`service-logo service-logo-${item.id}`} src={sidebarLogos[item.id]} alt="" draggable={false} />}<span className="nav-tooltip">{item.name}</span>
             {state.states[item.id].status === 'ready' && <span className="nav-dot" />}
           </button>;
         })}
+        </div>)}
       </nav>
       <div className="sidebar-bottom">
         <button className={`nav-item ${state.panel === 'settings' ? 'active' : ''}`} aria-label="Ajustes" onClick={() => panel('settings')}><IconSettings size={22} stroke={1.65} /><span className="nav-tooltip">Ajustes</span></button>
