@@ -1,6 +1,6 @@
 import { WebContentsView, session, type BrowserWindow } from 'electron';
 import { type ApplicationTab, type Service, type ServiceId, type ServiceState, type Snapshot, type Preferences } from '../shared/contracts';
-import { allowedNavigation, sameServiceOrigin, contentBounds, partitionFor, remotePreferences } from './policy';
+import { allowedNavigation, allowedDownload, isPdfUrl, sameServiceOrigin, contentBounds, partitionFor, remotePreferences } from './policy';
 import { ApplicationTabs } from './application-tabs';
 import { isZoomPercent, PAGE_ZOOM } from '../shared/zoom';
 import { allowInternalCertificate } from './certificate-policy';
@@ -120,7 +120,10 @@ export class ServiceViewManager {
     if (!securedSessions.has(web.session)) {
       web.session.setPermissionRequestHandler((_web, _permission, callback) => callback(false));
       web.session.setPermissionCheckHandler(() => false);
-      web.session.on('will-download', event => event.preventDefault());
+      // La sesión es por servicio: solo se permite bajar archivos de su propio origen (diálogo "Guardar como" nativo).
+      web.session.on('will-download', (event, item) => {
+        if (!allowedDownload(item.getURL(), service)) event.preventDefault();
+      });
       securedSessions.add(web.session);
     }
     const guard = (event: Electron.Event, url: string) => {
@@ -139,7 +142,9 @@ export class ServiceViewManager {
     web.setWindowOpenHandler(details => {
       if (entry.disposed) return { action: 'deny' };
       // Los enlaces internos que abren ventana crean otra pestaña de esta aplicación.
-      if (sameServiceOrigin(details.url, service)) this.openTab(service.id, details.url, service.id === this.active && this.panel === 'service');
+      // Enlaces "Descargar" a PDF (target=_blank): bajar el archivo en vez de abrir una pestaña vacía.
+      if (sameServiceOrigin(details.url, service) && isPdfUrl(details.url)) web.downloadURL(details.url);
+      else if (sameServiceOrigin(details.url, service)) this.openTab(service.id, details.url, service.id === this.active && this.panel === 'service');
       else {
         let origin = 'URL inválida';
         try { origin = new URL(details.url).origin; } catch { /* se registra como inválida */ }

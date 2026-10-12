@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { SERVICES, isServiceId, allowedNavigation, partitionFor, contentBounds, remotePreferences } from '../../src/main/policy';
+import { SERVICES, isServiceId, allowedNavigation, allowedDownload, isPdfUrl, partitionFor, contentBounds, remotePreferences } from '../../src/main/policy';
 
 describe('registro y aislamiento', () => {
-  it('registra las cinco direcciones reales', () => {
+  it('registra las seis direcciones reales', () => {
     expect(SERVICES.map(s => s.url)).toEqual([
       'http://172.16.8.73:8087/', 'http://172.16.8.73:5678/',
       'https://172.16.8.73/', 'https://app.amatime.com/',
-      'https://email-category-ama-ia.netlify.app/',
+      'https://email-category-ama-ia.netlify.app/', 'http://172.16.8.73:8080/',
     ]);
   });
   it('solo acepta IDs conocidos, nunca URLs ni propiedades heredadas', () => {
@@ -28,6 +28,18 @@ describe('registro y aislamiento', () => {
       expect(allowedNavigation(url, email)).toBe(false);
     }
     expect(allowedNavigation('https://login.microsoftonline.com/', SERVICES[0])).toBe(false);
+  });
+  it('permite descargar solo archivos del mismo origen del servicio', () => {
+    const chat = SERVICES.find(s => s.id === 'librechat')!;
+    expect(allowedDownload('https://172.16.8.73/pdf-out/abc/PDFs_unidos.pdf', chat)).toBe(true);
+    for (const url of ['https://evil.test/a.pdf', 'http://172.16.8.73/a.pdf', 'file:///a.pdf', 'not a url']) {
+      expect(allowedDownload(url, chat)).toBe(false);
+    }
+  });
+  it('detecta enlaces a PDF para descargarlos en vez de abrir pestaña', () => {
+    expect(isPdfUrl('https://172.16.8.73/pdf-out/abc/PDFs_unidos.pdf?x=1')).toBe(true);
+    expect(isPdfUrl('https://172.16.8.73/c/new')).toBe(false);
+    expect(isPdfUrl('not a url')).toBe(false);
   });
   it('separa las sesiones persistentes y temporales por servicio', () => {
     expect(partitionFor('huly', true)).toBe('persist:amatime-huly');

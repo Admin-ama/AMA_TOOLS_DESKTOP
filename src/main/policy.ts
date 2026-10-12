@@ -7,6 +7,7 @@ export const SERVICES: Service[] = [
   { id: 'librechat', name: 'LibreChat AI', shortName: 'LibreChat', url: 'https://172.16.8.73/' },
   { id: 'portal', name: 'Portal de Operaciones', shortName: 'Portal Ops', url: 'https://app.amatime.com/' },
   { id: 'emailai', name: 'Email Category AI', shortName: 'Email AI', url: 'https://email-category-ama-ia.netlify.app/', authOrigins: ['https://login.microsoftonline.com', 'https://login.live.com', 'https://mysignins.microsoft.com'] },
+  { id: 'stirling', name: 'Stirling PDF', shortName: 'Stirling PDF', url: 'http://172.16.8.73:8080/' },
 ];
 export function isServiceId(value: unknown): value is ServiceId {
   return typeof value === 'string' && SERVICE_IDS.some(id => id === value);
@@ -24,6 +25,13 @@ export function allowedNavigation(destination: string, service: Service): boolea
     const url = new URL(destination);
     return url.protocol === 'https:' && !url.username && !url.password && (service.authOrigins ?? []).includes(url.origin);
   } catch { return false; }
+}
+// Descargas: solo archivos servidos por el propio origen del servicio.
+export function allowedDownload(destination: string, service: Service): boolean {
+  return sameServiceOrigin(destination, service);
+}
+export function isPdfUrl(destination: string): boolean {
+  try { return new URL(destination).pathname.toLowerCase().endsWith('.pdf'); } catch { return false; }
 }
 export function partitionFor(id: ServiceId, persistent: boolean): string {
   return `${persistent ? 'persist:' : ''}amatime-${id}`;
