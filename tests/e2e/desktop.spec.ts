@@ -95,6 +95,16 @@ test('[updates] aviso sigue tamaño y minimización del padre y cerrar equivale 
   await expect.poll(() => page.evaluate(async () => (await window.portal.snapshot()).updates.noticeVisible)).toBe(false);
 });
 
+test('[updates] aviso aparece al restaurar si la versión se encontró con la ventana minimizada', async () => {
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].minimize());
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isMinimized())).toBe(true);
+  await app.evaluate(({ app }) => app.emit('ama:test-update', 'update-available', { version: '0.3.0' }));
+  await expect.poll(() => app.windows().some(w => w.url().endsWith('#update-notice'))).toBe(true);
+  await new Promise(resolve => setTimeout(resolve, 1500));
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!.restore());
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.getParentWindow())!.isVisible())).toBe(true);
+});
+
 test('[updates] descarga por consentimiento y permite posponer sin reinicio automático', async () => {
   const notice = await availableUpdate();
   await notice.getByRole('button', { name: 'Descargar y actualizar' }).click();

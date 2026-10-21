@@ -43,7 +43,10 @@ export class UpdateNoticeWindow {
       notice.webContents.on('will-attach-webview', event => event.preventDefault());
       notice.webContents.on('zoom-changed', () => notice.webContents.setZoomFactor(1));
       notice.on('close', event => { if (!this.disposed) { event.preventDefault(); this.snooze(); notice.hide(); } });
-      notice.once('ready-to-show', () => { this.ready = true; this.sync(); });
+      // A hidden child window may never paint outside automation, so ready-to-show alone is unreliable.
+      const markReady = () => { if (this.ready) return; this.ready = true; this.sync(); };
+      notice.once('ready-to-show', markReady);
+      notice.webContents.once('did-finish-load', markReady);
       void notice.loadURL(UPDATE_NOTICE_URL).catch(() => { if (!notice.isDestroyed()) notice.hide(); });
     }
     this.sync();
