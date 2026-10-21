@@ -6,7 +6,7 @@ export const SERVICES: Service[] = [
   { id: 'n8n', name: 'n8n Automations', shortName: 'n8n', url: 'http://172.16.8.73:5678/' },
   { id: 'librechat', name: 'LibreChat AI', shortName: 'LibreChat', url: 'https://172.16.8.73/' },
   { id: 'portal', name: 'Portal de Operaciones', shortName: 'Portal Ops', url: 'https://app.amatime.com/' },
-  { id: 'emailai', name: 'Email Category AI', shortName: 'Email AI', url: 'https://email-category-ama-ia.netlify.app/', authOrigins: ['https://login.microsoftonline.com', 'https://login.live.com', 'https://mysignins.microsoft.com'] },
+  { id: 'emailai', name: 'Email Category AI', shortName: 'Email AI', url: 'https://email-category-ai.vercel.app/', authOrigins: ['https://login.microsoftonline.com', 'https://login.live.com', 'https://mysignins.microsoft.com'] },
   { id: 'stirling', name: 'Stirling PDF', shortName: 'Stirling PDF', url: 'http://172.16.8.73:8080/' },
 ];
 export function isServiceId(value: unknown): value is ServiceId {

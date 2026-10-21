@@ -6,7 +6,7 @@ describe('registro y aislamiento', () => {
     expect(SERVICES.map(s => s.url)).toEqual([
       'http://172.16.8.73:8087/', 'http://172.16.8.73:5678/',
       'https://172.16.8.73/', 'https://app.amatime.com/',
-      'https://email-category-ama-ia.netlify.app/', 'http://172.16.8.73:8080/',
+      'https://email-category-ai.vercel.app/', 'http://172.16.8.73:8080/',
     ]);
   });
   it('solo acepta IDs conocidos, nunca URLs ni propiedades heredadas', () => {

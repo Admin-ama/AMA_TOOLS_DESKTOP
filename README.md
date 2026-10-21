@@ -45,7 +45,7 @@ El instalador de desarrollo no tiene firma corporativa. Configurar certificado d
 | n8n Automations | `http://172.16.8.73:5678/` |
 | LibreChat AI | `https://172.16.8.73/` |
 | Portal de Operaciones | `https://app.amatime.com/` |
-| Email Category AI | `https://email-category-ama-ia.netlify.app/` |
+| Email Category AI | `https://email-category-ai.vercel.app/` |
 
 Email Category AI puede navegar también a `https://login.microsoftonline.com`, `https://login.live.com` y `https://mysignins.microsoft.com` (login MSAL por redirect y pantalla de registro de seguridad de Microsoft). Solo navegación de esa vista, origen exacto y HTTPS; no abre pestañas ni ventanas hacia esos dominios.
 
