@@ -50,7 +50,7 @@ Publica el borrador cuando el workflow termine. No edites una etiqueta publicada
 
 ## Actualizar desde la app
 
-1. La app Windows empaquetada busca versiones al arrancar y cada seis horas. En desarrollo no consulta GitHub.
+1. La app Windows empaquetada busca versiones al arrancar y cada 30 minutos. En desarrollo no consulta GitHub.
 2. En **Ajustes → Actualizaciones**, usa **Buscar actualizaciones** y luego **Descargar actualización**.
 3. Tras la descarga, guarda el trabajo pendiente y pulsa **Instalar y reiniciar**. Un diálogo pide confirmación; cancelar deja la app abierta. Al confirmar, el instalador corre en modo silencioso (sin asistente), reutiliza la carpeta instalada y vuelve a abrir la app.
 

@@ -75,7 +75,7 @@ async function createWindow() {
   if (testUpdates) (app as EventEmitter).on('ama:test-update', testUpdate);
   updates = new UpdateController(backend, testUpdates || (app.isPackaged && process.platform === 'win32'), app.getVersion(), publish);
   const initialCheck = setTimeout(() => { if (app.isPackaged && process.platform === 'win32') void updates.check(); }, 10_000);
-  const periodicCheck = setInterval(() => { if (app.isPackaged && process.platform === 'win32') void updates.check(); }, 6 * 60 * 60 * 1000);
+  const periodicCheck = setInterval(() => { if (app.isPackaged && process.platform === 'win32') void updates.check(); }, 30 * 60 * 1000);
   let queue = Promise.resolve<unknown>(undefined);
   ipcMain.handle('portal:command', (event, command: unknown, ...args: unknown[]) => {
     const shellSender = event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && event.senderFrame.url === 'app://bundle/index.html';
