@@ -177,11 +177,54 @@ test('zoom valida IPC y respeta los límites', async () => {
   await expect(page.getByRole('button', { name: 'Restablecer zoom' })).toBeDisabled();
 });
 
-test('marca superior usa el logo digital AMA sin fondo de icono genérico', async () => {
-  const logo = page.getByRole('img', { name: 'AMA Time Digital', exact: true });
-  await expect(logo).toBeVisible();
-  await expect.poll(() => logo.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
-  expect(await logo.evaluate((img: HTMLImageElement) => getComputedStyle(img).objectFit)).toBe('contain');
+test('el botón de aplicaciones reemplaza al logo en la parte superior de la sidebar', async () => {
+  await expect(page.getByRole('img', { name: 'AMA Time Digital', exact: true })).toHaveCount(0);
+  const launcher = page.getByRole('button', { name: 'Ver todas las aplicaciones', exact: true });
+  await expect(launcher).toBeVisible();
+  await expect(page.getByRole('complementary', { name: 'Navegación principal' }).getByRole('button').first()).toHaveAccessibleName('Ver todas las aplicaciones');
+});
+
+test('launcher agrupa por categorías, fija y desfija apps y abre apps no fijadas', async ({}, testInfo) => {
+  await waitForPage();
+  const nav = page.getByRole('navigation', { name: 'Servicios' });
+  await page.getByRole('button', { name: 'Ver todas las aplicaciones', exact: true }).click();
+  const launcher = page.getByRole('region', { name: 'Todas las aplicaciones' });
+  await expect(launcher).toBeVisible();
+  for (const name of ['Control', 'Operación', 'Automatización y herramientas']) await expect(launcher.getByRole('heading', { name })).toBeVisible();
+  await expect(launcher.getByRole('button', { name: /^Abrir / })).toHaveCount(6);
+  // Las vistas nativas no pueden pintar sobre el launcher.
+  const visibility = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children.map(v => v.getVisible()));
+  expect(visibility.every(v => !v)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('launcher.png') });
+  // Buscar filtra.
+  await launcher.getByRole('textbox', { name: 'Buscar aplicación' }).fill('stirl');
+  await expect(launcher.getByRole('button', { name: /^Abrir / })).toHaveCount(1);
+  await launcher.getByRole('textbox', { name: 'Buscar aplicación' }).fill('');
+  // Desfijar n8n lo quita de la sidebar y se conserva en preferencias.
+  await launcher.getByRole('button', { name: 'Quitar n8n Automations de la barra lateral' }).click();
+  await expect(launcher.getByRole('button', { name: 'Fijar n8n Automations en la barra lateral' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(launcher).toHaveCount(0);
+  await expect(nav.getByRole('button', { name: 'Abrir n8n Automations' })).toHaveCount(0);
+  await expect(nav.getByRole('button')).toHaveCount(5);
+  expect(await page.evaluate(async () => (await window.portal.snapshot()).preferences.pinned)).not.toContain('n8n');
+  // Abrir una app no fijada desde el launcher: aparece temporalmente en la sidebar.
+  await page.getByRole('button', { name: 'Ver todas las aplicaciones', exact: true }).click();
+  await launcher.getByRole('button', { name: 'Abrir n8n Automations' }).click();
+  await expect(page.getByTestId('n8n-tab-1')).toHaveAttribute('aria-selected', 'true');
+  await expect(launcher).toHaveCount(0);
+  await expect(nav.getByRole('button', { name: 'Abrir n8n Automations' })).toBeVisible();
+  await waitForPage();
+  // Al cambiar de app, la no fijada deja de mostrarse.
+  await page.getByRole('button', { name: 'Abrir Huly Workspace', exact: true }).click();
+  await expect(nav.getByRole('button', { name: 'Abrir n8n Automations' })).toHaveCount(0);
+  // IPC: ids y valores inválidos rechazados.
+  const rejected = await page.evaluate(async () => {
+    const results = [];
+    for (const [id, value] of [['evil', true], ['huly', 'yes']] as const) { try { await window.portal.pin(id as never, value as never); results.push(false); } catch { results.push(true); } }
+    return results;
+  });
+  expect(rejected).toEqual([true, true]);
 });
 
 test('navegación compacta alinea shell y vista nativa', async () => {

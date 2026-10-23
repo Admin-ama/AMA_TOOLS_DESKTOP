@@ -1,24 +1,11 @@
 import { useEffect, useState, type KeyboardEvent, type CSSProperties } from 'react';
-import { IconCalendarEvent, IconGitBranch, IconMessageCircle2, IconServerCog, IconMailAi, IconFileTypePdf, IconSettings, IconHelpHexagon, IconMoon, IconSun, IconRefresh, IconShieldCheck, IconAlertTriangle, IconChevronLeft, IconTrash, IconActivity, IconPlus, IconMinus, IconX, IconShieldLock } from '@tabler/icons-react';
-import type { ServiceId, Snapshot } from '../shared/contracts';
+import { IconSettings, IconHelpHexagon, IconMoon, IconSun, IconRefresh, IconShieldCheck, IconAlertTriangle, IconChevronLeft, IconTrash, IconActivity, IconPlus, IconMinus, IconX, IconShieldLock, IconLayoutGrid } from '@tabler/icons-react';
+import { CATEGORIES, type ServiceId, type Snapshot } from '../shared/contracts';
 import { SHELL_LAYOUT } from '../shared/layout';
 import { PAGE_ZOOM } from '../shared/zoom';
-import hulyLogo from '../../images/Huly-logo.svg';
-import n8nLogo from '../../images/n8n-logo.svg';
-import amaBotLogo from '../../images/ama-bot-cuadrado.svg';
-import amaAppLogo from '../../images/icon_144x144.png';
-import stirlingLogo from '../../images/stirling.png';
-import amaDigitalLogo from '../../images/AMA-TIME-digital.png';
-import { AmaBot } from './AmaBot';
+import { Launcher } from './Launcher';
+import { ServiceLogo, icons } from './service-visuals';
 
-const icons = { huly: IconCalendarEvent, n8n: IconGitBranch, librechat: IconMessageCircle2, portal: IconServerCog, emailai: IconMailAi, stirling: IconFileTypePdf };
-const sidebarLogos: Record<Exclude<ServiceId, 'emailai'>, string> = { huly: hulyLogo, n8n: n8nLogo, librechat: amaBotLogo, portal: amaAppLogo, stirling: stirlingLogo };
-// LibreChat es el centro de mando; después operación y, al final, automatización/herramientas.
-const sidebarGroups: { label: string; ids: ServiceId[] }[] = [
-  { label: 'Control', ids: ['librechat'] },
-  { label: 'Operación', ids: ['portal', 'huly'] },
-  { label: 'Automatización y herramientas', ids: ['n8n', 'emailai', 'stirling'] },
-];
 const updateLabels = { disabled: 'Las actualizaciones están disponibles en la app instalada de Windows.', idle: 'Puedes buscar una nueva versión.', checking: 'Buscando actualizaciones…', available: 'Hay una nueva versión disponible.', current: 'Tienes la última versión disponible.', downloading: 'Descargando actualización…', downloaded: 'La actualización está lista para instalar.', installing: 'Instalando actualización…', error: 'No se pudo actualizar. Revisa la conexión a GitHub y vuelve a intentar.' };
 const networkLabels: Record<Snapshot['network']['status'], { text: string; tooltip: string }> = {
   checking: { text: 'comprobando', tooltip: 'Comprobando red interna…' },
@@ -49,6 +36,12 @@ export function App() {
   const service = state.services.find(s => s.id === state.active)!;
   const activeTabs = state.tabs.filter(tab => tab.serviceId === state.active);
   const light = state.preferences.theme === 'light';
+  // Fijadas por categoría; la app activa no fijada se muestra mientras está en uso para no perder la navegación.
+  const sidebarGroups = CATEGORIES.map(category => ({
+    label: category.label,
+    ids: state.services.filter(item => item.category === category.id && (state.preferences.pinned.includes(item.id) || item.id === state.active))
+      .sort((a, b) => { const rank = (id: ServiceId) => { const index = state.preferences.pinned.indexOf(id); return index < 0 ? Infinity : index; }; return rank(a.id) - rank(b.id); }),
+  })).filter(group => group.ids.length > 0);
   const activate = (id: ServiceId) => void action(() => window.portal.activate(id));
   const selectTab = (id: string) => void action(() => window.portal.selectTab(id));
   const panel = (value: Snapshot['panel']) => void action(() => window.portal.panel(value));
@@ -74,12 +67,12 @@ export function App() {
 
   return <div className="app-shell" style={{ '--sidebar-width': `${SHELL_LAYOUT.sidebarWidth}px`, '--header-height': `${SHELL_LAYOUT.headerHeight}px` } as CSSProperties}>
     <aside className="sidebar" aria-label="Navegación principal">
-      <div className="brand" title="AMATIME · Portal Operacional"><img className="brand-logo" src={amaDigitalLogo} alt="AMA Time Digital" draggable={false} /></div>
+      <div className="brand"><button className={`nav-item launcher-button ${state.panel === 'launcher' ? 'active' : ''}`} aria-label="Ver todas las aplicaciones" aria-pressed={state.panel === 'launcher'} onClick={() => panel(state.panel === 'launcher' ? 'service' : 'launcher')}><IconLayoutGrid size={24} stroke={1.65} /><span className="nav-tooltip">Aplicaciones</span></button></div>
       <nav className="service-nav" aria-label="Servicios">
         {sidebarGroups.map(group => <div className="nav-group" role="group" aria-label={group.label} key={group.label}>
-        {group.ids.map(id => state.services.find(item => item.id === id)!).map(item => {
+        {group.ids.map(item => {
           return <button key={item.id} className={`nav-item ${state.active === item.id && state.panel === 'service' ? 'active' : ''}`} aria-label={`Abrir ${item.name}`} aria-current={state.active === item.id && state.panel === 'service' ? 'page' : undefined} onClick={() => activate(item.id)}>
-            {item.id === 'librechat' ? <AmaBot className="service-logo service-logo-librechat" /> : item.id === 'emailai' ? <IconMailAi className="service-logo service-logo-emailai" size={26} stroke={1.65} /> : <img className={`service-logo service-logo-${item.id}`} src={sidebarLogos[item.id]} alt="" draggable={false} />}<span className="nav-tooltip">{item.name}</span>
+            <ServiceLogo id={item.id} /><span className="nav-tooltip">{item.name}</span>
             {state.states[item.id].status === 'ready' && <span className="nav-dot" />}
           </button>;
         })}
@@ -124,6 +117,7 @@ export function App() {
     </header>
 
     <main id="service-content" className="content" role="tabpanel" aria-labelledby={state.activeTabId ? `tab-${state.activeTabId}` : undefined}>
+      {state.panel === 'launcher' && <Launcher services={state.services} pinned={state.preferences.pinned} onOpen={activate} onPin={(id, pinned) => void action(() => window.portal.pin(id, pinned))} onClose={() => panel('service')} />}
       {state.panel === 'settings' && <section className="settings-page">
         <button className="back-button" onClick={() => panel('service')}><IconChevronLeft size={17} />Volver al servicio</button>
         <div className="page-heading"><span className="eyebrow">PERSONALIZA TU ESPACIO</span><h1>Preferencias del portal</h1><p>Tu interfaz y tus sesiones. Cada aplicación conserva su propio inicio de sesión.</p></div>

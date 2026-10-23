@@ -17,6 +17,7 @@ const api: PortalApi = {
   panel: panel => command('panel', panel),
   theme: theme => command('theme', theme),
   remember: (id, enabled) => command('remember', id, enabled),
+  pin: (id, pinned) => command('pin', id, pinned),
   clearSession: id => command('clear-session', id),
   onChange: listener => {
     const handler = (_event: Electron.IpcRendererEvent, snapshot: Snapshot) => listener(snapshot);

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { CATEGORIES } from '../../src/shared/contracts';
 import { SERVICES, isServiceId, allowedNavigation, allowedDownload, isPdfUrl, partitionFor, contentBounds, remotePreferences } from '../../src/main/policy';
 
 describe('registro y aislamiento', () => {
@@ -8,6 +9,11 @@ describe('registro y aislamiento', () => {
       'https://172.16.8.73/', 'https://app.amatime.com/',
       'https://email-category-ai.vercel.app/', 'http://172.16.8.73:8080/',
     ]);
+  });
+  it('cada servicio pertenece a una categoría válida y cada categoría tiene servicios', () => {
+    const ids = CATEGORIES.map(c => c.id);
+    for (const service of SERVICES) expect(ids).toContain(service.category);
+    for (const id of ids) expect(SERVICES.some(s => s.category === id)).toBe(true);
   });
   it('solo acepta IDs conocidos, nunca URLs ni propiedades heredadas', () => {
     expect(isServiceId('huly')).toBe(true);

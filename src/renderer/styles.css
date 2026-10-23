@@ -27,7 +27,8 @@ button { transition:background .18s, color .18s, border-color .18s; }
 .app-shell { height:100dvh; display:grid; grid-template-columns:var(--sidebar-width) minmax(0,1fr); grid-template-rows:var(--header-height) minmax(0,1fr); overflow:hidden; }
 .sidebar { grid-row:1 / -1; background:var(--surface); border-right:1px solid var(--line); display:flex; flex-direction:column; z-index:3; }
 .brand { height:64px; flex-shrink:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.5rem; }
-.brand-logo { display:block; width:44px; height:48px; object-fit:contain; }
+.brand .nav-item { height:48px; }
+.launcher-button.active::before { display:none; }
 .service-nav { display:flex; flex-direction:column; padding:.5rem 0; }
 .nav-group { display:flex; flex-direction:column; gap:.375rem; padding:.5rem 0; }
 .nav-group + .nav-group { border-top:1px solid var(--line); margin:0 .75rem; }
@@ -112,3 +113,20 @@ input[type=checkbox] { accent-color:var(--accent); width:1rem; height:1rem; }
 @media (min-width:1100px) { .app-tab { padding:0 .75rem; } }
 @media (min-width:1280px) { .tab-long { display:inline; } .tab-short { display:none; } .header-actions { gap:.6rem; } }
 @media (prefers-reduced-motion:reduce) { *, *::before, *::after { animation:none !important; transition:none !important; } }
+.launcher { min-height:100%; padding:2rem; display:flex; justify-content:center; align-items:flex-start; }
+.launcher-panel { width:100%; max-width:52rem; padding:1.4rem; border-radius:1.1rem; background:var(--glass); border:1px solid var(--line); }
+.launcher-top { display:flex; align-items:center; gap:.6rem; }
+.launcher-search { flex:1; display:flex; align-items:center; gap:.6rem; padding:0 .9rem; height:2.6rem; border-radius:.7rem; border:1px solid var(--line); background:var(--bg); color:var(--soft); }
+.launcher-search input { flex:1; min-width:0; background:transparent; border:0; outline:0; color:var(--text); font-size:.8rem; }
+.launcher-search:focus-within { border-color:var(--teal); }
+.launcher-category h2 { margin:1.6rem 0 .7rem; font-size:.6rem; font-weight:800; letter-spacing:.13em; text-transform:uppercase; color:var(--soft); }
+.launcher-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(13rem,1fr)); gap:.6rem; }
+.launcher-card { position:relative; border-radius:.8rem; border:1px solid var(--line); background:var(--surface); }
+.launcher-card:hover { border-color:#0ea5a050; }
+.launcher-open { display:flex; align-items:center; gap:.8rem; width:100%; padding:.8rem 2.6rem .8rem .8rem; background:transparent; border-radius:.8rem; text-align:left; }
+.launcher-logo { display:grid; place-items:center; width:46px; height:46px; flex-shrink:0; }
+.launcher-name { font-size:.74rem; font-weight:700; }
+.pin-button { position:absolute; top:.5rem; right:.5rem; display:grid; place-items:center; width:1.8rem; height:1.8rem; border-radius:.5rem; background:transparent; color:var(--soft); }
+.pin-button:hover { color:var(--teal); background:#0ea5a010; }
+.pin-button.pinned { color:var(--accent); }
+.launcher-empty { color:var(--muted); font-size:.75rem; margin:1.5rem 0 0; }

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { NetworkMonitor, probeTarget, statusFromProbe } from '../../src/main/network-status';
 import type { Service } from '../../src/shared/contracts';
 
-const huly: Service = { id: 'huly', name: 'Huly Workspace', shortName: 'Huly', url: 'http://172.16.8.73:8087/' };
+const huly: Service = { id: 'huly', name: 'Huly Workspace', shortName: 'Huly', category: 'operacion', url: 'http://172.16.8.73:8087/' };
 
 describe('probeTarget', () => {
   it('derives host and port from the Huly service URL', () => {

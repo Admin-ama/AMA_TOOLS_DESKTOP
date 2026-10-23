@@ -123,9 +123,9 @@ async function createWindow() {
           break;
         }
         case 'panel': {
-          if (!['service', 'settings', 'help'].includes(args[0] as string)) throw new Error('Panel inválido');
+          if (!['service', 'settings', 'help', 'launcher'].includes(args[0] as string)) throw new Error('Panel inválido');
           if (args[0] === 'service') manager.activate(manager.active);
-          else manager.showPanel(args[0] as 'settings' | 'help');
+          else manager.showPanel(args[0] as 'settings' | 'help' | 'launcher');
           break;
         }
         case 'theme': {
@@ -141,6 +141,13 @@ async function createWindow() {
           if (typeof args[1] !== 'boolean') throw new Error('Preferencia inválida');
           await manager.clearSession(serviceId);
           preferences.remember[serviceId] = args[1];
+          await savePreferences(preferencesFile, preferences);
+          break;
+        }
+        case 'pin': {
+          const serviceId = id();
+          if (typeof args[1] !== 'boolean') throw new Error('Preferencia inválida');
+          preferences.pinned = args[1] ? (preferences.pinned.includes(serviceId) ? preferences.pinned : [...preferences.pinned, serviceId]) : preferences.pinned.filter(item => item !== serviceId);
           await savePreferences(preferencesFile, preferences);
           break;
         }

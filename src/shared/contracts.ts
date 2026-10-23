@@ -3,10 +3,18 @@ export type ServiceId = typeof SERVICE_IDS[number];
 export const STARTUP_SERVICE: ServiceId = 'librechat';
 export type Theme = 'dark' | 'light';
 export type PageStatus = 'idle' | 'loading' | 'ready' | 'error';
-export interface Service { id: ServiceId; name: string; shortName: string; url: string; authOrigins?: string[] }
+export const CATEGORIES = [
+  { id: 'control', label: 'Control' },
+  { id: 'operacion', label: 'Operación' },
+  { id: 'automatizacion', label: 'Automatización y herramientas' },
+] as const;
+export type CategoryId = typeof CATEGORIES[number]['id'];
+/** Apps fijadas por defecto: LibreChat es el centro de mando; después operación y herramientas. */
+export const DEFAULT_PINNED: readonly ServiceId[] = ['librechat', 'portal', 'huly', 'n8n', 'emailai', 'stirling'];
+export interface Service { id: ServiceId; name: string; shortName: string; category: CategoryId; url: string; authOrigins?: string[] }
 export interface ServiceState { status: PageStatus; message?: string }
 export interface ApplicationTab { id: string; serviceId: ServiceId; number: number; title: string; state: ServiceState }
-export interface Preferences { theme: Theme; remember: Record<ServiceId, boolean> }
+export interface Preferences { theme: Theme; remember: Record<ServiceId, boolean>; pinned: ServiceId[] }
 export interface UpdateState {
   status: 'disabled' | 'idle' | 'checking' | 'available' | 'current' | 'downloading' | 'downloaded' | 'installing' | 'error';
   currentVersion: string;
@@ -27,7 +35,7 @@ export interface Snapshot {
   tabs: ApplicationTab[];
   states: Record<ServiceId, ServiceState>;
   preferences: Preferences;
-  panel: 'service' | 'settings' | 'help';
+  panel: 'service' | 'settings' | 'help' | 'launcher';
 }
 export interface PortalApi {
   snapshot(): Promise<Snapshot>;
@@ -45,6 +53,7 @@ export interface PortalApi {
   panel(panel: Snapshot['panel']): Promise<void>;
   theme(theme: Theme): Promise<void>;
   remember(id: ServiceId, enabled: boolean): Promise<void>;
+  pin(id: ServiceId, pinned: boolean): Promise<void>;
   clearSession(id: ServiceId): Promise<void>;
   onChange(listener: (snapshot: Snapshot) => void): () => void;
   /** Cursor position in shell coordinates, also while hovering a remote service view. */
