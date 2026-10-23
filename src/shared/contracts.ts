@@ -14,7 +14,11 @@ export const DEFAULT_PINNED: readonly ServiceId[] = ['librechat', 'portal', 'hul
 export interface Service { id: ServiceId; name: string; shortName: string; category: CategoryId; url: string; authOrigins?: string[] }
 export interface ServiceState { status: PageStatus; message?: string }
 export interface ApplicationTab { id: string; serviceId: ServiceId; number: number; title: string; state: ServiceState }
-export interface Preferences { theme: Theme; remember: Record<ServiceId, boolean>; pinned: ServiceId[] }
+export interface DesktopApp { id: string; name: string; path: string }
+/** Lo único que ve el renderer de una app de escritorio: nunca la ruta. */
+export interface DesktopAppView { id: string; name: string; icon?: string }
+export interface Preferences { theme: Theme; remember: Record<ServiceId, boolean>; pinned: ServiceId[]; desktopApps: DesktopApp[] }
+export type PublicPreferences = Omit<Preferences, 'desktopApps'>;
 export interface UpdateState {
   status: 'disabled' | 'idle' | 'checking' | 'available' | 'current' | 'downloading' | 'downloaded' | 'installing' | 'error';
   currentVersion: string;
@@ -34,7 +38,8 @@ export interface Snapshot {
   zoomPercent: number;
   tabs: ApplicationTab[];
   states: Record<ServiceId, ServiceState>;
-  preferences: Preferences;
+  preferences: PublicPreferences;
+  desktopApps: DesktopAppView[];
   panel: 'service' | 'settings' | 'help' | 'launcher';
 }
 export interface PortalApi {
@@ -45,6 +50,9 @@ export interface PortalApi {
   closeTab(id: string): Promise<void>;
   reload(): Promise<void>;
   openForticlient(): Promise<void>;
+  addDesktopApp(): Promise<void>;
+  openDesktopApp(id: string): Promise<void>;
+  removeDesktopApp(id: string): Promise<void>;
   zoom(percent: number): Promise<void>;
   checkUpdates(): Promise<void>;
   downloadUpdate(): Promise<void>;

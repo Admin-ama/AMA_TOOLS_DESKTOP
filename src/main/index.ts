@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { app, BrowserWindow, ipcMain, protocol, nativeTheme, Menu, dialog, screen, shell } from 'electron';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
@@ -17,6 +18,7 @@ import { EventEmitter } from 'node:events';
 import { windowsAppDetails } from './windows-identity';
 import { NetworkMonitor, probeTarget, tcpProbe } from './network-status';
 import { FortiClientLauncher, forticlientCandidates } from './forticlient';
+import { DesktopApps } from './desktop-apps';
 import { commandAllowedWhileBlocked, BLOCKED_MESSAGE } from './network-gate';
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
@@ -54,7 +56,18 @@ async function createWindow() {
   const notice = new UpdateNoticeWindow(window, () => updates.snooze());
   let network: NetworkMonitor;
   const forticlient = new FortiClientLauncher({ candidates: forticlientCandidates(), exists: existsSync, open: file => shell.openPath(file), log: (message, detail) => console.error(message, detail) });
-  const snapshot = () => ({ ...manager.snapshot(), updates: updates.snapshot, network: { status: network.status, forticlient: forticlient.available } });
+  const desktopApps = new DesktopApps(preferences, {
+    pickFile: async () => {
+      const result = await dialog.showOpenDialog(window, { title: 'Vincular aplicación de escritorio', properties: ['openFile'], filters: [{ name: 'Aplicaciones y accesos directos', extensions: ['exe', 'lnk', 'url'] }] });
+      return result.canceled ? undefined : result.filePaths[0];
+    },
+    open: file => shell.openPath(file),
+    icon: async file => (await app.getFileIcon(file, { size: 'normal' })).toDataURL(),
+    save: next => savePreferences(preferencesFile, next),
+    id: () => randomUUID(),
+    log: (message, detail) => console.error(message, detail),
+  });
+  const snapshot = () => ({ ...manager.snapshot(), updates: updates.snapshot, network: { status: network.status, forticlient: forticlient.available }, desktopApps: desktopApps.views() });
   const publish = () => {
     if (!window.isDestroyed()) {
       const state = snapshot();
@@ -115,6 +128,9 @@ async function createWindow() {
           break;
         }
         case 'open-forticlient': await forticlient.open(...args); break;
+        case 'add-desktop-app': await desktopApps.add(...args); break;
+        case 'open-desktop-app': await desktopApps.open(args[0], ...args.slice(1)); break;
+        case 'remove-desktop-app': await desktopApps.remove(args[0], ...args.slice(1)); break;
         case 'check-updates': await updates.check(); break;
         case 'download-update':
           if (updates.snapshot.status !== 'available') throw new Error('No hay actualización para descargar');
@@ -181,6 +197,7 @@ async function createWindow() {
   window.on('closed', () => ipcMain.removeHandler('portal:command'));
   window.once('ready-to-show', () => window.show());
   await window.loadURL('app://bundle/index.html');
+  void desktopApps.warm().then(publish);
   network.start();
 }
 

@@ -5,10 +5,10 @@ import path from 'node:path';
 
 describe('preferencias sin secretos', () => {
   it('usa tema oscuro y particiones persistentes por defecto', () => {
-    expect(normalizePreferences(null)).toEqual({ theme: 'dark', remember: { huly: true, n8n: true, librechat: true, portal: true, emailai: true, stirling: true }, pinned: ['librechat', 'portal', 'huly', 'n8n', 'emailai', 'stirling'] });
+    expect(normalizePreferences(null)).toEqual({ theme: 'dark', remember: { huly: true, n8n: true, librechat: true, portal: true, emailai: true, stirling: true }, pinned: ['librechat', 'portal', 'huly', 'n8n', 'emailai', 'stirling'], desktopApps: [] });
   });
   it('acepta solo valores booleanos y temas conocidos', () => {
-    expect(normalizePreferences({ theme: 'light', remember: { huly: false, n8n: 'false' }, password: 'secret' })).toEqual({ theme: 'light', remember: { huly: false, n8n: true, librechat: true, portal: true, emailai: true, stirling: true }, pinned: ['librechat', 'portal', 'huly', 'n8n', 'emailai', 'stirling'] });
+    expect(normalizePreferences({ theme: 'light', remember: { huly: false, n8n: 'false' }, password: 'secret' })).toEqual({ theme: 'light', remember: { huly: false, n8n: true, librechat: true, portal: true, emailai: true, stirling: true }, pinned: ['librechat', 'portal', 'huly', 'n8n', 'emailai', 'stirling'], desktopApps: [] });
     expect(normalizePreferences({ theme: 'injected' }).theme).toBe('dark');
   });
   it('filtra apps fijadas inválidas y duplicadas, conservando el orden', () => {
@@ -17,6 +17,24 @@ describe('preferencias sin secretos', () => {
   it('permite no fijar ninguna app y cae al valor por defecto si el campo no es una lista', () => {
     expect(normalizePreferences({ pinned: [] }).pinned).toEqual([]);
     expect(normalizePreferences({ pinned: 'huly' }).pinned).toEqual(['librechat', 'portal', 'huly', 'n8n', 'emailai', 'stirling']);
+  });
+});
+
+describe('apps de escritorio en preferencias', () => {
+  const abs = 'C:\\Tools\\a.exe';
+  it('arranca vacío', () => { expect(normalizePreferences(null).desktopApps).toEqual([]); });
+  it('conserva entradas válidas y descarta forma inválida, rutas relativas y ids repetidos', () => {
+    const result = normalizePreferences({ desktopApps: [
+      { id: 'a', name: ' Excel ', path: abs, extra: 'x' }, { id: 'a', name: 'Dup', path: abs },
+      { id: '', name: 'Sin id', path: abs }, { id: 'b', name: '', path: abs }, { id: 'c', name: 'Rel', path: 'a.exe' },
+      { id: 'd', name: 'Num', path: 3 }, null, 'x',
+    ] }).desktopApps;
+    expect(result).toEqual([{ id: 'a', name: 'Excel', path: abs }]);
+  });
+  it('limita a 20 apps y exige lista', () => {
+    const many = Array.from({ length: 30 }, (_, i) => ({ id: `i${i}`, name: `n${i}`, path: abs }));
+    expect(normalizePreferences({ desktopApps: many }).desktopApps).toHaveLength(20);
+    expect(normalizePreferences({ desktopApps: 'x' }).desktopApps).toEqual([]);
   });
 });
 

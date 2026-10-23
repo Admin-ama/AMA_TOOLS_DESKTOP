@@ -1,7 +1,7 @@
 import { test, expect, _electron as electron, type ElectronApplication, type Page } from '@playwright/test';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -229,7 +229,8 @@ test('launcher agrupa por categorías, fija y desfija apps y abre apps no fijada
 });
 
 test('navegación compacta alinea shell y vista nativa', async () => {
-  await expect.poll(() => page.getByRole('complementary').evaluate(el => el.getBoundingClientRect().width)).toBe(64);
+  await expect.poll(() => page.getByRole('complementary', { name: 'Navegación principal' }).evaluate(el => el.getBoundingClientRect().width)).toBe(64);
+  await expect.poll(() => page.getByRole('complementary', { name: 'Aplicaciones de escritorio' }).evaluate(el => el.getBoundingClientRect().width)).toBe(56);
   await expect.poll(() => page.getByRole('banner').evaluate(el => el.getBoundingClientRect().height)).toBe(52);
   const content = await page.getByRole('tabpanel').boundingBox();
   const view = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children.find(v => v.getVisible())!.getBounds());
@@ -237,6 +238,45 @@ test('navegación compacta alinea shell y vista nativa', async () => {
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(900, 600));
   await expect(page.getByRole('button', { name: 'Abrir nueva pestaña de Huly' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Recargar servicio' })).toBeVisible();
+});
+
+test('apps de escritorio: vincular con diálogo del proceso principal, abrir por id sin exponer rutas y quitar', async () => {
+  const exe = path.join(directory, 'Fake Tool.exe');
+  await writeFile(exe, 'MZ');
+  // El diálogo y shell.openPath se sustituyen en main: no se abre nada real.
+  await app.evaluate(({ dialog, shell }, file) => {
+    const state = globalThis as unknown as { opened: string[] };
+    state.opened = [];
+    dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [file] })) as never;
+    shell.openPath = (async (target: string) => { state.opened.push(target); return ''; }) as never;
+  }, exe);
+  const dock = page.getByRole('complementary', { name: 'Aplicaciones de escritorio' });
+  await expect(dock).toBeVisible();
+  await dock.getByRole('button', { name: 'Vincular aplicación de escritorio' }).click();
+  const item = dock.getByRole('button', { name: 'Abrir Fake Tool (escritorio)' });
+  await expect(item).toBeVisible();
+  // Ni el snapshot ni el DOM conocen la ruta; solo el archivo de preferencias del proceso principal.
+  const snapshot = JSON.stringify(await page.evaluate(() => window.portal.snapshot()));
+  expect(snapshot).not.toContain('amatime-e2e-');
+  expect(snapshot).toContain('Fake Tool');
+  expect(await page.evaluate(() => document.documentElement.innerHTML)).not.toContain('amatime-e2e-');
+  const preferencesFile = path.join(directory, 'data', 'preferences.json');
+  expect(JSON.parse(await readFile(preferencesFile, 'utf8')).desktopApps).toMatchObject([{ name: 'Fake Tool', path: exe }]);
+  // Abrir: main resuelve la ruta por id.
+  await item.click();
+  await expect.poll(() => app.evaluate(() => (globalThis as unknown as { opened: string[] }).opened)).toEqual([exe]);
+  const rejected = await page.evaluate(async (file) => {
+    const results = [];
+    for (const task of [() => window.portal.openDesktopApp('desconocido'), () => window.portal.openDesktopApp(file), () => (window.portal.openDesktopApp as (...args: unknown[]) => Promise<void>)('x', '--flag'), () => window.portal.removeDesktopApp(file)]) { try { await task(); results.push(false); } catch { results.push(true); } }
+    return results;
+  }, exe);
+  expect(rejected).toEqual([true, true, true, true]);
+  expect(await app.evaluate(() => (globalThis as unknown as { opened: string[] }).opened)).toEqual([exe]);
+  // Quitar con clic derecho.
+  await item.click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Quitar Fake Tool de la barra' }).click();
+  await expect(item).toHaveCount(0);
+  expect(JSON.parse(await readFile(preferencesFile, 'utf8')).desktopApps).toEqual([]);
 });
 
 test('ojos del bot siguen el cursor aunque esté sobre la vista remota', async () => {
@@ -366,7 +406,7 @@ test('cambiar pestañas preserva contexto y ajusta límites al redimensionar', a
   const value = await app.evaluate(async ({ webContents }) => webContents.getAllWebContents().find(w => w.getURL().includes('/huly'))!.executeJavaScript("document.querySelector('input').value"));
   expect(value).toBe('contexto preservado');
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1000, 700));
-  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children[0].getBounds())).toEqual({ x: 64, y: 52, width: 936, height: 648 });
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children[0].getBounds())).toEqual({ x: 64, y: 52, width: 880, height: 648 });
 });
 
 test('sin red interna bloquea los servicios, rechaza comandos y se recupera al reintentar', async ({}, testInfo) => {
@@ -449,7 +489,7 @@ test('carga directa sin tarjetas, formularios ni gates intermedios', async () =>
     const window = BrowserWindow.getAllWindows()[0];
     return { visible: window.contentView.children.filter(view => view.getVisible()).map(view => view.getBounds()), size: window.getContentSize() };
   });
-  expect(visible).toEqual([{ x: 64, y: 52, width: size[0] - 64, height: size[1] - 52 }]);
+  expect(visible).toEqual([{ x: 64, y: 52, width: size[0] - 64 - 56, height: size[1] - 52 }]);
 });
 
 test('barra superior agrupa múltiples pestañas de la aplicación seleccionada', async ({}, testInfo) => {

@@ -21,8 +21,10 @@ export class ServiceViewManager {
     window.on('resize', () => this.resize());
   }
 
-  snapshot(): Omit<Snapshot, 'updates' | 'network'> {
-    return { services: this.services, active: this.active, activeTabId: this.tabs.activeTabId, zoomPercent: this.zoomLevels.get(this.active) ?? PAGE_ZOOM.default, tabs: this.tabs.all, states: this.tabs.serviceStates(), preferences: this.preferences, panel: this.panel };
+  snapshot(): Omit<Snapshot, 'updates' | 'network' | 'desktopApps'> {
+    // Las rutas de las apps de escritorio nunca salen del proceso principal.
+    const { desktopApps: _paths, ...preferences } = this.preferences;
+    return { services: this.services, active: this.active, activeTabId: this.tabs.activeTabId, zoomPercent: this.zoomLevels.get(this.active) ?? PAGE_ZOOM.default, tabs: this.tabs.all, states: this.tabs.serviceStates(), preferences, panel: this.panel };
   }
 
   private update(id: string, state: ServiceState) {
