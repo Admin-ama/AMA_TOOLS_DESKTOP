@@ -38,7 +38,8 @@ export class ApplicationTabs {
     return tab;
   }
 
-  close(id: string): void {
+  /** `fallback`: app a la que volver si se cierra la última pestaña (apps no fijadas); sin ella se abre una pestaña nueva. */
+  close(id: string, fallback?: ServiceId): void {
     const tab = this.items.find(item => item.id === id);
     if (!tab || tab.serviceId !== this.active) throw new Error('Pestaña inválida para esta aplicación');
     const peers = this.items.filter(item => item.serviceId === tab.serviceId);
@@ -46,7 +47,8 @@ export class ApplicationTabs {
     this.items = this.items.filter(item => item.id !== id);
     if (peers.length === 1) {
       this.selection.delete(tab.serviceId);
-      this.open(tab.serviceId);
+      if (fallback && fallback !== tab.serviceId) this.switchApplication(fallback);
+      else this.open(tab.serviceId);
     } else if (this.selection.get(tab.serviceId) === id) {
       this.selection.set(tab.serviceId, (peers[index - 1] ?? peers[index + 1]).id);
     }

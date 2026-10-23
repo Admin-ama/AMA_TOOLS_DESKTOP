@@ -84,7 +84,9 @@ export class ServiceViewManager {
   }
 
   closeTab(id: string) {
-    this.tabs.close(id); // Validar antes de destruir una vista.
+    // App no fijada: cerrar su última pestaña la cierra, como en una barra de tareas.
+    const fallback = this.preferences.pinned.includes(this.tabs.active) ? undefined : this.preferences.pinned[0];
+    this.tabs.close(id, fallback); // Validar antes de destruir una vista.
     this.destroyView(id);
     this.ensureView(this.tabs.current);
     this.visibility();

@@ -51,6 +51,22 @@ describe('pestañas por aplicación', () => {
     expect(tabs.activeTabId).not.toBe(first.id);
     expect(tabs.current.serviceId).toBe('huly');
   });
+  it('cerrar la última de una app no fijada cierra la app y vuelve a la indicada', () => {
+    const tabs = new ApplicationTabs();
+    const huly = tabs.switchApplication('huly');
+    const n8n = tabs.switchApplication('n8n');
+    tabs.close(n8n.id, 'huly');
+    expect(tabs.all.map(tab => tab.serviceId)).not.toContain('n8n');
+    expect(tabs.active).toBe('huly');
+    expect(tabs.activeTabId).toBe(huly.id);
+  });
+  it('ignora una app de regreso igual a la que se cierra', () => {
+    const tabs = new ApplicationTabs();
+    const first = tabs.switchApplication('huly');
+    tabs.close(first.id, 'huly');
+    expect(tabs.current.serviceId).toBe('huly');
+    expect(tabs.activeTabId).not.toBe(first.id);
+  });
   it('no acepta pestañas inexistentes ni selecciona otra aplicación desde su barra', () => {
     const tabs = new ApplicationTabs();
     const huly = tabs.switchApplication('huly');

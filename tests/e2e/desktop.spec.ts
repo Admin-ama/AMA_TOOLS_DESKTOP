@@ -216,8 +216,12 @@ test('launcher agrupa por categorías, fija y desfija apps y abre apps no fijada
   await expect(launcher).toHaveCount(0);
   await expect(nav.getByRole('button', { name: 'Abrir n8n Automations' })).toBeVisible();
   await waitForPage();
-  // Al cambiar de app, la no fijada deja de mostrarse.
+  // Como en una barra de tareas: la no fijada sigue visible mientras tenga pestañas abiertas.
   await page.getByRole('button', { name: 'Abrir Huly Workspace', exact: true }).click();
+  await expect(nav.getByRole('button', { name: 'Abrir n8n Automations' })).toBeVisible();
+  await nav.getByRole('button', { name: 'Abrir n8n Automations' }).click();
+  await expect(page.getByTestId('n8n-tab-1')).toHaveAttribute('aria-selected', 'true');
+  await page.getByTestId('close-n8n-tab-1').click();
   await expect(nav.getByRole('button', { name: 'Abrir n8n Automations' })).toHaveCount(0);
   // IPC: ids y valores inválidos rechazados.
   const rejected = await page.evaluate(async () => {

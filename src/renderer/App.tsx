@@ -35,10 +35,10 @@ export function App() {
   const activeTabs = state.tabs.filter(tab => tab.serviceId === state.active);
   const light = state.preferences.theme === 'light';
   const blocked = state.network.status !== 'connected';
-  // Fijadas por categoría; la app activa no fijada se muestra mientras está en uso para no perder la navegación.
+  // Fijadas por categoría; como en una barra de tareas, una app no fijada se muestra mientras tenga pestañas abiertas.
   const sidebarGroups = CATEGORIES.map(category => ({
     label: category.label,
-    ids: state.services.filter(item => item.category === category.id && (state.preferences.pinned.includes(item.id) || item.id === state.active))
+    ids: state.services.filter(item => item.category === category.id && (state.preferences.pinned.includes(item.id) || item.id === state.active || state.tabs.some(tab => tab.serviceId === item.id)))
       .sort((a, b) => { const rank = (id: ServiceId) => { const index = state.preferences.pinned.indexOf(id); return index < 0 ? Infinity : index; }; return rank(a.id) - rank(b.id); }),
   })).filter(group => group.ids.length > 0);
   const activate = (id: ServiceId) => void action(() => window.portal.activate(id));
