@@ -78,5 +78,9 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/Admin-ama/AMA_TOOLS_DESKTOP.git"
+  },
+  "dependencies": {
+    "@gsap/react": "^2.1.2",
+    "gsap": "^3.15.0"
   }
 }

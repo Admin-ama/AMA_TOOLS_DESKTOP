@@ -232,6 +232,25 @@ test('launcher agrupa por categorías, fija y desfija apps y abre apps no fijada
   expect(rejected).toEqual([true, true]);
 });
 
+test('launcher anima entrada y salida y respeta reducir movimiento', async () => {
+  const button = page.getByRole('button', { name: 'Ver todas las aplicaciones', exact: true });
+  const launcher = page.getByRole('region', { name: 'Todas las aplicaciones' });
+  const opacity = () => launcher.locator('.launcher-panel').evaluate(el => getComputedStyle(el).opacity);
+  await button.click();
+  await expect.poll(() => page.evaluate(() => document.querySelector('.launcher-panel')?.getAnimations?.().length ?? 0)).toBe(0);
+  const animated = await page.evaluate(() => (window as any).gsap === undefined && document.querySelector('.launcher-panel')!.hasAttribute('style'));
+  expect(animated).toBe(true);
+  await expect.poll(opacity).toBe('1');
+  await page.keyboard.press('Escape');
+  await expect(launcher).toHaveCount(0);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await button.click();
+  expect(await opacity()).toBe('1');
+  await expect(launcher.locator('.launcher-card').first()).toHaveCSS('opacity', '1');
+  await page.keyboard.press('Escape');
+  await expect(launcher).toHaveCount(0);
+});
+
 test('navegación compacta alinea shell y vista nativa', async () => {
   await expect.poll(() => page.getByRole('complementary', { name: 'Navegación principal' }).evaluate(el => el.getBoundingClientRect().width)).toBe(64);
   await expect.poll(() => page.getByRole('complementary', { name: 'Aplicaciones de escritorio' }).evaluate(el => el.getBoundingClientRect().width)).toBe(56);
