@@ -236,7 +236,9 @@ test('pestañas muestran el título real y siguen cambios dinámicos de la pági
 test('header sin estado de carga ni indicador HTTP', async () => {
   slowDocument = true;
   await switchApplication('n8n Automations', 'n8n 1');
-  await expect(page.getByRole('banner').getByRole('status')).toHaveCount(0);
+  // El único status del header es el indicador de red interna (no hay estado de carga).
+  await expect(page.getByRole('banner').getByRole('status').filter({ hasNotText: 'Red interna' })).toHaveCount(0);
+  await expect(page.getByRole('banner').getByRole('status', { name: /^Red interna/ })).toHaveCount(1);
   await expect(page.getByLabel('Conexión HTTP sin cifrado')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Recargar servicio' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Cambiar a tema claro' })).toBeVisible();

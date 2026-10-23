@@ -9,6 +9,11 @@ La marca superior usa `AMA-TIME-digital.png`, sin el icono de cuadrícula anteri
 
 En el header, **− / porcentaje / +** ajusta el zoom de la aplicación entre 50% y 200%. Haz clic en el porcentaje para volver al 100%. Cada aplicación mantiene su zoom durante la ejecución y lo comparte entre sus pestañas; la interfaz del escritorio no cambia de tamaño.
 
+A la izquierda del zoom, el header muestra el indicador **Red interna** y, si está instalado, el botón de **FortiClient**:
+
+- **Red interna** significa que el equipo alcanza por TCP el servidor interno (host y puerto de Huly en `src/main/policy.ts`, hoy `172.16.8.73:8087`), ya sea por la LAN de la oficina o por VPN. Verde: disponible. Rojo: sin acceso; conéctate a la VPN con FortiClient. Gris: comprobando. Se comprueba al iniciar, cada 15 s, al recuperar el foco de la ventana y al recargar el servicio (timeout de 3 s). Solo mide alcance de red, no que los servicios estén operativos ni que haya sesión iniciada.
+- **Abrir FortiClient** (icono de escudo) aparece solo si existe `FortiClient.exe` en `C:\Program Files\Fortinet\FortiClient\` o `C:\Program Files (x86)\Fortinet\FortiClient\` (también la edición VPN independiente). La ruta la decide el proceso principal; la interfaz solo puede pedir "abrir FortiClient", nunca una ruta. Si no se puede abrir, se registra el error y la app sigue funcionando. No se muestra el logo de Fortinet.
+
 La navegación compacta usa sidebar de 64 px y barra superior de 52 px; sus medidas y las vistas nativas se coordinan en `src/shared/layout.ts`. El logo de n8n se carga desde `n8n-logo.svg` (el archivo suministrado como `.png` contenía SVG).
 
 ## Ejecutar
@@ -71,6 +76,8 @@ Las direcciones se definen en [`src/main/policy.ts`](src/main/policy.ts). Editar
 | `src/main/service-view-manager.ts` | `WebContentsView`, navegación, carga, errores, sesiones y limpieza |
 | `src/main/application-tabs.ts` | Pestañas por aplicación, selección recordada, apertura y cierre |
 | `src/main/policy.ts` | Destinos, IDs, aislamiento y geometría del contenido |
+| `src/main/network-status.ts` | Sondeo TCP periódico de la red interna; notifica solo cambios |
+| `src/main/forticlient.ts` | Resolución de `FortiClient.exe` y lanzamiento de la única acción permitida |
 | `src/main/preferences.ts` | Preferencias locales sin secretos, escritura atómica |
 | `src/preload/index.ts` | Puente tipado y limitado, solo para el shell |
 | `src/renderer/` | Interfaz React, CSS y recursos locales |

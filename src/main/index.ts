@@ -1,4 +1,5 @@
-import { app, BrowserWindow, ipcMain, protocol, nativeTheme, Menu, dialog, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, protocol, nativeTheme, Menu, dialog, screen, shell } from 'electron';
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { SERVICES, isServiceId } from './policy';
@@ -14,6 +15,8 @@ import { UpdateController, type UpdateBackend } from './update-controller';
 import { UpdateNoticeWindow, UPDATE_NOTICE_URL } from './update-notice';
 import { EventEmitter } from 'node:events';
 import { windowsAppDetails } from './windows-identity';
+import { NetworkMonitor, probeTarget, tcpProbe } from './network-status';
+import { FortiClientLauncher, forticlientCandidates } from './forticlient';
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 const taskbarDetails = windowsAppDetails(app.isPackaged, process.execPath, app.getAppPath(), process.resourcesPath, path.join(__dirname, '../assets/amatime.ico'));
@@ -48,7 +51,9 @@ async function createWindow() {
   window.webContents.on('zoom-changed', () => window.webContents.setZoomFactor(1));
   let updates: UpdateController;
   const notice = new UpdateNoticeWindow(window, () => updates.snooze());
-  const snapshot = () => ({ ...manager.snapshot(), updates: updates.snapshot });
+  let network: NetworkMonitor;
+  const forticlient = new FortiClientLauncher({ candidates: forticlientCandidates(), exists: existsSync, open: file => shell.openPath(file), log: (message, detail) => console.error(message, detail) });
+  const snapshot = () => ({ ...manager.snapshot(), updates: updates.snapshot, network: { status: network.status, forticlient: forticlient.available } });
   const publish = () => {
     if (!window.isDestroyed()) {
       const state = snapshot();
@@ -65,6 +70,8 @@ async function createWindow() {
   const manager = new ServiceViewManager(window, services, preferences, () => {
     publish();
   });
+  const target = probeTarget(services);
+  network = new NetworkMonitor({ probe: () => tcpProbe(target.host, target.port), onChange: publish });
   // Only unpackaged, explicitly opted-in tests can use this offline updater.
   const testUpdates = testing && process.env.AMA_TEST_UPDATES === '1';
   const backend: UpdateBackend = testUpdates ? Object.assign(new EventEmitter(), {
@@ -90,7 +97,8 @@ async function createWindow() {
         case 'new-tab': manager.openTab(); break;
         case 'select-tab': manager.selectTab(tabId()); break;
         case 'close-tab': manager.closeTab(tabId()); break;
-        case 'reload': manager.reload(); break;
+        case 'reload': manager.reload(); void network.check(); break;
+        case 'open-forticlient': await forticlient.open(...args); break;
         case 'check-updates': await updates.check(); break;
         case 'download-update':
           if (updates.snapshot.status !== 'available') throw new Error('No hay actualización para descargar');
@@ -145,11 +153,13 @@ async function createWindow() {
     queue = result.catch(() => undefined);
     return result;
   });
-  window.on('close', () => { cursor.dispose(); clearTimeout(initialCheck); clearInterval(periodicCheck); if (testUpdates) (app as EventEmitter).removeListener('ama:test-update', testUpdate); notice.dispose(); updates.dispose(); manager.dispose(); });
+  window.on('focus', () => void network.check());
+  window.on('close', () => { network.dispose(); cursor.dispose(); clearTimeout(initialCheck); clearInterval(periodicCheck); if (testUpdates) (app as EventEmitter).removeListener('ama:test-update', testUpdate); notice.dispose(); updates.dispose(); manager.dispose(); });
   window.on('closed', () => ipcMain.removeHandler('portal:command'));
   window.once('ready-to-show', () => window.show());
   await window.loadURL('app://bundle/index.html');
   manager.activate(STARTUP_SERVICE);
+  network.start();
 }
 
 void app.whenReady().then(async () => {

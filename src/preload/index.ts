@@ -8,6 +8,7 @@ const api: PortalApi = {
   selectTab: id => command('select-tab', id),
   closeTab: id => command('close-tab', id),
   reload: () => command('reload'),
+  openForticlient: () => command('open-forticlient'),
   zoom: percent => command('zoom', percent),
   checkUpdates: () => command('check-updates'),
   downloadUpdate: () => command('download-update'),

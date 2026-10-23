@@ -19,7 +19,7 @@ export class ServiceViewManager {
     window.on('resize', () => this.resize());
   }
 
-  snapshot(): Omit<Snapshot, 'updates'> {
+  snapshot(): Omit<Snapshot, 'updates' | 'network'> {
     return { services: this.services, active: this.active, activeTabId: this.tabs.activeTabId, zoomPercent: this.zoomLevels.get(this.active) ?? PAGE_ZOOM.default, tabs: this.tabs.all, states: this.tabs.serviceStates(), preferences: this.preferences, panel: this.panel };
   }
 

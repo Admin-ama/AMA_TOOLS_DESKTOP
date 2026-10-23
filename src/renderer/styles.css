@@ -68,6 +68,11 @@ button { transition:background .18s, color .18s, border-color .18s; }
 .app-tab span { max-width:14rem; overflow:hidden; text-overflow:ellipsis; }
 .tab-long { display:none; }
 .header-actions { display:flex; align-items:center; gap:.35rem; flex-shrink:0; -webkit-app-region:no-drag; }
+.network-status { display:flex; align-items:center; gap:.4rem; height:28px; padding:0 .55rem; border:1px solid var(--line); border-radius:.6rem; color:var(--muted); font-size:.65rem; white-space:nowrap; cursor:default; }
+.network-dot { width:7px; height:7px; border-radius:50%; background:var(--soft); }
+.network-status.connected .network-dot { background:var(--accent); }
+.network-status.disconnected { color:var(--danger); }
+.network-status.disconnected .network-dot { background:var(--danger); }
 .zoom-control { display:flex; align-items:center; gap:1px; border:1px solid var(--line); border-radius:.6rem; padding:1px; }
 .zoom-control .icon-button { width:25px; height:28px; }
 .zoom-percent { min-width:43px; height:28px; padding:0 3px; background:transparent; color:var(--muted); font-size:.65rem; font-variant-numeric:tabular-nums; border-radius:.35rem; }

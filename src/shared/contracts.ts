@@ -14,8 +14,12 @@ export interface UpdateState {
   progress?: number;
   noticeVisible?: boolean;
 }
+/** Alcance TCP a los servicios internos (LAN o VPN). */
+export type NetworkStatus = 'checking' | 'connected' | 'disconnected';
+export interface NetworkState { status: NetworkStatus; forticlient: boolean }
 export interface Snapshot {
   updates: UpdateState;
+  network: NetworkState;
   services: Service[];
   active: ServiceId;
   activeTabId: string | null;
@@ -32,6 +36,7 @@ export interface PortalApi {
   selectTab(id: string): Promise<void>;
   closeTab(id: string): Promise<void>;
   reload(): Promise<void>;
+  openForticlient(): Promise<void>;
   zoom(percent: number): Promise<void>;
   checkUpdates(): Promise<void>;
   downloadUpdate(): Promise<void>;

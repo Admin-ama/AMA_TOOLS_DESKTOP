@@ -1,5 +1,5 @@
 import { useEffect, useState, type KeyboardEvent, type CSSProperties } from 'react';
-import { IconCalendarEvent, IconGitBranch, IconMessageCircle2, IconServerCog, IconMailAi, IconFileTypePdf, IconSettings, IconHelpHexagon, IconMoon, IconSun, IconRefresh, IconShieldCheck, IconAlertTriangle, IconChevronLeft, IconTrash, IconActivity, IconPlus, IconMinus, IconX } from '@tabler/icons-react';
+import { IconCalendarEvent, IconGitBranch, IconMessageCircle2, IconServerCog, IconMailAi, IconFileTypePdf, IconSettings, IconHelpHexagon, IconMoon, IconSun, IconRefresh, IconShieldCheck, IconAlertTriangle, IconChevronLeft, IconTrash, IconActivity, IconPlus, IconMinus, IconX, IconShieldLock } from '@tabler/icons-react';
 import type { ServiceId, Snapshot } from '../shared/contracts';
 import { SHELL_LAYOUT } from '../shared/layout';
 import { PAGE_ZOOM } from '../shared/zoom';
@@ -20,6 +20,11 @@ const sidebarGroups: { label: string; ids: ServiceId[] }[] = [
   { label: 'Automatización y herramientas', ids: ['n8n', 'emailai', 'stirling'] },
 ];
 const updateLabels = { disabled: 'Las actualizaciones están disponibles en la app instalada de Windows.', idle: 'Puedes buscar una nueva versión.', checking: 'Buscando actualizaciones…', available: 'Hay una nueva versión disponible.', current: 'Tienes la última versión disponible.', downloading: 'Descargando actualización…', downloaded: 'La actualización está lista para instalar.', installing: 'Instalando actualización…', error: 'No se pudo actualizar. Revisa la conexión a GitHub y vuelve a intentar.' };
+const networkLabels: Record<Snapshot['network']['status'], { text: string; tooltip: string }> = {
+  checking: { text: 'comprobando', tooltip: 'Comprobando red interna…' },
+  connected: { text: 'disponible', tooltip: 'Red interna disponible (LAN o VPN)' },
+  disconnected: { text: 'sin acceso', tooltip: 'Sin acceso a la red interna. Conéctate a la VPN con FortiClient.' },
+};
 
 export function App() {
   const [state, setState] = useState<Snapshot>();
@@ -104,6 +109,10 @@ export function App() {
       <button className="icon-button new-tab" aria-label={`Abrir nueva pestaña de ${service.shortName}`} title={`Abrir nueva pestaña de ${service.shortName}`} onClick={() => void action(() => window.portal.openTab())}><IconPlus size={19} /></button>
       </div>
       <div className="header-actions">
+        <div className={`network-status ${state.network.status}`} role="status" aria-label={`Red interna: ${networkLabels[state.network.status].text}`} title={networkLabels[state.network.status].tooltip}>
+          <span className="network-dot" aria-hidden="true" /><span className="network-label">Red interna</span>
+        </div>
+        {state.network.forticlient && <button className="icon-button" aria-label="Abrir FortiClient" title="Abrir FortiClient" onClick={() => void action(() => window.portal.openForticlient())}><IconShieldLock size={19} /></button>}
         <div className="zoom-control" role="group" aria-label="Zoom de la aplicación">
           <button className="icon-button" aria-label="Reducir zoom" title="Reducir zoom" disabled={state.panel !== 'service' || state.zoomPercent <= PAGE_ZOOM.min} onClick={() => void action(() => window.portal.zoom(Math.max(PAGE_ZOOM.min, state.zoomPercent - PAGE_ZOOM.step)))}><IconMinus size={15} /></button>
           <button className="zoom-percent" aria-label="Restablecer zoom" title="Restablecer zoom al 100%" disabled={state.panel !== 'service'} onClick={() => void action(() => window.portal.zoom(PAGE_ZOOM.default))}>{state.zoomPercent}%</button>
