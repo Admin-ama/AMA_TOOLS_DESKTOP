@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { SERVICES, isServiceId } from './policy';
 import { SHELL_LAYOUT } from '../shared/layout';
-import { STARTUP_SERVICE } from '../shared/contracts';
+import { STARTUP_SERVICE, type SplashPhase } from '../shared/contracts';
 import { isZoomPercent } from '../shared/zoom';
 import { assetPath } from './assets';
 import { readPreferences, savePreferences } from './preferences';
@@ -20,6 +20,7 @@ import { NetworkMonitor, probeTarget, tcpProbe } from './network-status';
 import { FortiClientLauncher, forticlientCandidates } from './forticlient';
 import { DesktopApps } from './desktop-apps';
 import { commandAllowedWhileBlocked, BLOCKED_MESSAGE } from './network-gate';
+import { SPLASH, splashReady } from './splash';
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 const taskbarDetails = windowsAppDetails(app.isPackaged, process.execPath, app.getAppPath(), process.resourcesPath, path.join(__dirname, '../assets/amatime.ico'));
@@ -67,9 +68,23 @@ async function createWindow() {
     id: () => randomUUID(),
     log: (message, detail) => console.error(message, detail),
   });
-  const snapshot = () => ({ ...manager.snapshot(), updates: updates.snapshot, network: { status: network.status, forticlient: forticlient.available }, desktopApps: desktopApps.views() });
+  // Pantalla de arranque: tapa la vista nativa vacía hasta que el servicio de inicio carga (o no hay red).
+  const splashStart = Date.now();
+  const splashLimits = testing ? { ...SPLASH, minMs: 400 } : SPLASH;
+  let splash: SplashPhase = 'loading';
+  const splashTimers: NodeJS.Timeout[] = [];
+  const finishSplash = () => { if (splash === 'done') return; splash = 'done'; manager.endSplash(); };
+  const evaluateSplash = () => {
+    if (splash !== 'loading' || !network) return;
+    if (!splashReady({ elapsedMs: Date.now() - splashStart, network: network.status, startup: manager.hasLoaded(STARTUP_SERVICE) ? 'ready' : 'loading' }, splashLimits)) return;
+    splash = 'leaving';
+    // Si el renderer no confirma su animación de salida, la app se muestra igual.
+    splashTimers.push(setTimeout(() => { finishSplash(); publish(); }, SPLASH.exitGraceMs));
+  };
+  const snapshot = () => ({ ...manager.snapshot(), splash, updates: updates.snapshot, network: { status: network.status, forticlient: forticlient.available }, desktopApps: desktopApps.views() });
   const publish = () => {
     if (!window.isDestroyed()) {
+      evaluateSplash();
       const state = snapshot();
       window.webContents.send('portal:changed', state);
       notice.update(state);
@@ -116,6 +131,7 @@ async function createWindow() {
       const tabId = () => { if (typeof args[0] !== 'string') throw new Error('Pestaña inválida'); return args[0]; };
       switch (command) {
         case 'snapshot': return snapshot();
+        case 'finish-splash': if (splash === 'leaving') finishSplash(); break;
         case 'activate': manager.activate(id()); break;
         case 'new-tab': manager.openTab(); break;
         case 'select-tab': manager.selectTab(tabId()); break;
@@ -193,12 +209,13 @@ async function createWindow() {
     return result;
   });
   window.on('focus', () => void network.check());
-  window.on('close', () => { network.dispose(); cursor.dispose(); clearTimeout(initialCheck); clearInterval(periodicCheck); if (testUpdates) (app as EventEmitter).removeListener('ama:test-update', testUpdate); notice.dispose(); updates.dispose(); manager.dispose(); });
+  window.on('close', () => { network.dispose(); cursor.dispose(); clearTimeout(initialCheck); clearInterval(periodicCheck); splashTimers.forEach(clearTimeout); if (testUpdates) (app as EventEmitter).removeListener('ama:test-update', testUpdate); notice.dispose(); updates.dispose(); manager.dispose(); });
   window.on('closed', () => ipcMain.removeHandler('portal:command'));
   window.once('ready-to-show', () => window.show());
   await window.loadURL('app://bundle/index.html');
   void desktopApps.warm().then(publish);
   network.start();
+  splashTimers.push(setTimeout(publish, splashLimits.minMs), setTimeout(publish, splashLimits.maxMs));
 }
 
 void app.whenReady().then(async () => {

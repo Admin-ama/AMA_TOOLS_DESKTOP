@@ -7,6 +7,7 @@ import { Launcher } from './Launcher';
 import { NetworkBlock } from './NetworkBlock';
 import { DesktopDock } from './DesktopDock';
 import { StatusBar } from './StatusBar';
+import { Splash } from './Splash';
 import { ServiceLogo, icons } from './service-visuals';
 
 const updateLabels = { disabled: 'Las actualizaciones están disponibles en la app instalada de Windows.', idle: 'Puedes buscar una nueva versión.', checking: 'Buscando actualizaciones…', available: 'Hay una nueva versión disponible.', current: 'Tienes la última versión disponible.', downloading: 'Descargando actualización…', downloaded: 'La actualización está lista para instalar.', installing: 'Instalando actualización…', error: 'No se pudo actualizar. Revisa la conexión a GitHub y vuelve a intentar.' };
@@ -30,7 +31,8 @@ export function App() {
     catch { setError('No se pudo completar la acción. Vuelve a intentar.'); }
   }
 
-  if (!state) return error ? <p role="alert">{error}</p> : null;
+  // Sin estado todavía, el logo ya ocupa la ventana: nunca se ve un fondo negro vacío.
+  if (!state) return error ? <p role="alert">{error}</p> : <><Splash key="splash" /></>;
   const service = state.services.find(s => s.id === state.active)!;
   const activeTabs = state.tabs.filter(tab => tab.serviceId === state.active);
   const light = state.preferences.theme === 'light';
@@ -64,7 +66,8 @@ export function App() {
     try { await action(task, success); } finally { setBusy(false); }
   }
 
-  return <div className="app-shell" style={{ '--sidebar-width': `${SHELL_LAYOUT.sidebarWidth}px`, '--header-height': `${SHELL_LAYOUT.headerHeight}px`, '--right-sidebar-width': `${SHELL_LAYOUT.rightSidebarWidth}px`, '--status-bar-height': `${SHELL_LAYOUT.statusBarHeight}px` } as CSSProperties}>
+  // Misma clave en ambos returns: la animación del logo no se reinicia al llegar el primer estado.
+  return <><div key="shell" className="app-shell" style={{ '--sidebar-width': `${SHELL_LAYOUT.sidebarWidth}px`, '--header-height': `${SHELL_LAYOUT.headerHeight}px`, '--right-sidebar-width': `${SHELL_LAYOUT.rightSidebarWidth}px`, '--status-bar-height': `${SHELL_LAYOUT.statusBarHeight}px` } as CSSProperties}>
     <aside className="sidebar" aria-label="Navegación principal">
       <div className="brand"><button className={`nav-item launcher-button ${state.panel === 'launcher' ? 'active' : ''}`} disabled={blocked} aria-label="Ver todas las aplicaciones" aria-pressed={state.panel === 'launcher'} onClick={() => panel(state.panel === 'launcher' ? 'service' : 'launcher')}><IconLayoutGrid size={24} stroke={1.65} /><span className="nav-tooltip">Aplicaciones</span></button></div>
       <nav className="service-nav" aria-label="Servicios">
@@ -151,7 +154,7 @@ export function App() {
     </main>
 
     <StatusBar network={state.network.status} version={state.updates.currentVersion} />
-  </div>;
+  </div>{state.splash !== 'done' && <Splash key="splash" state={state} />}</>;
 }
 
 

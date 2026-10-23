@@ -18,6 +18,7 @@ const api: PortalApi = {
   installUpdate: () => command('install-update'),
   snoozeUpdate: () => command('snooze-update'),
   panel: panel => command('panel', panel),
+  finishSplash: () => command('finish-splash'),
   theme: theme => command('theme', theme),
   remember: (id, enabled) => command('remember', id, enabled),
   pin: (id, pinned) => command('pin', id, pinned),

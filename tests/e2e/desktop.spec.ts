@@ -47,8 +47,22 @@ test.beforeEach(async ({}, testInfo) => {
   await writeFile(path.join(directory, 'services.json'), JSON.stringify(config));
   app = await electron.launch({ args: ['.'], env: { ...process.env, AMA_E2E: '1', AMA_TEST_UPDATES: testInfo.title.includes('[updates]') ? '1' : '0', AMA_TEST_CONFIG: path.join(directory, 'services.json'), AMA_TEST_USER_DATA: path.join(directory, 'data') } });
   page = await app.firstWindow();
+  if (testInfo.title.includes('[arranque]')) return;
+  await expect(page.getByRole('status', { name: 'Iniciando AMATIME Tools' })).toHaveCount(0);
   await expect(page.getByTestId('librechat-tab-1')).toHaveAttribute('aria-selected', 'true');
   await switchApplication('Huly Workspace', 'huly 1');
+});
+
+test('[arranque] logo animado tapa la app hasta que el servicio de inicio carga', async ({}, testInfo) => {
+  const splash = page.getByRole('status', { name: 'Iniciando AMATIME Tools' });
+  await expect(splash).toBeVisible();
+  await expect(splash.getByRole('img', { name: 'AMA Time' })).toBeVisible();
+  // Mientras se ve el logo, ninguna vista nativa puede pintar encima.
+  expect(await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].contentView.children.some(view => (view as any).getVisible?.()))).toBe(false);
+  await page.screenshot({ path: testInfo.outputPath('splash.png') });
+  await expect(splash).toHaveCount(0, { timeout: 15_000 });
+  await expect.poll(() => page.evaluate(async () => (await window.portal.snapshot()).splash)).toBe('done');
+  await expect.poll(() => app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].contentView.children.some(view => (view as any).getVisible?.()))).toBe(true);
 });
 
 test('[updates] aviso nativo abajo a la derecha permite posponer sin descargar', async ({}, testInfo) => {

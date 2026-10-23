@@ -21,7 +21,7 @@ export class ServiceViewManager {
     window.on('resize', () => this.resize());
   }
 
-  snapshot(): Omit<Snapshot, 'updates' | 'network' | 'desktopApps'> {
+  snapshot(): Omit<Snapshot, 'splash' | 'updates' | 'network' | 'desktopApps'> {
     // Las rutas de las apps de escritorio nunca salen del proceso principal.
     const { desktopApps: _paths, ...preferences } = this.preferences;
     return { services: this.services, active: this.active, activeTabId: this.tabs.activeTabId, zoomPercent: this.zoomLevels.get(this.active) ?? PAGE_ZOOM.default, tabs: this.tabs.all, states: this.tabs.serviceStates(), preferences, panel: this.panel };
@@ -34,11 +34,25 @@ export class ServiceViewManager {
     this.changed();
   }
 
-  private shouldShow(id: string) { return !this.blocked && id === this.tabs.activeTabId && this.panel === 'service'; }
+  private shouldShow(id: string) { return !this.splash && !this.blocked && id === this.tabs.activeTabId && this.panel === 'service'; }
+
+  /** La pantalla de arranque oculta las vistas nativas hasta que el renderer termina su animación de salida. */
+  endSplash() {
+    if (!this.splash) return;
+    this.splash = false;
+    this.visibility();
+    this.changed();
+  }
 
   private visibility() {
     for (const [id, entry] of this.views) entry.view.setVisible(this.shouldShow(id));
   }
+
+  private splash = true;
+  // Primera carga por servicio: did-start-loading se repite y no sirve para saber si ya hay algo que mostrar.
+  private loaded = new Set<ServiceId>();
+
+  hasLoaded(id: ServiceId) { return this.loaded.has(id); }
 
   setBlocked(blocked: boolean) {
     if (this.blocked === blocked) return;
@@ -188,11 +202,12 @@ export class ServiceViewManager {
     web.on('dom-ready', () => {
       if (!entry.disposed) web.setZoomFactor((this.zoomLevels.get(service.id) ?? PAGE_ZOOM.default) / 100);
       if (!entry.disposed) updateTitle(web.getTitle());
-      if (!entry.disposed && !entry.failed) this.update(id, { status: 'ready' });
+      if (!entry.disposed && !entry.failed) { this.loaded.add(service.id); this.update(id, { status: 'ready' }); }
     });
     web.on('did-fail-load', (_event, code, _description, _url, mainFrame) => {
       if (!mainFrame || code === -3 || entry.disposed) return;
       entry.failed = true;
+      this.loaded.add(service.id);
       this.update(id, { status: 'error', message: `No se pudo cargar el servicio (${code}). Revisa la red o VPN y vuelve a intentar.` });
     });
     web.on('render-process-gone', () => {

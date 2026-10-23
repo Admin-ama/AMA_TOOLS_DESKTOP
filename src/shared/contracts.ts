@@ -29,7 +29,10 @@ export interface UpdateState {
 /** Alcance TCP a los servicios internos (LAN o VPN). */
 export type NetworkStatus = 'checking' | 'connected' | 'disconnected';
 export interface NetworkState { status: NetworkStatus; forticlient: boolean }
+/** loading: logo animado tapa la app · leaving: el renderer anima la salida · done: la app es visible. */
+export type SplashPhase = 'loading' | 'leaving' | 'done';
 export interface Snapshot {
+  splash: SplashPhase;
   updates: UpdateState;
   network: NetworkState;
   services: Service[];
@@ -59,6 +62,7 @@ export interface PortalApi {
   installUpdate(): Promise<void>;
   snoozeUpdate(): Promise<void>;
   panel(panel: Snapshot['panel']): Promise<void>;
+  finishSplash(): Promise<void>;
   theme(theme: Theme): Promise<void>;
   remember(id: ServiceId, enabled: boolean): Promise<void>;
   pin(id: ServiceId, pinned: boolean): Promise<void>;
