@@ -4,6 +4,7 @@ import { CATEGORIES, type ServiceId, type Snapshot } from '../shared/contracts';
 import { SHELL_LAYOUT } from '../shared/layout';
 import { PAGE_ZOOM } from '../shared/zoom';
 import { Launcher } from './Launcher';
+import { NetworkBlock } from './NetworkBlock';
 import { ServiceLogo, icons } from './service-visuals';
 
 const updateLabels = { disabled: 'Las actualizaciones están disponibles en la app instalada de Windows.', idle: 'Puedes buscar una nueva versión.', checking: 'Buscando actualizaciones…', available: 'Hay una nueva versión disponible.', current: 'Tienes la última versión disponible.', downloading: 'Descargando actualización…', downloaded: 'La actualización está lista para instalar.', installing: 'Instalando actualización…', error: 'No se pudo actualizar. Revisa la conexión a GitHub y vuelve a intentar.' };
@@ -36,6 +37,7 @@ export function App() {
   const service = state.services.find(s => s.id === state.active)!;
   const activeTabs = state.tabs.filter(tab => tab.serviceId === state.active);
   const light = state.preferences.theme === 'light';
+  const blocked = state.network.status !== 'connected';
   // Fijadas por categoría; la app activa no fijada se muestra mientras está en uso para no perder la navegación.
   const sidebarGroups = CATEGORIES.map(category => ({
     label: category.label,
@@ -67,11 +69,11 @@ export function App() {
 
   return <div className="app-shell" style={{ '--sidebar-width': `${SHELL_LAYOUT.sidebarWidth}px`, '--header-height': `${SHELL_LAYOUT.headerHeight}px` } as CSSProperties}>
     <aside className="sidebar" aria-label="Navegación principal">
-      <div className="brand"><button className={`nav-item launcher-button ${state.panel === 'launcher' ? 'active' : ''}`} aria-label="Ver todas las aplicaciones" aria-pressed={state.panel === 'launcher'} onClick={() => panel(state.panel === 'launcher' ? 'service' : 'launcher')}><IconLayoutGrid size={24} stroke={1.65} /><span className="nav-tooltip">Aplicaciones</span></button></div>
+      <div className="brand"><button className={`nav-item launcher-button ${state.panel === 'launcher' ? 'active' : ''}`} disabled={blocked} aria-label="Ver todas las aplicaciones" aria-pressed={state.panel === 'launcher'} onClick={() => panel(state.panel === 'launcher' ? 'service' : 'launcher')}><IconLayoutGrid size={24} stroke={1.65} /><span className="nav-tooltip">Aplicaciones</span></button></div>
       <nav className="service-nav" aria-label="Servicios">
         {sidebarGroups.map(group => <div className="nav-group" role="group" aria-label={group.label} key={group.label}>
         {group.ids.map(item => {
-          return <button key={item.id} className={`nav-item ${state.active === item.id && state.panel === 'service' ? 'active' : ''}`} aria-label={`Abrir ${item.name}`} aria-current={state.active === item.id && state.panel === 'service' ? 'page' : undefined} onClick={() => activate(item.id)}>
+          return <button key={item.id} className={`nav-item ${state.active === item.id && state.panel === 'service' ? 'active' : ''}`} disabled={blocked} aria-label={`Abrir ${item.name}`} aria-current={state.active === item.id && state.panel === 'service' ? 'page' : undefined} onClick={() => activate(item.id)}>
             <ServiceLogo id={item.id} /><span className="nav-tooltip">{item.name}</span>
             {state.states[item.id].status === 'ready' && <span className="nav-dot" />}
           </button>;
@@ -92,14 +94,14 @@ export function App() {
           const label = tab.title || service.shortName;
           const selected = state.activeTabId === tab.id;
           return <div key={tab.id} className={`tab-group ${selected ? 'selected' : ''}`}>
-            <button id={`tab-${tab.id}`} data-testid={`${tab.serviceId}-tab-${tab.number}`} role="tab" title={label} aria-selected={selected} aria-controls="service-content" tabIndex={selected ? 0 : -1} className={`app-tab ${selected ? 'selected' : ''}`} onClick={() => selectTab(tab.id)} onKeyDown={event => tabKey(event, index)}>
+            <button id={`tab-${tab.id}`} data-testid={`${tab.serviceId}-tab-${tab.number}`} role="tab" title={label} aria-selected={selected} disabled={blocked} aria-controls="service-content" tabIndex={selected ? 0 : -1} className={`app-tab ${selected ? 'selected' : ''}`} onClick={() => selectTab(tab.id)} onKeyDown={event => tabKey(event, index)}>
               <Icon size={16} stroke={1.8} /><span>{label}</span>
             </button>
             <button className="close-tab" data-testid={`close-${tab.serviceId}-tab-${tab.number}`} aria-label={`Cerrar ${label}`} title={`Cerrar ${label}`} onClick={() => void action(() => window.portal.closeTab(tab.id))}><IconX size={13} /></button>
           </div>;
         })}
       </div>
-      <button className="icon-button new-tab" aria-label={`Abrir nueva pestaña de ${service.shortName}`} title={`Abrir nueva pestaña de ${service.shortName}`} onClick={() => void action(() => window.portal.openTab())}><IconPlus size={19} /></button>
+      <button className="icon-button new-tab" disabled={blocked} aria-label={`Abrir nueva pestaña de ${service.shortName}`} title={`Abrir nueva pestaña de ${service.shortName}`} onClick={() => void action(() => window.portal.openTab())}><IconPlus size={19} /></button>
       </div>
       <div className="header-actions">
         <div className={`network-status ${state.network.status}`} role="status" aria-label={`Red interna: ${networkLabels[state.network.status].text}`} title={networkLabels[state.network.status].tooltip}>
@@ -107,9 +109,9 @@ export function App() {
         </div>
         {state.network.forticlient && <button className="icon-button" aria-label="Abrir FortiClient" title="Abrir FortiClient" onClick={() => void action(() => window.portal.openForticlient())}><IconShieldLock size={19} /></button>}
         <div className="zoom-control" role="group" aria-label="Zoom de la aplicación">
-          <button className="icon-button" aria-label="Reducir zoom" title="Reducir zoom" disabled={state.panel !== 'service' || state.zoomPercent <= PAGE_ZOOM.min} onClick={() => void action(() => window.portal.zoom(Math.max(PAGE_ZOOM.min, state.zoomPercent - PAGE_ZOOM.step)))}><IconMinus size={15} /></button>
-          <button className="zoom-percent" aria-label="Restablecer zoom" title="Restablecer zoom al 100%" disabled={state.panel !== 'service'} onClick={() => void action(() => window.portal.zoom(PAGE_ZOOM.default))}>{state.zoomPercent}%</button>
-          <button className="icon-button" aria-label="Aumentar zoom" title="Aumentar zoom" disabled={state.panel !== 'service' || state.zoomPercent >= PAGE_ZOOM.max} onClick={() => void action(() => window.portal.zoom(Math.min(PAGE_ZOOM.max, state.zoomPercent + PAGE_ZOOM.step)))}><IconPlus size={15} /></button>
+          <button className="icon-button" aria-label="Reducir zoom" title="Reducir zoom" disabled={blocked || state.panel !== 'service' || state.zoomPercent <= PAGE_ZOOM.min} onClick={() => void action(() => window.portal.zoom(Math.max(PAGE_ZOOM.min, state.zoomPercent - PAGE_ZOOM.step)))}><IconMinus size={15} /></button>
+          <button className="zoom-percent" aria-label="Restablecer zoom" title="Restablecer zoom al 100%" disabled={blocked || state.panel !== 'service'} onClick={() => void action(() => window.portal.zoom(PAGE_ZOOM.default))}>{state.zoomPercent}%</button>
+          <button className="icon-button" aria-label="Aumentar zoom" title="Aumentar zoom" disabled={blocked || state.panel !== 'service' || state.zoomPercent >= PAGE_ZOOM.max} onClick={() => void action(() => window.portal.zoom(Math.min(PAGE_ZOOM.max, state.zoomPercent + PAGE_ZOOM.step)))}><IconPlus size={15} /></button>
         </div>
         <button className="icon-button" aria-label="Recargar servicio" title="Recargar servicio" onClick={() => void action(() => window.portal.reload())}><IconRefresh size={19} /></button>
         <button className="icon-button" aria-label={light ? 'Cambiar a tema oscuro' : 'Cambiar a tema claro'} title="Cambiar tema del portal" onClick={toggleTheme}>{light ? <IconSun size={19} /> : <IconMoon size={19} />}</button>
@@ -117,7 +119,8 @@ export function App() {
     </header>
 
     <main id="service-content" className="content" role="tabpanel" aria-labelledby={state.activeTabId ? `tab-${state.activeTabId}` : undefined}>
-      {state.panel === 'launcher' && <Launcher services={state.services} pinned={state.preferences.pinned} onOpen={activate} onPin={(id, pinned) => void action(() => window.portal.pin(id, pinned))} onClose={() => panel('service')} />}
+      {blocked && (state.panel === 'service' || state.panel === 'launcher') && <NetworkBlock network={state.network} onRetry={() => action(() => window.portal.reload())} onForticlient={() => action(() => window.portal.openForticlient())} />}
+      {!blocked && state.panel === 'launcher' && <Launcher services={state.services} pinned={state.preferences.pinned} onOpen={activate} onPin={(id, pinned) => void action(() => window.portal.pin(id, pinned))} onClose={() => panel('service')} />}
       {state.panel === 'settings' && <section className="settings-page">
         <button className="back-button" onClick={() => panel('service')}><IconChevronLeft size={17} />Volver al servicio</button>
         <div className="page-heading"><span className="eyebrow">PERSONALIZA TU ESPACIO</span><h1>Preferencias del portal</h1><p>Tu interfaz y tus sesiones. Cada aplicación conserva su propio inicio de sesión.</p></div>

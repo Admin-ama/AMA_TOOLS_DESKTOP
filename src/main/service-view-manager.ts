@@ -14,6 +14,8 @@ export class ServiceViewManager {
   private zoomLevels = new Map<ServiceId, number>();
   get active(): ServiceId { return this.tabs.active; }
   panel: Snapshot['panel'] = 'service';
+  /** Sin acceso a la red interna: ninguna vista se muestra ni se crea. Empieza bloqueado hasta la primera sonda. */
+  private blocked = true;
 
   constructor(private window: BrowserWindow, readonly services: Service[], readonly preferences: Preferences, private changed: () => void) {
     window.on('resize', () => this.resize());
@@ -30,10 +32,22 @@ export class ServiceViewManager {
     this.changed();
   }
 
+  private shouldShow(id: string) { return !this.blocked && id === this.tabs.activeTabId && this.panel === 'service'; }
+
   private visibility() {
-    for (const [id, entry] of this.views) {
-      entry.view.setVisible(id === this.tabs.activeTabId && this.panel === 'service');
+    for (const [id, entry] of this.views) entry.view.setVisible(this.shouldShow(id));
+  }
+
+  setBlocked(blocked: boolean) {
+    if (this.blocked === blocked) return;
+    this.blocked = blocked;
+    if (blocked && this.panel === 'launcher') this.panel = 'service';
+    if (!blocked) {
+      const current = this.tabs.all.find(tab => tab.id === this.tabs.activeTabId);
+      if (current) this.ensureView(current);
     }
+    this.visibility();
+    this.changed();
   }
 
   resize() {
@@ -76,7 +90,7 @@ export class ServiceViewManager {
   }
 
   private ensureView(tab: ApplicationTab, url?: string) {
-    if (!this.views.has(tab.id)) this.create(tab, url);
+    if (!this.blocked && !this.views.has(tab.id)) this.create(tab, url);
   }
 
   showPanel(panel: Snapshot['panel']) {
@@ -106,7 +120,7 @@ export class ServiceViewManager {
     const view = new WebContentsView({ webPreferences: remotePreferences(service.id, this.preferences.remember[service.id]) });
     const entry: Entry = { view, disposed: false, failed: false };
     this.views.set(id, entry);
-    view.setVisible(this.tabs.activeTabId === id && this.panel === 'service');
+    view.setVisible(this.shouldShow(id));
     view.setBackgroundColor('#020617');
     this.window.contentView.addChildView(view);
     this.resize();

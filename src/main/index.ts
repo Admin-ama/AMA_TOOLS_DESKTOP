@@ -17,6 +17,7 @@ import { EventEmitter } from 'node:events';
 import { windowsAppDetails } from './windows-identity';
 import { NetworkMonitor, probeTarget, tcpProbe } from './network-status';
 import { FortiClientLauncher, forticlientCandidates } from './forticlient';
+import { commandAllowedWhileBlocked, BLOCKED_MESSAGE } from './network-gate';
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 const taskbarDetails = windowsAppDetails(app.isPackaged, process.execPath, app.getAppPath(), process.resourcesPath, path.join(__dirname, '../assets/amatime.ico'));
@@ -71,7 +72,15 @@ async function createWindow() {
     publish();
   });
   const target = probeTarget(services);
-  network = new NetworkMonitor({ probe: () => tcpProbe(target.host, target.port), onChange: publish });
+  // Sin red interna la app no funciona: la sonda decide si las vistas pueden mostrarse o crearse.
+  let started = false;
+  const applyNetwork = () => {
+    manager.setBlocked(network.status !== 'connected');
+    // El servicio de inicio solo se abre cuando ya hay red.
+    if (network.status === 'connected' && !started) { started = true; manager.activate(STARTUP_SERVICE); }
+    publish();
+  };
+  network = new NetworkMonitor({ probe: () => tcpProbe(target.host, target.port), onChange: applyNetwork });
   // Only unpackaged, explicitly opted-in tests can use this offline updater.
   const testUpdates = testing && process.env.AMA_TEST_UPDATES === '1';
   const backend: UpdateBackend = testUpdates ? Object.assign(new EventEmitter(), {
@@ -89,6 +98,7 @@ async function createWindow() {
     const noticeSender = notice.window && !notice.window.isDestroyed() && event.sender === notice.window.webContents && event.senderFrame === notice.window.webContents.mainFrame && event.senderFrame.url === UPDATE_NOTICE_URL;
     if (!shellSender && !(noticeSender && ['snapshot', 'download-update', 'install-update', 'snooze-update'].includes(command as string))) throw new Error('Remitente no autorizado');
     const run = async () => {
+      if (network.status !== 'connected' && !commandAllowedWhileBlocked(command, args)) throw new Error(BLOCKED_MESSAGE);
       const id = () => { if (!isServiceId(args[0])) throw new Error('Servicio inválido'); return args[0]; };
       const tabId = () => { if (typeof args[0] !== 'string') throw new Error('Pestaña inválida'); return args[0]; };
       switch (command) {
@@ -97,7 +107,13 @@ async function createWindow() {
         case 'new-tab': manager.openTab(); break;
         case 'select-tab': manager.selectTab(tabId()); break;
         case 'close-tab': manager.closeTab(tabId()); break;
-        case 'reload': manager.reload(); void network.check(); break;
+        case 'reload': {
+          // Reintentar: sondear primero; recargar solo si ya había red (si no, la recuperación activa las vistas).
+          const wasConnected = network.status === 'connected';
+          await network.check();
+          if (wasConnected && network.status === 'connected') manager.reload();
+          break;
+        }
         case 'open-forticlient': await forticlient.open(...args); break;
         case 'check-updates': await updates.check(); break;
         case 'download-update':
@@ -124,7 +140,7 @@ async function createWindow() {
         }
         case 'panel': {
           if (!['service', 'settings', 'help', 'launcher'].includes(args[0] as string)) throw new Error('Panel inválido');
-          if (args[0] === 'service') manager.activate(manager.active);
+          if (args[0] === 'service') { if (network.status === 'connected') manager.activate(manager.active); else manager.showPanel('service'); }
           else manager.showPanel(args[0] as 'settings' | 'help' | 'launcher');
           break;
         }
@@ -165,7 +181,6 @@ async function createWindow() {
   window.on('closed', () => ipcMain.removeHandler('portal:command'));
   window.once('ready-to-show', () => window.show());
   await window.loadURL('app://bundle/index.html');
-  manager.activate(STARTUP_SERVICE);
   network.start();
 }
 

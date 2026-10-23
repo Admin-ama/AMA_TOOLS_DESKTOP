@@ -1,5 +1,6 @@
 import { test, expect, _electron as electron, type ElectronApplication, type Page } from '@playwright/test';
 import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -368,18 +369,41 @@ test('cambiar pestañas preserva contexto y ajusta límites al redimensionar', a
   await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children[0].getBounds())).toEqual({ x: 64, y: 52, width: 936, height: 648 });
 });
 
-test('fallo de red permite reintento y no inutiliza ajustes', async () => {
+test('sin red interna bloquea los servicios, rechaza comandos y se recupera al reintentar', async ({}, testInfo) => {
   await waitForPage();
+  const port = (server.address() as AddressInfo).port;
   server.closeAllConnections();
   await new Promise<void>(resolve => server.close(() => resolve()));
   await page.getByRole('button', { name: 'Recargar servicio' }).click();
-  await expect.poll(() => page.evaluate(async () => {
-    const snapshot = await window.portal.snapshot();
-    return snapshot.states[snapshot.active].message || '';
-  })).toContain('No se pudo cargar');
-  await expect(page.getByRole('button', { name: 'Recargar servicio' })).toBeVisible();
+  const block = page.getByRole('alert').filter({ has: page.getByRole('heading', { name: 'Sin acceso a red interna' }) });
+  await expect(block).toBeVisible();
+  await expect(block.getByRole('button', { name: 'Reintentar' })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('network-block.png') });
+  // Las vistas nativas no pueden pintar sobre la pantalla de bloqueo.
+  const visible = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children.map(v => v.getVisible()));
+  expect(visible.length).toBeGreaterThan(0);
+  expect(visible.every(v => !v)).toBe(true);
+  // El proceso principal rechaza cargar o crear servicios aunque la UI no lo ofrezca.
+  const rejected = await page.evaluate(async () => {
+    const results = [];
+    for (const task of [() => window.portal.activate('n8n'), () => window.portal.openTab(), () => window.portal.panel('launcher'), () => window.portal.zoom(110)]) { try { await task(); results.push(false); } catch { results.push(true); } }
+    return results;
+  });
+  expect(rejected).toEqual([true, true, true, true]);
+  // Ajustes sigue disponible y volver al servicio mantiene el bloqueo.
   await page.getByRole('button', { name: 'Ajustes', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Preferencias del portal' })).toBeVisible();
+  await page.getByRole('button', { name: 'Volver al servicio' }).click();
+  await expect(block).toBeVisible();
+  // Al volver la red, Reintentar restablece el servicio.
+  server = createServer((_req, res) => { res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.end('<html><head><title>Recuperado</title></head><body>ok</body></html>'); });
+  await new Promise<void>(resolve => server.listen(port, '127.0.0.1', resolve));
+  await block.getByRole('button', { name: 'Reintentar' }).click();
+  await expect(block).toHaveCount(0);
+  await waitForPage();
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children.filter(v => v.getVisible()).length)).toBe(1);
+  await page.getByRole('button', { name: 'Abrir n8n Automations', exact: true }).click();
+  await expect(page.getByTestId('n8n-tab-1')).toHaveAttribute('aria-selected', 'true');
 });
 
 test('enlaces fuera del origen no abandonan la aplicación', async () => {
