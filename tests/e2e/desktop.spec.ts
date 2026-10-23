@@ -232,6 +232,7 @@ test('navegación compacta alinea shell y vista nativa', async () => {
   await expect.poll(() => page.getByRole('complementary', { name: 'Navegación principal' }).evaluate(el => el.getBoundingClientRect().width)).toBe(64);
   await expect.poll(() => page.getByRole('complementary', { name: 'Aplicaciones de escritorio' }).evaluate(el => el.getBoundingClientRect().width)).toBe(56);
   await expect.poll(() => page.getByRole('banner').evaluate(el => el.getBoundingClientRect().height)).toBe(52);
+  await expect.poll(() => page.getByRole('contentinfo').evaluate(el => el.getBoundingClientRect().height)).toBe(28);
   const content = await page.getByRole('tabpanel').boundingBox();
   const view = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children.find(v => v.getVisible())!.getBounds());
   expect(view).toEqual(content);
@@ -279,6 +280,23 @@ test('apps de escritorio: vincular con diálogo del proceso principal, abrir por
   expect(JSON.parse(await readFile(preferencesFile, 'utf8')).desktopApps).toEqual([]);
 });
 
+test('barra de estado inferior muestra red, versión y reloj alineada con la vista nativa', async ({}, testInfo) => {
+  const bar = page.getByRole('contentinfo');
+  await expect(bar.getByRole('status', { name: 'Red interna: disponible' })).toBeVisible();
+  await expect(bar.getByText(/^v\d+\.\d+\.\d+$/)).toBeVisible();
+  await expect(bar.getByRole('timer')).toHaveText(/^\d{2}:\d{2}$/);
+  const box = await bar.boundingBox();
+  const size = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getContentSize());
+  expect(box).toMatchObject({ x: 0, height: 28, width: size[0] });
+  expect(box!.y + box!.height).toBe(size[1]);
+  const view = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children.find(v => v.getVisible())!.getBounds());
+  expect(view.y + view.height).toBe(box!.y);
+  await page.screenshot({ path: testInfo.outputPath('shell-dark.png') });
+  await page.getByRole('button', { name: 'Cambiar a tema claro' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await page.screenshot({ path: testInfo.outputPath('shell-light.png') });
+});
+
 test('ojos del bot siguen el cursor aunque esté sobre la vista remota', async () => {
   const eyes = page.getByRole('button', { name: 'Abrir LibreChat AI', exact: true }).locator('.bot-eyes');
   // El cursor real no llega al shell sobre la vista remota; main reenvía la posición global.
@@ -320,9 +338,9 @@ test('pestañas muestran el título real y siguen cambios dinámicos de la pági
 test('header sin estado de carga ni indicador HTTP', async () => {
   slowDocument = true;
   await switchApplication('n8n Automations', 'n8n 1');
-  // El único status del header es el indicador de red interna (no hay estado de carga).
-  await expect(page.getByRole('banner').getByRole('status').filter({ hasNotText: 'Red interna' })).toHaveCount(0);
-  await expect(page.getByRole('banner').getByRole('status', { name: /^Red interna/ })).toHaveCount(1);
+  // El header ya no muestra estados: la red interna vive en la barra de estado inferior.
+  await expect(page.getByRole('banner').getByRole('status')).toHaveCount(0);
+  await expect(page.getByRole('contentinfo').getByRole('status', { name: /^Red interna/ })).toHaveCount(1);
   await expect(page.getByLabel('Conexión HTTP sin cifrado')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Recargar servicio' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Cambiar a tema claro' })).toBeVisible();
@@ -406,7 +424,7 @@ test('cambiar pestañas preserva contexto y ajusta límites al redimensionar', a
   const value = await app.evaluate(async ({ webContents }) => webContents.getAllWebContents().find(w => w.getURL().includes('/huly'))!.executeJavaScript("document.querySelector('input').value"));
   expect(value).toBe('contexto preservado');
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1000, 700));
-  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children[0].getBounds())).toEqual({ x: 64, y: 52, width: 880, height: 648 });
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children[0].getBounds())).toEqual({ x: 64, y: 52, width: 880, height: 620 });
 });
 
 test('sin red interna bloquea los servicios, rechaza comandos y se recupera al reintentar', async ({}, testInfo) => {
@@ -415,6 +433,7 @@ test('sin red interna bloquea los servicios, rechaza comandos y se recupera al r
   server.closeAllConnections();
   await new Promise<void>(resolve => server.close(() => resolve()));
   await page.getByRole('button', { name: 'Recargar servicio' }).click();
+  await expect(page.getByRole('contentinfo').getByRole('status', { name: 'Red interna: sin acceso' })).toBeVisible();
   const block = page.getByRole('alert').filter({ has: page.getByRole('heading', { name: 'Sin acceso a red interna' }) });
   await expect(block).toBeVisible();
   await expect(block.getByRole('button', { name: 'Reintentar' })).toBeVisible();
@@ -489,7 +508,7 @@ test('carga directa sin tarjetas, formularios ni gates intermedios', async () =>
     const window = BrowserWindow.getAllWindows()[0];
     return { visible: window.contentView.children.filter(view => view.getVisible()).map(view => view.getBounds()), size: window.getContentSize() };
   });
-  expect(visible).toEqual([{ x: 64, y: 52, width: size[0] - 64 - 56, height: size[1] - 52 }]);
+  expect(visible).toEqual([{ x: 64, y: 52, width: size[0] - 64 - 56, height: size[1] - 52 - 28 }]);
 });
 
 test('barra superior agrupa múltiples pestañas de la aplicación seleccionada', async ({}, testInfo) => {

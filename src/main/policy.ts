@@ -40,6 +40,6 @@ export function remotePreferences(id: ServiceId, persistent: boolean) {
   return { partition: partitionFor(id, persistent), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, allowRunningInsecureContent: false };
 }
 export function contentBounds(width: number, height: number) {
-  const { sidebarWidth: x, headerHeight: y, rightSidebarWidth: right } = SHELL_LAYOUT;
-  return { x, y, width: Math.max(0, width - x - right), height: Math.max(0, height - y) };
+  const { sidebarWidth: x, headerHeight: y, rightSidebarWidth: right, statusBarHeight: bottom } = SHELL_LAYOUT;
+  return { x, y, width: Math.max(0, width - x - right), height: Math.max(0, height - y - bottom) };
 }

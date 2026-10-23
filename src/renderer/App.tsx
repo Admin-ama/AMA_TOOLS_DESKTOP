@@ -6,14 +6,10 @@ import { PAGE_ZOOM } from '../shared/zoom';
 import { Launcher } from './Launcher';
 import { NetworkBlock } from './NetworkBlock';
 import { DesktopDock } from './DesktopDock';
+import { StatusBar } from './StatusBar';
 import { ServiceLogo, icons } from './service-visuals';
 
 const updateLabels = { disabled: 'Las actualizaciones están disponibles en la app instalada de Windows.', idle: 'Puedes buscar una nueva versión.', checking: 'Buscando actualizaciones…', available: 'Hay una nueva versión disponible.', current: 'Tienes la última versión disponible.', downloading: 'Descargando actualización…', downloaded: 'La actualización está lista para instalar.', installing: 'Instalando actualización…', error: 'No se pudo actualizar. Revisa la conexión a GitHub y vuelve a intentar.' };
-const networkLabels: Record<Snapshot['network']['status'], { text: string; tooltip: string }> = {
-  checking: { text: 'comprobando', tooltip: 'Comprobando red interna…' },
-  connected: { text: 'disponible', tooltip: 'Red interna disponible (LAN o VPN)' },
-  disconnected: { text: 'sin acceso', tooltip: 'Sin acceso a la red interna. Conéctate a la VPN con FortiClient.' },
-};
 
 export function App() {
   const [state, setState] = useState<Snapshot>();
@@ -68,7 +64,7 @@ export function App() {
     try { await action(task, success); } finally { setBusy(false); }
   }
 
-  return <div className="app-shell" style={{ '--sidebar-width': `${SHELL_LAYOUT.sidebarWidth}px`, '--header-height': `${SHELL_LAYOUT.headerHeight}px`, '--right-sidebar-width': `${SHELL_LAYOUT.rightSidebarWidth}px` } as CSSProperties}>
+  return <div className="app-shell" style={{ '--sidebar-width': `${SHELL_LAYOUT.sidebarWidth}px`, '--header-height': `${SHELL_LAYOUT.headerHeight}px`, '--right-sidebar-width': `${SHELL_LAYOUT.rightSidebarWidth}px`, '--status-bar-height': `${SHELL_LAYOUT.statusBarHeight}px` } as CSSProperties}>
     <aside className="sidebar" aria-label="Navegación principal">
       <div className="brand"><button className={`nav-item launcher-button ${state.panel === 'launcher' ? 'active' : ''}`} disabled={blocked} aria-label="Ver todas las aplicaciones" aria-pressed={state.panel === 'launcher'} onClick={() => panel(state.panel === 'launcher' ? 'service' : 'launcher')}><IconLayoutGrid size={24} stroke={1.65} /><span className="nav-tooltip">Aplicaciones</span></button></div>
       <nav className="service-nav" aria-label="Servicios">
@@ -105,9 +101,6 @@ export function App() {
       <button className="icon-button new-tab" disabled={blocked} aria-label={`Abrir nueva pestaña de ${service.shortName}`} title={`Abrir nueva pestaña de ${service.shortName}`} onClick={() => void action(() => window.portal.openTab())}><IconPlus size={19} /></button>
       </div>
       <div className="header-actions">
-        <div className={`network-status ${state.network.status}`} role="status" aria-label={`Red interna: ${networkLabels[state.network.status].text}`} title={networkLabels[state.network.status].tooltip}>
-          <span className="network-dot" aria-hidden="true" /><span className="network-label">Red interna</span>
-        </div>
         <div className="zoom-control" role="group" aria-label="Zoom de la aplicación">
           <button className="icon-button" aria-label="Reducir zoom" title="Reducir zoom" disabled={blocked || state.panel !== 'service' || state.zoomPercent <= PAGE_ZOOM.min} onClick={() => void action(() => window.portal.zoom(Math.max(PAGE_ZOOM.min, state.zoomPercent - PAGE_ZOOM.step)))}><IconMinus size={15} /></button>
           <button className="zoom-percent" aria-label="Restablecer zoom" title="Restablecer zoom al 100%" disabled={blocked || state.panel !== 'service'} onClick={() => void action(() => window.portal.zoom(PAGE_ZOOM.default))}>{state.zoomPercent}%</button>
@@ -156,6 +149,8 @@ export function App() {
       </section>}
       {error && <p className="action-error" role="alert">{error}</p>}
     </main>
+
+    <StatusBar network={state.network.status} version={state.updates.currentVersion} />
   </div>;
 }
 

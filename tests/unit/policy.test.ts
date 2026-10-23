@@ -57,7 +57,7 @@ describe('registro y aislamiento', () => {
     expect(remotePreferences('huly', true)).not.toHaveProperty('preload');
   });
   it('mantiene el contenido fuera de sidebar y header incluso en ventanas pequeñas', () => {
-    expect(contentBounds(1280, 720)).toEqual({ x: 64, y: 52, width: 1160, height: 668 });
+    expect(contentBounds(1280, 720)).toEqual({ x: 64, y: 52, width: 1160, height: 640 });
     expect(contentBounds(20, 30)).toEqual({ x: 64, y: 52, width: 0, height: 0 });
   });
 });
