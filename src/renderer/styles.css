@@ -123,7 +123,7 @@ input[type=checkbox] { accent-color:var(--accent); width:1rem; height:1rem; }
 .launcher-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(13rem,1fr)); gap:.6rem; }
 .launcher-card { position:relative; border-radius:.8rem; border:1px solid var(--line); background:var(--surface); }
 .launcher-card:hover { border-color:#0ea5a050; }
-.launcher-open { display:flex; align-items:center; gap:.8rem; width:100%; padding:.8rem 2.6rem .8rem .8rem; background:transparent; border-radius:.8rem; text-align:left; }
+.launcher-open { display:flex; align-items:center; gap:.8rem; width:100%; padding:.8rem 4.6rem .8rem .8rem; background:transparent; border-radius:.8rem; text-align:left; }
 .launcher-logo { display:grid; place-items:center; width:46px; height:46px; flex-shrink:0; }
 .launcher-name { font-size:.74rem; font-weight:700; }
 .pin-button { position:absolute; top:.5rem; right:.5rem; display:grid; place-items:center; width:1.8rem; height:1.8rem; border-radius:.5rem; background:transparent; color:var(--soft); }
@@ -171,3 +171,19 @@ input[type=checkbox] { accent-color:var(--accent); width:1rem; height:1rem; }
 .splash-status { margin:0; min-height:1em; font-size:.66rem; color:#5f8273; letter-spacing:.03em; }
 .splash-spark, .splash-ring { pointer-events:none; }
 @media (prefers-reduced-motion:reduce) { .splash-shine, .splash-spark, .splash-ring, .splash-logo-glow { display:none; } }
+.pin-button.split-button { right:2.5rem; }
+.icon-button.toggled { color:var(--accent); background:#1da7741a; }
+/* Panel lateral: el DOM solo dibuja divisor, cabecera y capturas; la página es una vista nativa en el hueco .split-slot. */
+.split-layer { position:fixed; inset:0; pointer-events:none; z-index:2; }
+.split-layer > * { position:fixed; pointer-events:auto; }
+.split-slot { pointer-events:none; background:var(--bg); }
+.split-header { display:flex; align-items:center; gap:.4rem; padding:0 .45rem 0 .65rem; background:var(--surface); border-bottom:1px solid var(--line); min-width:0; }
+.split-header .icon-button { width:1.7rem; height:1.7rem; flex-shrink:0; }
+.split-logo { display:grid; place-items:center; width:24px; height:24px; flex-shrink:0; overflow:hidden; }
+.split-logo .service-logo { width:22px; height:22px; }
+.split-select { flex:1; min-width:0; height:1.7rem; padding:0 .5rem; border-radius:.5rem; border:1px solid var(--line); background:var(--bg); color:var(--text); font:inherit; font-size:.7rem; font-weight:700; }
+.split-select:focus-visible { outline:2px solid var(--teal); outline-offset:2px; }
+.split-divider { background:var(--line); cursor:col-resize; touch-action:none; transition:background .15s; }
+.split-divider:hover, .split-divider:focus-visible, .split-divider.dragging { background:var(--teal); outline:0; }
+.split-ghost { overflow:hidden; background:var(--bg); pointer-events:none; }
+.split-ghost img { display:block; max-width:none; object-fit:cover; object-position:left top; }

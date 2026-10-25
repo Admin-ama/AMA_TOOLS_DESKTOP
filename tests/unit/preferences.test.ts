@@ -5,10 +5,10 @@ import path from 'node:path';
 
 describe('preferencias sin secretos', () => {
   it('usa tema oscuro y particiones persistentes por defecto', () => {
-    expect(normalizePreferences(null)).toEqual({ theme: 'dark', remember: { huly: true, n8n: true, librechat: true, portal: true, emailai: true, stirling: true }, pinned: ['librechat', 'portal', 'huly', 'n8n', 'emailai', 'stirling'], desktopApps: [] });
+    expect(normalizePreferences(null)).toEqual({ theme: 'dark', remember: { huly: true, n8n: true, librechat: true, portal: true, emailai: true, stirling: true }, pinned: ['librechat', 'portal', 'huly', 'n8n', 'emailai', 'stirling'], desktopApps: [], splitRatio: 0.38, splitService: 'librechat' });
   });
   it('acepta solo valores booleanos y temas conocidos', () => {
-    expect(normalizePreferences({ theme: 'light', remember: { huly: false, n8n: 'false' }, password: 'secret' })).toEqual({ theme: 'light', remember: { huly: false, n8n: true, librechat: true, portal: true, emailai: true, stirling: true }, pinned: ['librechat', 'portal', 'huly', 'n8n', 'emailai', 'stirling'], desktopApps: [] });
+    expect(normalizePreferences({ theme: 'light', remember: { huly: false, n8n: 'false' }, password: 'secret' })).toEqual({ theme: 'light', remember: { huly: false, n8n: true, librechat: true, portal: true, emailai: true, stirling: true }, pinned: ['librechat', 'portal', 'huly', 'n8n', 'emailai', 'stirling'], desktopApps: [], splitRatio: 0.38, splitService: 'librechat' });
     expect(normalizePreferences({ theme: 'injected' }).theme).toBe('dark');
   });
   it('filtra apps fijadas inválidas y duplicadas, conservando el orden', () => {
@@ -17,6 +17,22 @@ describe('preferencias sin secretos', () => {
   it('permite no fijar ninguna app y cae al valor por defecto si el campo no es una lista', () => {
     expect(normalizePreferences({ pinned: [] }).pinned).toEqual([]);
     expect(normalizePreferences({ pinned: 'huly' }).pinned).toEqual(['librechat', 'portal', 'huly', 'n8n', 'emailai', 'stirling']);
+  });
+});
+
+describe('vista dividida en preferencias', () => {
+  it('conserva ratio y servicio válidos', () => {
+    const result = normalizePreferences({ splitRatio: 0.5, splitService: 'n8n' });
+    expect(result.splitRatio).toBe(0.5);
+    expect(result.splitService).toBe('n8n');
+  });
+  it('vuelve al valor por defecto si son inválidos', () => {
+    for (const splitRatio of [NaN, Infinity, -1, 0, 1, 5, '0.5', null, undefined, {}]) expect(normalizePreferences({ splitRatio }).splitRatio).toBe(0.38);
+    for (const splitService of ['evil', 3, null, undefined, 'constructor']) expect(normalizePreferences({ splitService }).splitService).toBe('librechat');
+  });
+  it('acota el ratio a un rango razonable', () => {
+    expect(normalizePreferences({ splitRatio: 0.01 }).splitRatio).toBe(0.1);
+    expect(normalizePreferences({ splitRatio: 0.99 }).splitRatio).toBe(0.9);
   });
 });
 

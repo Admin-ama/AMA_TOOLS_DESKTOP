@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
-import { IconPin, IconPinFilled, IconSearch, IconX } from '@tabler/icons-react';
+import { IconPin, IconPinFilled, IconSearch, IconX, IconLayoutSidebarRight } from '@tabler/icons-react';
 import { CATEGORIES, type Service, type ServiceId } from '../shared/contracts';
 import { ServiceLogo } from './service-visuals';
 
@@ -14,11 +14,12 @@ interface Props {
   services: Service[];
   pinned: ServiceId[];
   onOpen(id: ServiceId): void;
+  onSplit(id: ServiceId): void;
   onPin(id: ServiceId, pinned: boolean): void;
   onClose(): void;
 }
 
-export function Launcher({ services, pinned, onOpen, onPin, onClose }: Props) {
+export function Launcher({ services, pinned, onOpen, onSplit, onPin, onClose }: Props) {
   const [query, setQuery] = useState('');
   const search = useRef<HTMLInputElement>(null);
   const root = useRef<HTMLElement>(null);
@@ -49,7 +50,8 @@ export function Launcher({ services, pinned, onOpen, onPin, onClose }: Props) {
   }, [close]);
   const needle = query.trim().toLowerCase();
   const matches = (service: Service) => !needle || `${service.name} ${service.shortName}`.toLowerCase().includes(needle);
-  return <section ref={root} className="launcher" aria-label="Todas las aplicaciones">
+  // Solo el fondo cierra: los clics dentro del panel tienen otro target.
+  return <section ref={root} className="launcher" aria-label="Todas las aplicaciones" onMouseDown={event => { if (event.target === event.currentTarget) close(); }}>
     <div className="launcher-panel">
       <div className="launcher-top">
         <label className="launcher-search"><IconSearch size={17} aria-hidden="true" /><input ref={search} type="text" aria-label="Buscar aplicación" placeholder="Buscar aplicación…" value={query} onChange={event => setQuery(event.target.value)} /></label>
@@ -67,6 +69,7 @@ export function Launcher({ services, pinned, onOpen, onPin, onClose }: Props) {
                 <button className="launcher-open" aria-label={`Abrir ${service.name}`} onClick={() => onOpen(service.id)}>
                   <span className="launcher-logo"><ServiceLogo id={service.id} /></span><span className="launcher-name">{service.name}</span>
                 </button>
+                <button className="pin-button split-button" aria-label={`Abrir ${service.name} a la derecha`} title="Abrir a la derecha" onClick={() => onSplit(service.id)}><IconLayoutSidebarRight size={16} /></button>
                 <button className={`pin-button ${isPinned ? 'pinned' : ''}`} aria-pressed={isPinned} aria-label={isPinned ? `Quitar ${service.name} de la barra lateral` : `Fijar ${service.name} en la barra lateral`} title={isPinned ? 'Quitar de la barra lateral' : 'Fijar en la barra lateral'} onClick={event => pin(event, service.id, !isPinned)}>
                   {isPinned ? <IconPinFilled size={16} /> : <IconPin size={16} />}
                 </button>

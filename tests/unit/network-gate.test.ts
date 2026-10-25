@@ -18,3 +18,12 @@ describe('comandos sin acceso a la red interna', () => {
     }
   });
 });
+
+describe('vista dividida sin acceso a la red interna', () => {
+  it('solo permite cerrar el panel', () => {
+    expect(commandAllowedWhileBlocked('split-close', [])).toBe(true);
+    for (const command of ['split-open', 'split-set', 'split-resize', 'split-to-tab', 'split-capture', 'split-drag']) {
+      expect(commandAllowedWhileBlocked(command, ['n8n'])).toBe(false);
+    }
+  });
+});

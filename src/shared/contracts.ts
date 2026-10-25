@@ -17,7 +17,13 @@ export interface ApplicationTab { id: string; serviceId: ServiceId; number: numb
 export interface DesktopApp { id: string; name: string; path: string }
 /** Lo único que ve el renderer de una app de escritorio: nunca la ruta. */
 export interface DesktopAppView { id: string; name: string; icon?: string }
-export interface Preferences { theme: Theme; remember: Record<ServiceId, boolean>; pinned: ServiceId[]; desktopApps: DesktopApp[] }
+export const DEFAULT_SPLIT_RATIO = 0.38;
+export const DEFAULT_SPLIT_SERVICE: ServiceId = 'librechat';
+/** Panel lateral: ratio = fracción del área de contenido que ocupa el panel. */
+export interface SplitState { serviceId: ServiceId; ratio: number }
+/** Capturas (data URL) de ambas vistas para pintarlas mientras se arrastra el divisor. */
+export interface SplitCapture { main: string | null; panel: string | null }
+export interface Preferences { theme: Theme; remember: Record<ServiceId, boolean>; pinned: ServiceId[]; desktopApps: DesktopApp[]; splitRatio: number; splitService: ServiceId }
 export type PublicPreferences = Omit<Preferences, 'desktopApps'>;
 export interface UpdateState {
   status: 'disabled' | 'idle' | 'checking' | 'available' | 'current' | 'downloading' | 'downloaded' | 'installing' | 'error';
@@ -44,6 +50,7 @@ export interface Snapshot {
   preferences: PublicPreferences;
   desktopApps: DesktopAppView[];
   panel: 'service' | 'settings' | 'help' | 'launcher';
+  split: SplitState | null;
 }
 export interface PortalApi {
   snapshot(): Promise<Snapshot>;
@@ -67,6 +74,15 @@ export interface PortalApi {
   remember(id: ServiceId, enabled: boolean): Promise<void>;
   pin(id: ServiceId, pinned: boolean): Promise<void>;
   clearSession(id: ServiceId): Promise<void>;
+  splitOpen(id?: ServiceId): Promise<void>;
+  splitSet(id: ServiceId): Promise<void>;
+  /** Sin persist el ratio solo se aplica; con persist se guarda en preferencias. */
+  splitResize(ratio: number, persist?: boolean): Promise<void>;
+  splitClose(): Promise<void>;
+  splitToTab(): Promise<void>;
+  splitCapture(): Promise<SplitCapture>;
+  /** Oculta las vistas nativas mientras se arrastra el divisor. */
+  splitDrag(active: boolean): Promise<void>;
   onChange(listener: (snapshot: Snapshot) => void): () => void;
   /** Cursor position in shell coordinates, also while hovering a remote service view. */
   onCursor(listener: (point: { x: number; y: number }) => void): () => void;

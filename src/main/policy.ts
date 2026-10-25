@@ -1,5 +1,4 @@
 import { SERVICE_IDS, type ServiceId, type Service } from '../shared/contracts';
-import { SHELL_LAYOUT } from '../shared/layout';
 
 export const SERVICES: Service[] = [
   { id: 'huly', name: 'Huly Workspace', shortName: 'Huly', category: 'operacion', url: 'http://172.16.8.73:8087/' },
@@ -39,7 +38,5 @@ export function partitionFor(id: ServiceId, persistent: boolean): string {
 export function remotePreferences(id: ServiceId, persistent: boolean) {
   return { partition: partitionFor(id, persistent), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, allowRunningInsecureContent: false };
 }
-export function contentBounds(width: number, height: number) {
-  const { sidebarWidth: x, headerHeight: y, rightSidebarWidth: right, statusBarHeight: bottom } = SHELL_LAYOUT;
-  return { x, y, width: Math.max(0, width - x - right), height: Math.max(0, height - y - bottom) };
-}
+export { contentBounds } from '../shared/layout';
+export { splitBounds, SPLIT } from '../shared/split';

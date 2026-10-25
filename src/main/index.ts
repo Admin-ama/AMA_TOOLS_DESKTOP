@@ -200,6 +200,36 @@ async function createWindow() {
           break;
         }
         case 'clear-session': await manager.clearSession(id()); break;
+        case 'split-open': {
+          const serviceId = args[0] === undefined ? preferences.splitService : id();
+          manager.openSplit(serviceId);
+          preferences.splitService = serviceId;
+          await savePreferences(preferencesFile, preferences);
+          break;
+        }
+        case 'split-set': {
+          const serviceId = id();
+          manager.setSplitService(serviceId);
+          preferences.splitService = serviceId;
+          await savePreferences(preferencesFile, preferences);
+          break;
+        }
+        case 'split-resize': {
+          const ratio = args[0];
+          if (typeof ratio !== 'number' || !Number.isFinite(ratio) || ratio <= 0 || ratio >= 1) throw new Error('Proporción inválida');
+          if (args[1] !== undefined && typeof args[1] !== 'boolean') throw new Error('Preferencia inválida');
+          const effective = manager.setSplitRatio(ratio);
+          if (args[1] === true) { preferences.splitRatio = effective; await savePreferences(preferencesFile, preferences); }
+          break;
+        }
+        case 'split-close': manager.closeSplit(); break;
+        case 'split-to-tab': manager.splitToTab(); break;
+        case 'split-capture': return manager.capture();
+        case 'split-drag': {
+          if (typeof args[0] !== 'boolean') throw new Error('Estado inválido');
+          manager.setDragging(args[0]);
+          break;
+        }
         default: throw new Error('Comando desconocido');
       }
       publish();

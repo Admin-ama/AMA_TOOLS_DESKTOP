@@ -1,6 +1,6 @@
 import { readFile, writeFile, rename, mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import { SERVICE_IDS, DEFAULT_PINNED, type DesktopApp, type Preferences, type ServiceId } from '../shared/contracts';
+import { SERVICE_IDS, DEFAULT_PINNED, type DesktopApp, type Preferences, type ServiceId, DEFAULT_SPLIT_RATIO, DEFAULT_SPLIT_SERVICE } from '../shared/contracts';
 import { MAX_DESKTOP_APPS, MAX_DESKTOP_APP_NAME } from './desktop-apps';
 
 export function normalizePinned(input: unknown): ServiceId[] {
@@ -23,6 +23,12 @@ export function normalizeDesktopApps(input: unknown): DesktopApp[] {
   }
   return apps.slice(0, MAX_DESKTOP_APPS);
 }
+export function normalizeSplitRatio(input: unknown): number {
+  return typeof input === 'number' && input > 0 && input < 1 ? Math.min(0.9, Math.max(0.1, input)) : DEFAULT_SPLIT_RATIO;
+}
+export function normalizeSplitService(input: unknown): ServiceId {
+  return SERVICE_IDS.find(id => id === input) ?? DEFAULT_SPLIT_SERVICE;
+}
 export function normalizePreferences(input: unknown): Preferences {
   const source = input && typeof input === 'object' ? input as Record<string, unknown> : {};
   const remember = source.remember && typeof source.remember === 'object' ? source.remember as Record<string, unknown> : {};
@@ -31,6 +37,8 @@ export function normalizePreferences(input: unknown): Preferences {
     remember: Object.fromEntries(SERVICE_IDS.map(id => [id, typeof remember[id] === 'boolean' ? remember[id] : true])) as Preferences['remember'],
     pinned: normalizePinned(source.pinned),
     desktopApps: normalizeDesktopApps(source.desktopApps),
+    splitRatio: normalizeSplitRatio(source.splitRatio),
+    splitService: normalizeSplitService(source.splitService),
   };
 }
 export async function readPreferences(file: string): Promise<Preferences> {

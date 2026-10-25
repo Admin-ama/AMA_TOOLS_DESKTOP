@@ -206,14 +206,15 @@ test('launcher agrupa por categorías, fija y desfija apps y abre apps no fijada
   const launcher = page.getByRole('region', { name: 'Todas las aplicaciones' });
   await expect(launcher).toBeVisible();
   for (const name of ['Control', 'Operación', 'Automatización y herramientas']) await expect(launcher.getByRole('heading', { name })).toBeVisible();
-  await expect(launcher.getByRole('button', { name: /^Abrir / })).toHaveCount(6);
+  await expect(launcher.getByRole('button', { name: /^Abrir (?!.*a la derecha)/ })).toHaveCount(6);
+  await expect(launcher.getByRole('button', { name: /^Abrir .* a la derecha$/ })).toHaveCount(6);
   // Las vistas nativas no pueden pintar sobre el launcher.
   const visibility = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children.map(v => v.getVisible()));
   expect(visibility.every(v => !v)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('launcher.png') });
   // Buscar filtra.
   await launcher.getByRole('textbox', { name: 'Buscar aplicación' }).fill('stirl');
-  await expect(launcher.getByRole('button', { name: /^Abrir / })).toHaveCount(1);
+  await expect(launcher.getByRole('button', { name: /^Abrir (?!.*a la derecha)/ })).toHaveCount(1);
   await launcher.getByRole('textbox', { name: 'Buscar aplicación' }).fill('');
   // Desfijar n8n lo quita de la sidebar y se conserva en preferencias.
   await launcher.getByRole('button', { name: 'Quitar n8n Automations de la barra lateral' }).click();
@@ -225,7 +226,7 @@ test('launcher agrupa por categorías, fija y desfija apps y abre apps no fijada
   expect(await page.evaluate(async () => (await window.portal.snapshot()).preferences.pinned)).not.toContain('n8n');
   // Abrir una app no fijada desde el launcher: aparece temporalmente en la sidebar.
   await page.getByRole('button', { name: 'Ver todas las aplicaciones', exact: true }).click();
-  await launcher.getByRole('button', { name: 'Abrir n8n Automations' }).click();
+  await launcher.getByRole('button', { name: 'Abrir n8n Automations', exact: true }).click();
   await expect(page.getByTestId('n8n-tab-1')).toHaveAttribute('aria-selected', 'true');
   await expect(launcher).toHaveCount(0);
   await expect(nav.getByRole('button', { name: 'Abrir n8n Automations' })).toBeVisible();
@@ -627,4 +628,176 @@ test('borrar sesión cierra todas las vistas de esa aplicación sin afectar otra
   await expect(page.getByRole('tab')).toHaveCount(2);
   await expect(page.getByTestId('huly-tab-2')).toHaveAttribute('aria-selected', 'true');
   await waitForPage();
+});
+
+// --- Vista dividida -------------------------------------------------------------------------
+const nativeViews = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children.map(v => ({ url: (v as any).webContents?.getURL() as string, visible: v.getVisible(), bounds: v.getBounds() })));
+const visibleViews = async () => (await nativeViews()).filter(v => v.visible);
+const visibleApps = async () => (await visibleViews()).map(v => v.url.split('/').pop()).sort();
+const splitState = () => page.evaluate(async () => { const s = await window.portal.snapshot(); return { split: s.split, preferences: s.preferences, panel: s.panel, active: s.active }; });
+async function openSplit() {
+  await page.getByRole('button', { name: 'Abrir panel lateral', exact: true }).click();
+  await expect.poll(async () => (await splitState()).split?.serviceId).toBe('librechat');
+  await expect.poll(async () => (await visibleViews()).length).toBe(2);
+}
+async function layoutNow() {
+  const slot = (await page.getByTestId('split-panel-slot').boundingBox())!;
+  const views = await visibleViews();
+  return { slot, panel: views.find(v => Math.abs(v.bounds.x - slot.x) <= 1)!, main: views.find(v => Math.abs(v.bounds.x - slot.x) > 1)! };
+}
+// El DOM puede tener fracciones de píxel (escala de pantalla); la vista nativa se redondea a enteros.
+const expectSameRect = (view: { x: number; y: number; width: number; height: number }, slot: { x: number; y: number; width: number; height: number }) => { for (const key of ['x', 'y', 'width', 'height'] as const) expect(Math.abs(view[key] - slot[key]), key).toBeLessThanOrEqual(1); };
+
+test('panel lateral abre LibreChat junto a la app activa, con la misma sesión y bounds iguales al DOM', async () => {
+  await waitForPage();
+  await openSplit();
+  await expect(page.getByRole('button', { name: 'Cerrar panel lateral', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  const { slot, panel, main } = await layoutNow();
+  expect(panel.url).toMatch(/\/librechat$/);
+  expect(main.url).toMatch(/\/huly$/);
+  expectSameRect(panel.bounds, slot);
+  expect(main.bounds.x + main.bounds.width + 6).toBe(panel.bounds.x);
+  expect(await app.evaluate(({ webContents }) => { const chats = webContents.getAllWebContents().filter(w => w.getURL().endsWith('/librechat')); return chats.length === 2 && chats[0].session === chats[1].session; })).toBe(true);
+  await expect(page.getByRole('combobox', { name: 'App del panel' })).toHaveValue('librechat');
+  await expect(page.getByRole('separator')).toHaveAttribute('aria-orientation', 'vertical');
+});
+
+test('panel lateral cambia de app con el selector y recuerda la última usada', async () => {
+  await openSplit();
+  await page.getByRole('combobox', { name: 'App del panel' }).selectOption('n8n');
+  await expect.poll(visibleApps).toEqual(['huly', 'n8n']);
+  await expect.poll(async () => (await splitState()).preferences.splitService).toBe('n8n');
+  expect((await splitState()).split?.serviceId).toBe('n8n');
+  const { slot, panel } = await layoutNow();
+  expectSameRect(panel.bounds, slot);
+  // El panel guarda el último servicio: reabrirlo usa n8n.
+  await page.getByRole('button', { name: 'Cerrar panel lateral', exact: true }).click();
+  await expect.poll(async () => (await splitState()).split).toBeNull();
+  await page.getByRole('button', { name: 'Abrir panel lateral', exact: true }).click();
+  await expect.poll(async () => (await splitState()).split?.serviceId).toBe('n8n');
+});
+
+test('flechas sobre el separador redimensionan ambas vistas y persisten el ratio', async () => {
+  await openSplit();
+  const before = await layoutNow();
+  const ratioBefore = (await splitState()).split!.ratio;
+  await page.getByRole('separator').focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect.poll(async () => (await layoutNow()).panel.bounds.width).toBeGreaterThan(before.panel.bounds.width);
+  const after = await layoutNow();
+  expect(after.main.bounds.width).toBeLessThan(before.main.bounds.width);
+  expect(after.main.bounds.width + 6 + after.panel.bounds.width).toBe(before.main.bounds.width + 6 + before.panel.bounds.width);
+  const state = await splitState();
+  expect(state.split!.ratio).toBeGreaterThan(ratioBefore);
+  expect(state.preferences.splitRatio).toBeCloseTo(state.split!.ratio, 10);
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(async () => (await layoutNow()).panel.bounds.width).toBeLessThan(before.panel.bounds.width);
+  await page.getByRole('separator').dblclick();
+  await expect.poll(async () => (await splitState()).split!.ratio).toBeCloseTo(0.5, 2);
+});
+
+test('arrastrar el divisor oculta las vistas, muestra capturas y al soltar aplica y guarda el ratio', async () => {
+  await openSplit();
+  const before = await layoutNow();
+  const box = (await page.getByRole('separator').boundingBox())!;
+  const x = box.x + box.width / 2, y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x - 60, y, { steps: 6 });
+  await page.mouse.move(x - 140, y, { steps: 6 });
+  await expect(page.getByTestId('split-ghost-panel')).toBeVisible();
+  await expect.poll(async () => (await visibleViews()).length).toBe(0);
+  await page.mouse.up();
+  await expect(page.getByTestId('split-ghost-panel')).toHaveCount(0);
+  await expect.poll(async () => (await visibleViews()).length).toBe(2);
+  const after = await layoutNow();
+  expect(Math.abs(after.panel.bounds.width - (before.panel.bounds.width + 140))).toBeLessThanOrEqual(2);
+  expectSameRect(after.panel.bounds, after.slot);
+  const state = await splitState();
+  expect(state.split!.ratio).toBeGreaterThan(0.38);
+  expect(state.preferences.splitRatio).toBeCloseTo(state.split!.ratio, 10);
+});
+
+test('el divisor respeta 320 px por lado y un clic sin mover no oculta las vistas', async () => {
+  await openSplit();
+  const box = (await page.getByRole('separator').boundingBox())!;
+  const x = box.x + box.width / 2, y = box.y + box.height / 2;
+  await page.mouse.click(x, y);
+  expect(await visibleViews()).toHaveLength(2);
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x - 2000, y, { steps: 5 });
+  await page.mouse.up();
+  await expect.poll(async () => (await layoutNow()).main.bounds.width).toBe(320);
+});
+
+test('abrir el panel como pestaña lo cierra y activa esa app en el área principal', async () => {
+  await openSplit();
+  await page.getByRole('combobox', { name: 'App del panel' }).selectOption('n8n');
+  await expect.poll(async () => (await splitState()).split?.serviceId).toBe('n8n');
+  await page.getByRole('button', { name: 'Abrir como pestaña' }).click();
+  await expect.poll(async () => (await splitState()).split).toBeNull();
+  await expect(page.getByTestId('n8n-tab-1')).toHaveAttribute('aria-selected', 'true');
+  expect((await splitState()).active).toBe('n8n');
+  await expect.poll(visibleApps).toEqual(['n8n']);
+  await expect(page.getByRole('separator')).toHaveCount(0);
+});
+
+test('cerrar el panel destruye su vista y devuelve todo el ancho a la app principal', async () => {
+  const full = (await visibleViews())[0].bounds;
+  await openSplit();
+  const count = (await nativeViews()).length;
+  await page.getByRole('button', { name: 'Cerrar panel', exact: true }).click();
+  await expect.poll(async () => (await splitState()).split).toBeNull();
+  await expect.poll(async () => (await nativeViews()).length).toBe(count - 1);
+  expect((await visibleViews())[0].bounds).toEqual(full);
+});
+
+test('el panel se oculta bajo ajustes y launcher y vuelve al regresar', async () => {
+  await openSplit();
+  await page.getByRole('button', { name: 'Ajustes', exact: true }).click();
+  await expect(page.getByRole('separator')).toHaveCount(0);
+  await expect.poll(async () => (await visibleViews()).length).toBe(0);
+  await page.getByRole('button', { name: 'Volver al servicio' }).click();
+  await expect.poll(async () => (await visibleViews()).length).toBe(2);
+  await page.getByRole('button', { name: 'Ver todas las aplicaciones', exact: true }).click();
+  await expect.poll(async () => (await visibleViews()).length).toBe(0);
+  await page.getByRole('textbox', { name: 'Buscar aplicación' }).click();
+  await page.keyboard.press('Escape');
+  await expect.poll(async () => (await visibleViews()).length).toBe(2);
+});
+
+test('el launcher abre cualquier app a la derecha', async () => {
+  await page.getByRole('button', { name: 'Ver todas las aplicaciones', exact: true }).click();
+  await page.getByRole('button', { name: 'Abrir n8n Automations a la derecha', exact: true }).click();
+  await expect.poll(async () => (await splitState()).split?.serviceId).toBe('n8n');
+  expect((await splitState()).panel).toBe('service');
+  await expect(page.getByRole('region', { name: 'Todas las aplicaciones' })).toHaveCount(0);
+  await expect.poll(visibleApps).toEqual(['huly', 'n8n']);
+});
+
+test('los comandos del panel validan sus argumentos en el proceso principal', async () => {
+  const outcome = await page.evaluate(async () => {
+    const portal = window.portal as any;
+    const rejects = async (task: () => Promise<unknown>) => { try { await task(); return false; } catch { return true; } };
+    const result: Record<string, boolean> = {};
+    result.closedResize = await rejects(() => portal.splitResize(0.5));
+    result.closedCapture = await rejects(() => portal.splitCapture());
+    result.closedSet = await rejects(() => portal.splitSet('n8n'));
+    result.closedToTab = await rejects(() => portal.splitToTab());
+    result.badOpen = await rejects(() => portal.splitOpen('x'));
+    result.nullOpen = await rejects(() => portal.splitOpen(null));
+    await portal.splitOpen('n8n');
+    result.badSet = await rejects(() => portal.splitSet('evil'));
+    for (const bad of [NaN, Infinity, 5, 1, 0, -0.2, 'x', null, undefined, {}]) result['ratio:' + String(bad)] = await rejects(() => portal.splitResize(bad));
+    result.badPersist = await rejects(() => portal.splitResize(0.5, 'yes'));
+    result.badDrag = await rejects(() => portal.splitDrag('yes'));
+    result.okRatio = !(await rejects(() => portal.splitResize(0.45)));
+    return result;
+  });
+  expect(Object.entries(outcome).filter(([key, value]) => key !== 'okRatio' && !value)).toEqual([]);
+  expect(outcome.okRatio).toBe(true);
+  // Sin persist el ratio solo se aplica: no se guarda.
+  expect((await splitState()).preferences.splitRatio).toBe(0.38);
 });

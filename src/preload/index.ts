@@ -23,6 +23,13 @@ const api: PortalApi = {
   remember: (id, enabled) => command('remember', id, enabled),
   pin: (id, pinned) => command('pin', id, pinned),
   clearSession: id => command('clear-session', id),
+  splitOpen: id => command('split-open', id),
+  splitSet: id => command('split-set', id),
+  splitResize: (ratio, persist) => command('split-resize', ratio, persist),
+  splitClose: () => command('split-close'),
+  splitToTab: () => command('split-to-tab'),
+  splitCapture: () => command('split-capture'),
+  splitDrag: active => command('split-drag', active),
   onChange: listener => {
     const handler = (_event: Electron.IpcRendererEvent, snapshot: Snapshot) => listener(snapshot);
     ipcRenderer.on('portal:changed', handler);

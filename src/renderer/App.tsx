@@ -1,5 +1,5 @@
 import { useEffect, useState, type KeyboardEvent, type CSSProperties } from 'react';
-import { IconSettings, IconHelpHexagon, IconMoon, IconSun, IconRefresh, IconShieldCheck, IconAlertTriangle, IconChevronLeft, IconTrash, IconActivity, IconPlus, IconMinus, IconX, IconLayoutGrid } from '@tabler/icons-react';
+import { IconSettings, IconHelpHexagon, IconMoon, IconSun, IconRefresh, IconShieldCheck, IconAlertTriangle, IconChevronLeft, IconTrash, IconActivity, IconPlus, IconMinus, IconX, IconLayoutGrid, IconLayoutSidebarRight } from '@tabler/icons-react';
 import { CATEGORIES, type ServiceId, type Snapshot } from '../shared/contracts';
 import { SHELL_LAYOUT } from '../shared/layout';
 import { PAGE_ZOOM } from '../shared/zoom';
@@ -8,6 +8,7 @@ import { NetworkBlock } from './NetworkBlock';
 import { DesktopDock } from './DesktopDock';
 import { StatusBar } from './StatusBar';
 import { Splash } from './Splash';
+import { SplitView } from './SplitView';
 import { ServiceLogo, icons } from './service-visuals';
 
 const updateLabels = { disabled: 'Las actualizaciones están disponibles en la app instalada de Windows.', idle: 'Puedes buscar una nueva versión.', checking: 'Buscando actualizaciones…', available: 'Hay una nueva versión disponible.', current: 'Tienes la última versión disponible.', downloading: 'Descargando actualización…', downloaded: 'La actualización está lista para instalar.', installing: 'Instalando actualización…', error: 'No se pudo actualizar. Revisa la conexión a GitHub y vuelve a intentar.' };
@@ -17,10 +18,16 @@ export function App() {
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [size, setSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   useEffect(() => {
     const unsubscribe = window.portal.onChange(setState);
     void window.portal.snapshot().then(setState).catch(() => setError('No se pudo conectar con el contenedor. Reinicia la aplicación.'));
     return unsubscribe;
+  }, []);
+  useEffect(() => {
+    const onResize = () => setSize({ width: window.innerWidth, height: window.innerHeight });
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, []);
   useEffect(() => { if (state) document.documentElement.dataset.theme = state.preferences.theme; }, [state?.preferences.theme]);
   useEffect(() => { if (state?.activeTabId) document.getElementById(`tab-${state.activeTabId}`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }, [state?.activeTabId]);
@@ -110,6 +117,7 @@ export function App() {
           <button className="icon-button" aria-label="Aumentar zoom" title="Aumentar zoom" disabled={blocked || state.panel !== 'service' || state.zoomPercent >= PAGE_ZOOM.max} onClick={() => void action(() => window.portal.zoom(Math.min(PAGE_ZOOM.max, state.zoomPercent + PAGE_ZOOM.step)))}><IconPlus size={15} /></button>
         </div>
         <button className="icon-button" aria-label="Recargar servicio" title="Recargar servicio" onClick={() => void action(() => window.portal.reload())}><IconRefresh size={19} /></button>
+        <button className={`icon-button ${state.split ? 'toggled' : ''}`} aria-label={state.split ? 'Cerrar panel lateral' : 'Abrir panel lateral'} aria-pressed={!!state.split} title={state.split ? 'Cerrar panel lateral' : 'Abrir panel lateral'} disabled={blocked && !state.split} onClick={() => void action(() => state.split ? window.portal.splitClose() : window.portal.splitOpen())}><IconLayoutSidebarRight size={19} /></button>
         <button className="icon-button" aria-label={light ? 'Cambiar a tema oscuro' : 'Cambiar a tema claro'} title="Cambiar tema del portal" onClick={toggleTheme}>{light ? <IconSun size={19} /> : <IconMoon size={19} />}</button>
       </div>
     </header>
@@ -118,7 +126,7 @@ export function App() {
 
     <main id="service-content" className="content" role="tabpanel" aria-labelledby={state.activeTabId ? `tab-${state.activeTabId}` : undefined}>
       {blocked && (state.panel === 'service' || state.panel === 'launcher') && <NetworkBlock network={state.network} onRetry={() => action(() => window.portal.reload())} onForticlient={() => action(() => window.portal.openForticlient())} />}
-      {!blocked && state.panel === 'launcher' && <Launcher services={state.services} pinned={state.preferences.pinned} onOpen={activate} onPin={(id, pinned) => void action(() => window.portal.pin(id, pinned))} onClose={() => panel('service')} />}
+      {!blocked && state.panel === 'launcher' && <Launcher services={state.services} pinned={state.preferences.pinned} onOpen={activate} onSplit={id => void action(() => window.portal.splitOpen(id))} onPin={(id, pinned) => void action(() => window.portal.pin(id, pinned))} onClose={() => panel('service')} />}
       {state.panel === 'settings' && <section className="settings-page">
         <button className="back-button" onClick={() => panel('service')}><IconChevronLeft size={17} />Volver al servicio</button>
         <div className="page-heading"><span className="eyebrow">PERSONALIZA TU ESPACIO</span><h1>Preferencias del portal</h1><p>Tu interfaz y tus sesiones. Cada aplicación conserva su propio inicio de sesión.</p></div>
@@ -152,6 +160,8 @@ export function App() {
       </section>}
       {error && <p className="action-error" role="alert">{error}</p>}
     </main>
+
+    {!blocked && state.panel === 'service' && state.split && <SplitView services={state.services} split={state.split} width={size.width} height={size.height} onSet={id => void action(() => window.portal.splitSet(id))} onToTab={() => void action(() => window.portal.splitToTab())} onClose={() => void action(() => window.portal.splitClose())} onResize={(ratio, persist) => window.portal.splitResize(ratio, persist)} onCapture={() => window.portal.splitCapture()} onDrag={active => window.portal.splitDrag(active)} />}
 
     <StatusBar network={state.network.status} version={state.updates.currentVersion} />
   </div>{state.splash !== 'done' && <Splash key="splash" state={state} />}</>;
