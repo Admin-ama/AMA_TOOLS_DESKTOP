@@ -1,11 +1,13 @@
 import { readFile, writeFile, rename, mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import { SERVICE_IDS, DEFAULT_PINNED, type DesktopApp, type Preferences, type ServiceId, DEFAULT_SPLIT_RATIO, DEFAULT_SPLIT_SERVICE } from '../shared/contracts';
+import { GLOBAL_APP_IDS, DEFAULT_PINNED, type DesktopApp, type Preferences, type AppId, DEFAULT_SPLIT_RATIO, DEFAULT_SPLIT_SERVICE } from '../shared/contracts';
+import { normalizeCustomApps } from '../shared/custom-apps';
 import { MAX_DESKTOP_APPS, MAX_DESKTOP_APP_NAME } from './desktop-apps';
 
-export function normalizePinned(input: unknown): ServiceId[] {
-  if (!Array.isArray(input)) return [...DEFAULT_PINNED];
-  return [...new Set(input)].filter((id): id is ServiceId => SERVICE_IDS.some(known => known === id));
+/** `ids`: catálogo vigente (globales + páginas propias); lo desconocido se descarta. */
+export function normalizePinned(input: unknown, ids: readonly AppId[] = GLOBAL_APP_IDS): AppId[] {
+  if (!Array.isArray(input)) return DEFAULT_PINNED.filter(id => ids.includes(id));
+  return [...new Set(input)].filter((id): id is AppId => ids.some(known => known === id));
 }
 /** Solo la forma: que la ruta exista se comprueba al vincular y al abrir. */
 export function normalizeDesktopApps(input: unknown): DesktopApp[] {
@@ -26,19 +28,22 @@ export function normalizeDesktopApps(input: unknown): DesktopApp[] {
 export function normalizeSplitRatio(input: unknown): number {
   return typeof input === 'number' && input > 0 && input < 1 ? Math.min(0.9, Math.max(0.1, input)) : DEFAULT_SPLIT_RATIO;
 }
-export function normalizeSplitService(input: unknown): ServiceId {
-  return SERVICE_IDS.find(id => id === input) ?? DEFAULT_SPLIT_SERVICE;
+export function normalizeSplitService(input: unknown, ids: readonly AppId[] = GLOBAL_APP_IDS): AppId {
+  return ids.find(id => id === input) ?? DEFAULT_SPLIT_SERVICE;
 }
 export function normalizePreferences(input: unknown): Preferences {
   const source = input && typeof input === 'object' ? input as Record<string, unknown> : {};
   const remember = source.remember && typeof source.remember === 'object' ? source.remember as Record<string, unknown> : {};
+  const customApps = normalizeCustomApps(source.customApps);
+  const ids: AppId[] = [...GLOBAL_APP_IDS, ...customApps.map(app => app.id)];
   return {
     theme: source.theme === 'light' ? 'light' : 'dark',
-    remember: Object.fromEntries(SERVICE_IDS.map(id => [id, typeof remember[id] === 'boolean' ? remember[id] : true])) as Preferences['remember'],
-    pinned: normalizePinned(source.pinned),
+    remember: Object.fromEntries(ids.map(id => [id, Object.hasOwn(remember, id) && typeof remember[id] === 'boolean' ? remember[id] : true])),
+    pinned: normalizePinned(source.pinned, ids),
     desktopApps: normalizeDesktopApps(source.desktopApps),
+    customApps,
     splitRatio: normalizeSplitRatio(source.splitRatio),
-    splitService: normalizeSplitService(source.splitService),
+    splitService: normalizeSplitService(source.splitService, ids),
   };
 }
 export async function readPreferences(file: string): Promise<Preferences> {

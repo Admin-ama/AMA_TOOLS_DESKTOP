@@ -1,6 +1,7 @@
 import { WebContentsView, session, type BrowserWindow } from 'electron';
-import { type ApplicationTab, type Service, type ServiceId, type ServiceState, type Snapshot, type Preferences, type SplitCapture } from '../shared/contracts';
-import { allowedNavigation, allowedDownload, isPdfUrl, sameServiceOrigin, contentBounds, splitBounds, partitionFor, remotePreferences } from './policy';
+import { type ApplicationTab, type Service, type AppId, type ServiceState, type Snapshot, type Preferences, type SplitCapture } from '../shared/contracts';
+import { permissionAllowed, sanitizeUserAgent } from './permissions';
+import { allowedNavigation, allowedDownload, isPdfUrl, sameServiceOrigin, contentBounds, splitBounds, partitionFor, remotePreferences, catalogOf } from './policy';
 import { ApplicationTabs } from './application-tabs';
 import { isZoomPercent, PAGE_ZOOM } from '../shared/zoom';
 import { allowInternalCertificate } from './certificate-policy';
@@ -13,24 +14,30 @@ const securedSessions = new WeakSet<Electron.Session>();
 export class ServiceViewManager {
   private views = new Map<string, Entry>();
   private tabs = new ApplicationTabs();
-  private zoomLevels = new Map<ServiceId, number>();
-  get active(): ServiceId { return this.tabs.active; }
+  private zoomLevels = new Map<AppId, number>();
+  get active(): AppId { return this.tabs.active; }
   panel: Snapshot['panel'] = 'service';
   private split: Snapshot['split'] = null;
-  private panelEntry?: Entry & { serviceId: ServiceId };
+  private panelEntry?: Entry & { serviceId: AppId };
   /** Mientras se arrastra el divisor las vistas nativas se ocultan: el renderer pinta capturas. */
   private dragging = false;
   /** Sin acceso a la red interna: ninguna vista se muestra ni se crea. Empieza bloqueado hasta la primera sonda. */
   private blocked = true;
 
-  constructor(private window: BrowserWindow, readonly services: Service[], readonly preferences: Preferences, private changed: () => void) {
+  /** Un menú o diálogo del DOM está abierto: las vistas nativas pintan por encima del DOM, así que se ocultan. */
+  private overlay = false;
+
+  constructor(private window: BrowserWindow, private readonly globals: Service[], readonly preferences: Preferences, private changed: () => void) {
     window.on('resize', () => this.resize());
   }
+
+  /** Catálogo vigente: globales + páginas del usuario (preferencias). */
+  get services(): Service[] { return catalogOf(this.globals, this.preferences.customApps); }
 
   snapshot(): Omit<Snapshot, 'splash' | 'updates' | 'network' | 'desktopApps'> {
     // Las rutas de las apps de escritorio nunca salen del proceso principal.
     const { desktopApps: _paths, ...preferences } = this.preferences;
-    return { services: this.services, active: this.active, activeTabId: this.tabs.activeTabId, zoomPercent: this.zoomLevels.get(this.active) ?? PAGE_ZOOM.default, tabs: this.tabs.all, states: this.tabs.serviceStates(), preferences, panel: this.panel, split: this.split ? { ...this.split } : null };
+    return { services: this.services, active: this.active, activeTabId: this.tabs.activeTabId, zoomPercent: this.zoomLevels.get(this.active) ?? PAGE_ZOOM.default, tabs: this.tabs.all, states: this.tabs.serviceStates(this.services.map(service => service.id)), preferences, panel: this.panel, split: this.split ? { ...this.split } : null };
   }
 
   private update(id: string, state: ServiceState) {
@@ -40,8 +47,8 @@ export class ServiceViewManager {
     this.changed();
   }
 
-  private shouldShow(id: string) { return !this.splash && !this.blocked && !this.dragging && id === this.tabs.activeTabId && this.panel === 'service'; }
-  private shouldShowPanel() { return !!this.panelEntry && !this.splash && !this.blocked && !this.dragging && this.panel === 'service' && this.splitLayout() !== null; }
+  private shouldShow(id: string) { return !this.splash && !this.blocked && !this.dragging && !this.overlay && id === this.tabs.activeTabId && this.panel === 'service'; }
+  private shouldShowPanel() { return !!this.panelEntry && !this.splash && !this.blocked && !this.dragging && !this.overlay && this.panel === 'service' && this.splitLayout() !== null; }
 
   /** La pantalla de arranque oculta las vistas nativas hasta que el renderer termina su animación de salida. */
   endSplash() {
@@ -58,9 +65,9 @@ export class ServiceViewManager {
 
   private splash = true;
   // Primera carga por servicio: did-start-loading se repite y no sirve para saber si ya hay algo que mostrar.
-  private loaded = new Set<ServiceId>();
+  private loaded = new Set<AppId>();
 
-  hasLoaded(id: ServiceId) { return this.loaded.has(id); }
+  hasLoaded(id: AppId) { return this.loaded.has(id); }
 
   setBlocked(blocked: boolean) {
     if (this.blocked === blocked) return;
@@ -90,7 +97,7 @@ export class ServiceViewManager {
     return splitBounds(width, height, this.split.ratio);
   }
 
-  openSplit(serviceId: ServiceId) {
+  openSplit(serviceId: AppId) {
     const same = this.split?.serviceId === serviceId && this.panelEntry;
     this.panel = 'service';
     this.split = { serviceId, ratio: this.split?.ratio ?? this.preferences.splitRatio };
@@ -100,7 +107,7 @@ export class ServiceViewManager {
     this.changed();
   }
 
-  setSplitService(serviceId: ServiceId) {
+  setSplitService(serviceId: AppId) {
     if (!this.split) throw new Error('Panel lateral cerrado');
     this.openSplit(serviceId);
   }
@@ -113,6 +120,36 @@ export class ServiceViewManager {
     this.resize();
     this.changed();
     return this.split.ratio;
+  }
+
+  setOverlay(active: boolean) {
+    if (this.overlay === active) return;
+    this.overlay = active;
+    this.visibility();
+    this.changed();
+  }
+
+  /** Cierra las pestañas y el panel de una app (borrado o cambio de origen); si era la activa vuelve a `fallback`. */
+  dropApp(id: AppId, fallback: AppId) {
+    if (this.split?.serviceId === id) this.closeSplit();
+    const wasActive = this.tabs.active === id;
+    for (const tab of this.tabs.all) if (tab.serviceId === id) this.destroyView(tab.id);
+    this.tabs.removeApp(id);
+    this.zoomLevels.delete(id);
+    this.loaded.delete(id);
+    if (wasActive) this.ensureView(this.tabs.switchApplication(fallback)); // El panel visible no cambia: puede ser el launcher.
+    this.visibility();
+    this.changed();
+  }
+
+  /** Borra la sesión guardada (persistente y temporal) de una app sin tocar sus pestañas. */
+  async wipeStorage(id: AppId) {
+    for (const persistent of [true, false]) {
+      const isolated = session.fromPartition(partitionFor(id, persistent));
+      await isolated.closeAllConnections();
+      await isolated.clearStorageData();
+      await isolated.clearCache();
+    }
   }
 
   setDragging(active: boolean) {
@@ -176,7 +213,7 @@ export class ServiceViewManager {
     this.panelEntry = undefined;
   }
 
-  activate(id: ServiceId) {
+  activate(id: AppId) {
     this.panel = 'service';
     const tab = this.tabs.switchApplication(id);
     this.ensureView(tab);
@@ -184,7 +221,7 @@ export class ServiceViewManager {
     this.changed();
   }
 
-  openTab(serviceId: ServiceId = this.active, url?: string, focus = true) {
+  openTab(serviceId: AppId = this.active, url?: string, focus = true) {
     const service = this.services.find(item => item.id === serviceId)!;
     if (url && !sameServiceOrigin(url, service)) throw new Error('Destino de pestaña inválido');
     const tab = this.tabs.open(serviceId, focus);
@@ -252,7 +289,7 @@ export class ServiceViewManager {
 
   /** Vista remota de un servicio con todas las guardas (navegación, ventanas, descargas, certificados, permisos). */
   private build(service: Service, hooks: Hooks, url?: string) {
-    const view = new WebContentsView({ webPreferences: remotePreferences(service.id, this.preferences.remember[service.id]) });
+    const view = new WebContentsView({ webPreferences: remotePreferences(service.id, this.preferences.remember[service.id] ?? true) });
     const entry: Entry = { view, disposed: false, failed: false };
     hooks.attach(entry);
     view.setBackgroundColor('#020617');
@@ -266,8 +303,12 @@ export class ServiceViewManager {
       } else callback(false);
     });
     if (!securedSessions.has(web.session)) {
-      web.session.setPermissionRequestHandler((_web, _permission, callback) => callback(false));
-      web.session.setPermissionCheckHandler(() => false);
+      // Todo denegado, salvo Teams (llamadas, avisos, copiar, pantalla completa) y solo desde sus orígenes.
+      web.session.setPermissionRequestHandler((_web, permission, callback, details) => callback(permissionAllowed(service, permission, details.requestingUrl)));
+      web.session.setPermissionCheckHandler((_web, permission, requestingOrigin) => permissionAllowed(service, permission, requestingOrigin));
+      web.session.setDisplayMediaRequestHandler((_request, callback) => callback({})); // Compartir pantalla: no implementado.
+      // Teams rechaza el UA de Electron.
+      if (service.id === 'teams') web.session.setUserAgent(sanitizeUserAgent(web.session.getUserAgent()));
       // La sesión es por servicio: solo se permite bajar archivos de su propio origen (diálogo "Guardar como" nativo).
       web.session.on('will-download', (event, item) => {
         if (!allowedDownload(item.getURL(), service)) event.preventDefault();
@@ -338,15 +379,10 @@ export class ServiceViewManager {
     this.views.delete(id);
   }
 
-  async clearSession(id: ServiceId) {
+  async clearSession(id: AppId) {
     if (this.split?.serviceId === id) this.closeSplit();
     for (const tab of this.tabs.all) if (tab.serviceId === id) this.destroyView(tab.id);
-    for (const persistent of [true, false]) {
-      const isolated = session.fromPartition(partitionFor(id, persistent));
-      await isolated.closeAllConnections();
-      await isolated.clearStorageData();
-      await isolated.clearCache();
-    }
+    await this.wipeStorage(id);
     this.tabs.reset(id);
     this.changed();
     // No recrear mientras Ajustes está abierto; evita que una página escriba otra sesión inmediatamente.

@@ -1,11 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { app, BrowserWindow, ipcMain, protocol, nativeTheme, Menu, dialog, screen, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, protocol, nativeTheme, Menu, dialog, screen, shell, net } from 'electron';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { SERVICES, isServiceId } from './policy';
+import { SERVICES, isAppId } from './policy';
 import { SHELL_LAYOUT } from '../shared/layout';
-import { STARTUP_SERVICE, type SplashPhase } from '../shared/contracts';
+import { STARTUP_SERVICE, DEFAULT_SPLIT_SERVICE, type SplashPhase } from '../shared/contracts';
+import { checkCustomName, checkCustomUrl, isCustomId, MAX_CUSTOM_APPS } from '../shared/custom-apps';
+import { fetchFavicon } from './favicon';
 import { isZoomPercent } from '../shared/zoom';
 import { assetPath } from './assets';
 import { readPreferences, savePreferences } from './preferences';
@@ -127,7 +129,21 @@ async function createWindow() {
     if (!shellSender && !(noticeSender && ['snapshot', 'download-update', 'install-update', 'snooze-update'].includes(command as string))) throw new Error('Remitente no autorizado');
     const run = async () => {
       if (network.status !== 'connected' && !commandAllowedWhileBlocked(command, args)) throw new Error(BLOCKED_MESSAGE);
-      const id = () => { if (!isServiceId(args[0])) throw new Error('Servicio inválido'); return args[0]; };
+      const id = () => { if (!isAppId(args[0], manager.services)) throw new Error('Servicio inválido'); return args[0]; };
+      // Páginas del usuario: todo dato del renderer se valida aquí, con los mismos mensajes que el formulario.
+      const customId = () => { if (!isCustomId(args[0]) || !preferences.customApps.some(item => item.id === args[0])) throw new Error('Página inválida'); return args[0]; };
+      const customInput = (value: unknown, withPin: boolean) => {
+        if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Datos de página inválidos');
+        const { name, url, pin } = value as Record<string, unknown>;
+        const checkedName = checkCustomName(name);
+        if (!('name' in checkedName)) throw new Error(checkedName.error);
+        const checkedUrl = checkCustomUrl(url);
+        if (!('url' in checkedUrl)) throw new Error(checkedUrl.error);
+        if (withPin && typeof pin !== 'boolean') throw new Error('Datos de página inválidos');
+        return { name: checkedName.name, url: checkedUrl.url, pin: pin === true };
+      };
+      const favicon = (url: string) => fetchFavicon(new URL(url).origin, (target, init) => net.fetch(target, init));
+      const fallbackApp = (dropped: string) => preferences.pinned.find(item => item !== dropped) ?? STARTUP_SERVICE;
       const tabId = () => { if (typeof args[0] !== 'string') throw new Error('Pestaña inválida'); return args[0]; };
       switch (command) {
         case 'snapshot': return snapshot();
@@ -200,6 +216,48 @@ async function createWindow() {
           break;
         }
         case 'clear-session': await manager.clearSession(id()); break;
+        case 'custom-add': {
+          const input = customInput(args[0], true);
+          if (preferences.customApps.length >= MAX_CUSTOM_APPS) throw new Error(`Máximo ${MAX_CUSTOM_APPS} páginas propias.`);
+          const created = `custom-${randomUUID()}`;
+          const icon = await favicon(input.url); // Mejor esfuerzo: nunca bloquea ni falla.
+          preferences.customApps.push({ id: created, name: input.name, url: input.url, ...(icon ? { icon } : {}) });
+          preferences.remember[created] = true;
+          if (input.pin) preferences.pinned = [...preferences.pinned, created];
+          await savePreferences(preferencesFile, preferences);
+          publish();
+          return created;
+        }
+        case 'custom-edit': {
+          const target = customId();
+          const input = customInput(args[1], false);
+          const entry = preferences.customApps.find(item => item.id === target)!;
+          const originChanged = new URL(entry.url).origin !== new URL(input.url).origin;
+          const visible = manager.active === target && manager.panel === 'service';
+          entry.name = input.name;
+          entry.url = input.url;
+          if (originChanged) { delete entry.icon; const icon = await favicon(input.url); if (icon) entry.icon = icon; }
+          await savePreferences(preferencesFile, preferences);
+          // Otro origen: las pestañas abiertas ya no pertenecen a la página; se cierran y se reabre en el nuevo.
+          if (originChanged) { manager.dropApp(target, fallbackApp(target)); if (visible) manager.activate(target); }
+          break;
+        }
+        case 'custom-remove': {
+          const target = customId();
+          manager.dropApp(target, fallbackApp(target));
+          await manager.wipeStorage(target);
+          preferences.customApps = preferences.customApps.filter(item => item.id !== target);
+          preferences.pinned = preferences.pinned.filter(item => item !== target);
+          delete preferences.remember[target];
+          if (preferences.splitService === target) preferences.splitService = DEFAULT_SPLIT_SERVICE;
+          await savePreferences(preferencesFile, preferences);
+          break;
+        }
+        case 'overlay': {
+          if (typeof args[0] !== 'boolean') throw new Error('Estado inválido');
+          manager.setOverlay(args[0]);
+          break;
+        }
         case 'split-open': {
           const serviceId = args[0] === undefined ? preferences.splitService : id();
           manager.openSplit(serviceId);

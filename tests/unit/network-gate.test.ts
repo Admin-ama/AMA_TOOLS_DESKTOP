@@ -13,9 +13,16 @@ describe('comandos sin acceso a la red interna', () => {
     expect(commandAllowedWhileBlocked('panel', [])).toBe(false);
   });
   it('rechaza todo lo que cargaría o modificaría servicios', () => {
-    for (const command of ['activate', 'new-tab', 'select-tab', 'close-tab', 'zoom', 'remember', 'pin', 'clear-session', 'add-desktop-app', 'remove-desktop-app', 'desconocido', undefined, 3, {}]) {
+    for (const command of ['activate', 'new-tab', 'select-tab', 'close-tab', 'zoom', 'remember', 'pin', 'clear-session', 'custom-add', 'custom-edit', 'custom-remove', 'add-desktop-app', 'remove-desktop-app', 'desconocido', undefined, 3, {}]) {
       expect(commandAllowedWhileBlocked(command, ['huly'])).toBe(false);
     }
+  });
+});
+
+describe('overlay sin acceso a la red interna', () => {
+  it('solo permite desactivarlo: nunca debe quedar un menú atascado', () => {
+    expect(commandAllowedWhileBlocked('overlay', [false])).toBe(true);
+    for (const args of [[true], [], ['false'], [1]]) expect(commandAllowedWhileBlocked('overlay', args)).toBe(false);
   });
 });
 

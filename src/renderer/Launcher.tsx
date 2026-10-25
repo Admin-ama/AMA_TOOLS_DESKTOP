@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { IconPin, IconPinFilled, IconSearch, IconX, IconLayoutSidebarRight } from '@tabler/icons-react';
-import { CATEGORIES, type Service, type ServiceId } from '../shared/contracts';
+import { CATEGORIES, type Service, type AppId } from '../shared/contracts';
 import { ServiceLogo } from './service-visuals';
 
 gsap.registerPlugin(useGSAP);
@@ -12,10 +12,10 @@ const MOTION = '(prefers-reduced-motion: no-preference)';
 
 interface Props {
   services: Service[];
-  pinned: ServiceId[];
-  onOpen(id: ServiceId): void;
-  onSplit(id: ServiceId): void;
-  onPin(id: ServiceId, pinned: boolean): void;
+  pinned: AppId[];
+  onOpen(id: AppId): void;
+  onSplit(id: AppId): void;
+  onPin(id: AppId, pinned: boolean): void;
   onClose(): void;
 }
 
@@ -39,7 +39,7 @@ export function Launcher({ services, pinned, onOpen, onSplit, onPin, onClose }: 
     if (!window.matchMedia(MOTION).matches) return onClose();
     gsap.to('.launcher-panel', { opacity: 0, y: -8, scale: 0.98, duration: 0.14, ease: 'power2.in', onComplete: onClose });
   });
-  const pin = contextSafe((event: MouseEvent<HTMLButtonElement>, id: ServiceId, value: boolean) => {
+  const pin = contextSafe((event: MouseEvent<HTMLButtonElement>, id: AppId, value: boolean) => {
     if (window.matchMedia(MOTION).matches) gsap.fromTo(event.currentTarget, { scale: 0.7 }, { scale: 1, duration: 0.35, ease: 'back.out(3)', clearProps: 'transform' });
     onPin(id, value);
   });
@@ -67,7 +67,7 @@ export function Launcher({ services, pinned, onOpen, onSplit, onPin, onClose }: 
               const isPinned = pinned.includes(service.id);
               return <div className="launcher-card" key={service.id}>
                 <button className="launcher-open" aria-label={`Abrir ${service.name}`} onClick={() => onOpen(service.id)}>
-                  <span className="launcher-logo"><ServiceLogo id={service.id} /></span><span className="launcher-name">{service.name}</span>
+                  <span className="launcher-logo"><ServiceLogo id={service.id} icon={service.icon} /></span><span className="launcher-name">{service.name}</span>
                 </button>
                 <button className="pin-button split-button" aria-label={`Abrir ${service.name} a la derecha`} title="Abrir a la derecha" onClick={() => onSplit(service.id)}><IconLayoutSidebarRight size={16} /></button>
                 <button className={`pin-button ${isPinned ? 'pinned' : ''}`} aria-pressed={isPinned} aria-label={isPinned ? `Quitar ${service.name} de la barra lateral` : `Fijar ${service.name} en la barra lateral`} title={isPinned ? 'Quitar de la barra lateral' : 'Fijar en la barra lateral'} onClick={event => pin(event, service.id, !isPinned)}>

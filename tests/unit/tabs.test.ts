@@ -86,6 +86,21 @@ describe('pestañas por aplicación', () => {
     expect(tabs.all.find(tab => tab.id === huly.id)?.state.status).toBe('idle');
     expect(tabs.current.state.status).toBe('ready');
   });
+  it('serviceStates cubre exactamente el catálogo recibido, también apps propias', () => {
+    const tabs = new ApplicationTabs();
+    const wiki = tabs.switchApplication('custom-0a1b2c3d-aaaa');
+    tabs.update(wiki.id, { status: 'ready' });
+    expect(tabs.serviceStates(['librechat', 'custom-0a1b2c3d-aaaa', 'teams'])).toEqual({ librechat: { status: 'idle' }, 'custom-0a1b2c3d-aaaa': { status: 'ready' }, teams: { status: 'idle' } });
+  });
+  it('removeApp elimina pestañas, selección y numeración de una app; las demás no se tocan', () => {
+    const tabs = new ApplicationTabs();
+    const huly = tabs.switchApplication('huly');
+    tabs.switchApplication('custom-0a1b2c3d-aaaa');
+    tabs.open('custom-0a1b2c3d-aaaa');
+    tabs.removeApp('custom-0a1b2c3d-aaaa');
+    expect(tabs.all.map(tab => tab.id)).toEqual([huly.id]);
+    expect(tabs.switchApplication('custom-0a1b2c3d-aaaa').number).toBe(1);
+  });
   it('un popup en segundo plano no roba la selección actual', () => {
     const tabs = new ApplicationTabs();
     tabs.switchApplication('huly');

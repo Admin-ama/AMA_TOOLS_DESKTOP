@@ -50,6 +50,10 @@ button { transition:background .18s, color .18s, border-color .18s; }
 .service-logo-portal { width:28px; height:28px; border-radius:7px; }
 .service-logo-emailai { color:var(--accent); }
 .service-logo-stirling { width:28px; height:28px; border-radius:6px; }
+.service-logo-teams { color:#7b83eb; }
+.service-logo-custom { width:28px; height:28px; border-radius:6px; object-fit:contain; }
+.service-logo-custom-fallback { color:var(--teal); }
+.app-favicon { flex-shrink:0; border-radius:3px; object-fit:contain; }
 :root[data-theme='light'] .service-logo-huly { filter:brightness(0); }
 .sidebar-bottom { margin-top:auto; border-top:1px solid var(--line); padding:.75rem 0; }
 .header { grid-column:2 / 4; display:flex; align-items:center; gap:.7rem; background:var(--surface); border-bottom:1px solid var(--line); padding:0 145px 0 .75rem; -webkit-app-region:drag; min-width:0; }

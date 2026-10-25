@@ -43,7 +43,7 @@ test.beforeEach(async ({}, testInfo) => {
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('Missing server port');
-  const config = Object.fromEntries(['huly', 'n8n', 'librechat', 'portal', 'emailai', 'stirling'].map(id => [id, `http://127.0.0.1:${address.port}/${id}`]));
+  const config = Object.fromEntries(['huly', 'n8n', 'librechat', 'portal', 'emailai', 'stirling', 'teams'].map(id => [id, `http://127.0.0.1:${address.port}/${id}`]));
   await writeFile(path.join(directory, 'services.json'), JSON.stringify(config));
   app = await electron.launch({ args: ['.'], env: { ...process.env, AMA_E2E: '1', AMA_TEST_UPDATES: testInfo.title.includes('[updates]') ? '1' : '0', AMA_TEST_CONFIG: path.join(directory, 'services.json'), AMA_TEST_USER_DATA: path.join(directory, 'data') } });
   page = await app.firstWindow();
@@ -205,9 +205,12 @@ test('launcher agrupa por categorías, fija y desfija apps y abre apps no fijada
   await page.getByRole('button', { name: 'Ver todas las aplicaciones', exact: true }).click();
   const launcher = page.getByRole('region', { name: 'Todas las aplicaciones' });
   await expect(launcher).toBeVisible();
-  for (const name of ['Control', 'Operación', 'Automatización y herramientas']) await expect(launcher.getByRole('heading', { name })).toBeVisible();
-  await expect(launcher.getByRole('button', { name: /^Abrir (?!.*a la derecha)/ })).toHaveCount(6);
-  await expect(launcher.getByRole('button', { name: /^Abrir .* a la derecha$/ })).toHaveCount(6);
+  for (const name of ['Control', 'Operación', 'Comunicación', 'Automatización y herramientas']) await expect(launcher.getByRole('heading', { name })).toBeVisible();
+  await expect(launcher.getByRole('button', { name: /^Abrir (?!.*a la derecha)/ })).toHaveCount(7);
+  await expect(launcher.getByRole('button', { name: /^Abrir .* a la derecha$/ })).toHaveCount(7);
+  // Teams es global pero no está fijado por defecto: solo vive en Comunicación.
+  await expect(launcher.getByRole('button', { name: 'Fijar Microsoft Teams en la barra lateral' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Servicios' }).getByRole('button', { name: 'Abrir Microsoft Teams' })).toHaveCount(0);
   // Las vistas nativas no pueden pintar sobre el launcher.
   const visibility = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children.map(v => v.getVisible()));
   expect(visibility.every(v => !v)).toBe(true);

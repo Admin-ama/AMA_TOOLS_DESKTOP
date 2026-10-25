@@ -1,6 +1,6 @@
 import { useEffect, useState, type KeyboardEvent, type CSSProperties } from 'react';
 import { IconSettings, IconHelpHexagon, IconMoon, IconSun, IconRefresh, IconShieldCheck, IconAlertTriangle, IconChevronLeft, IconTrash, IconActivity, IconPlus, IconMinus, IconX, IconLayoutGrid, IconLayoutSidebarRight } from '@tabler/icons-react';
-import { CATEGORIES, type ServiceId, type Snapshot } from '../shared/contracts';
+import { CATEGORIES, MINE_CATEGORY, type AppId, type Snapshot } from '../shared/contracts';
 import { SHELL_LAYOUT } from '../shared/layout';
 import { PAGE_ZOOM } from '../shared/zoom';
 import { Launcher } from './Launcher';
@@ -9,7 +9,7 @@ import { DesktopDock } from './DesktopDock';
 import { StatusBar } from './StatusBar';
 import { Splash } from './Splash';
 import { SplitView } from './SplitView';
-import { ServiceLogo, icons } from './service-visuals';
+import { ServiceLogo, AppIcon } from './service-visuals';
 
 const updateLabels = { disabled: 'Las actualizaciones están disponibles en la app instalada de Windows.', idle: 'Puedes buscar una nueva versión.', checking: 'Buscando actualizaciones…', available: 'Hay una nueva versión disponible.', current: 'Tienes la última versión disponible.', downloading: 'Descargando actualización…', downloaded: 'La actualización está lista para instalar.', installing: 'Instalando actualización…', error: 'No se pudo actualizar. Revisa la conexión a GitHub y vuelve a intentar.' };
 
@@ -45,12 +45,12 @@ export function App() {
   const light = state.preferences.theme === 'light';
   const blocked = state.network.status !== 'connected';
   // Fijadas por categoría; como en una barra de tareas, una app no fijada se muestra mientras tenga pestañas abiertas.
-  const sidebarGroups = CATEGORIES.map(category => ({
+  const sidebarGroups = [...CATEGORIES, MINE_CATEGORY].map(category => ({
     label: category.label,
     ids: state.services.filter(item => item.category === category.id && (state.preferences.pinned.includes(item.id) || item.id === state.active || state.tabs.some(tab => tab.serviceId === item.id)))
-      .sort((a, b) => { const rank = (id: ServiceId) => { const index = state.preferences.pinned.indexOf(id); return index < 0 ? Infinity : index; }; return rank(a.id) - rank(b.id); }),
+      .sort((a, b) => { const rank = (id: AppId) => { const index = state.preferences.pinned.indexOf(id); return index < 0 ? Infinity : index; }; return rank(a.id) - rank(b.id); }),
   })).filter(group => group.ids.length > 0);
-  const activate = (id: ServiceId) => void action(() => window.portal.activate(id));
+  const activate = (id: AppId) => void action(() => window.portal.activate(id));
   const selectTab = (id: string) => void action(() => window.portal.selectTab(id));
   const panel = (value: Snapshot['panel']) => void action(() => window.portal.panel(value));
   const toggleTheme = () => void action(() => window.portal.theme(light ? 'dark' : 'light'));
@@ -81,7 +81,7 @@ export function App() {
         {sidebarGroups.map(group => <div className="nav-group" role="group" aria-label={group.label} key={group.label}>
         {group.ids.map(item => {
           return <button key={item.id} className={`nav-item ${state.active === item.id && state.panel === 'service' ? 'active' : ''}`} disabled={blocked} aria-label={`Abrir ${item.name}`} aria-current={state.active === item.id && state.panel === 'service' ? 'page' : undefined} onClick={() => activate(item.id)}>
-            <ServiceLogo id={item.id} /><span className="nav-tooltip">{item.name}</span>
+            <ServiceLogo id={item.id} icon={item.icon} /><span className="nav-tooltip">{item.name}</span>
             {state.states[item.id].status === 'ready' && <span className="nav-dot" />}
           </button>;
         })}
@@ -97,12 +97,11 @@ export function App() {
       <div className="tab-strip">
       <div className="tabs" role="tablist" aria-label={`Pestañas de ${service.shortName}`}>
         {activeTabs.map((tab, index) => {
-          const Icon = icons[tab.serviceId];
           const label = tab.title || service.shortName;
           const selected = state.activeTabId === tab.id;
           return <div key={tab.id} className={`tab-group ${selected ? 'selected' : ''}`}>
             <button id={`tab-${tab.id}`} data-testid={`${tab.serviceId}-tab-${tab.number}`} role="tab" title={label} aria-selected={selected} disabled={blocked} aria-controls="service-content" tabIndex={selected ? 0 : -1} className={`app-tab ${selected ? 'selected' : ''}`} onClick={() => selectTab(tab.id)} onKeyDown={event => tabKey(event, index)}>
-              <Icon size={16} stroke={1.8} /><span>{label}</span>
+              <AppIcon id={tab.serviceId} icon={service.icon} /><span>{label}</span>
             </button>
             <button className="close-tab" data-testid={`close-${tab.serviceId}-tab-${tab.number}`} aria-label={`Cerrar ${label}`} title={`Cerrar ${label}`} onClick={() => void action(() => window.portal.closeTab(tab.id))}><IconX size={13} /></button>
           </div>;
@@ -143,8 +142,7 @@ export function App() {
         <h2 className="section-title">Sesiones independientes</h2><p className="section-description">Cambiar la persistencia borra la sesión local de ese servicio. No guardamos contraseñas.</p>
         <div className="settings-card session-list">
           {state.services.map(item => {
-            const Icon = icons[item.id];
-            return <div className="session-row" key={item.id}><span className="session-icon"><Icon size={22} /></span><div className="session-info"><h3>{item.name}</h3><p>{item.url}</p></div><label className="remember-label"><input type="checkbox" checked={state.preferences.remember[item.id]} disabled={busy} onChange={event => void settingsAction(() => window.portal.remember(item.id, event.target.checked), `Persistencia actualizada: ${item.name}`)} /><span>Recordar sesión</span></label><button className="icon-button destructive" aria-label={`Borrar sesión de ${item.name}`} title="Borrar sesión local" disabled={busy} onClick={() => void settingsAction(() => window.portal.clearSession(item.id), `Sesión local eliminada: ${item.name}`)}><IconTrash size={18} /></button></div>;
+            return <div className="session-row" key={item.id}><span className="session-icon"><AppIcon id={item.id} icon={item.icon} size={22} /></span><div className="session-info"><h3>{item.name}</h3><p>{item.url}</p></div><label className="remember-label"><input type="checkbox" checked={state.preferences.remember[item.id] ?? true} disabled={busy} onChange={event => void settingsAction(() => window.portal.remember(item.id, event.target.checked), `Persistencia actualizada: ${item.name}`)} /><span>Recordar sesión</span></label><button className="icon-button destructive" aria-label={`Borrar sesión de ${item.name}`} title="Borrar sesión local" disabled={busy} onClick={() => void settingsAction(() => window.portal.clearSession(item.id), `Sesión local eliminada: ${item.name}`)}><IconTrash size={18} /></button></div>;
           })}
         </div>
         <p className="section-description">Borrar la sesión local no revoca sesiones en el servidor. Para eso, usa el cierre de sesión de la aplicación.</p>

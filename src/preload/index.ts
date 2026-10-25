@@ -30,6 +30,10 @@ const api: PortalApi = {
   splitToTab: () => command('split-to-tab'),
   splitCapture: () => command('split-capture'),
   splitDrag: active => command('split-drag', active),
+  customAdd: input => command('custom-add', input),
+  customEdit: (id, input) => command('custom-edit', id, input),
+  customRemove: id => command('custom-remove', id),
+  overlay: active => command('overlay', active),
   onChange: listener => {
     const handler = (_event: Electron.IpcRendererEvent, snapshot: Snapshot) => listener(snapshot);
     ipcRenderer.on('portal:changed', handler);

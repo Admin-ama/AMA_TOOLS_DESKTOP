@@ -5,10 +5,10 @@ import path from 'node:path';
 
 describe('preferencias sin secretos', () => {
   it('usa tema oscuro y particiones persistentes por defecto', () => {
-    expect(normalizePreferences(null)).toEqual({ theme: 'dark', remember: { huly: true, n8n: true, librechat: true, portal: true, emailai: true, stirling: true }, pinned: ['librechat', 'portal', 'huly', 'n8n', 'emailai', 'stirling'], desktopApps: [], splitRatio: 0.38, splitService: 'librechat' });
+    expect(normalizePreferences(null)).toEqual({ theme: 'dark', remember: { huly: true, n8n: true, librechat: true, portal: true, emailai: true, stirling: true, teams: true }, pinned: ['librechat', 'portal', 'huly', 'n8n', 'emailai', 'stirling'], desktopApps: [], customApps: [], splitRatio: 0.38, splitService: 'librechat' });
   });
   it('acepta solo valores booleanos y temas conocidos', () => {
-    expect(normalizePreferences({ theme: 'light', remember: { huly: false, n8n: 'false' }, password: 'secret' })).toEqual({ theme: 'light', remember: { huly: false, n8n: true, librechat: true, portal: true, emailai: true, stirling: true }, pinned: ['librechat', 'portal', 'huly', 'n8n', 'emailai', 'stirling'], desktopApps: [], splitRatio: 0.38, splitService: 'librechat' });
+    expect(normalizePreferences({ theme: 'light', remember: { huly: false, n8n: 'false' }, password: 'secret' })).toEqual({ theme: 'light', remember: { huly: false, n8n: true, librechat: true, portal: true, emailai: true, stirling: true, teams: true }, pinned: ['librechat', 'portal', 'huly', 'n8n', 'emailai', 'stirling'], desktopApps: [], customApps: [], splitRatio: 0.38, splitService: 'librechat' });
     expect(normalizePreferences({ theme: 'injected' }).theme).toBe('dark');
   });
   it('filtra apps fijadas inválidas y duplicadas, conservando el orden', () => {
@@ -51,6 +51,35 @@ describe('apps de escritorio en preferencias', () => {
     const many = Array.from({ length: 30 }, (_, i) => ({ id: `i${i}`, name: `n${i}`, path: abs }));
     expect(normalizePreferences({ desktopApps: many }).desktopApps).toHaveLength(20);
     expect(normalizePreferences({ desktopApps: 'x' }).desktopApps).toEqual([]);
+  });
+});
+
+describe('páginas del usuario en preferencias', () => {
+  const id = 'custom-0a1b2c3d-1111-2222-3333-444455556666';
+  const app = { id, name: 'Wiki', url: 'https://wiki.com/' };
+  it('arrancan vacías y conservan las válidas', () => {
+    expect(normalizePreferences(null).customApps).toEqual([]);
+    expect(normalizePreferences({ customApps: [{ ...app, url: 'https://wiki.com' }, { id: 'huly', name: 'x', url: 'https://x.com/' }] }).customApps).toEqual([app]);
+  });
+  it('cada app propia tiene su preferencia de recordar sesión (por defecto sí)', () => {
+    expect(normalizePreferences({ customApps: [app] }).remember[id]).toBe(true);
+    expect(normalizePreferences({ customApps: [app], remember: { [id]: false } }).remember[id]).toBe(false);
+  });
+  it('fijadas y panel lateral aceptan ids propios existentes', () => {
+    const result = normalizePreferences({ customApps: [app], pinned: ['huly', id], splitService: id });
+    expect(result.pinned).toEqual(['huly', id]);
+    expect(result.splitService).toBe(id);
+  });
+  it('descarta ids desconocidos (también custom borradas) en fijadas, recordar y panel lateral', () => {
+    const ghost = 'custom-ffffffff-0000-0000-0000-000000000000';
+    const result = normalizePreferences({ customApps: [app], pinned: [ghost, id, 'evil'], remember: { [ghost]: false, [id]: false, evil: false }, splitService: ghost });
+    expect(result.pinned).toEqual([id]);
+    expect(Object.keys(result.remember)).toEqual(['huly', 'n8n', 'librechat', 'portal', 'emailai', 'stirling', 'teams', id]);
+    expect(result.splitService).toBe('librechat');
+  });
+  it('Teams es una app global: se puede fijar y recordar', () => {
+    expect(normalizePreferences({ pinned: ['teams'], remember: { teams: false } })).toMatchObject({ pinned: ['teams'], remember: { teams: false } });
+    expect(normalizePreferences({ splitService: 'teams' }).splitService).toBe('teams');
   });
 });
 

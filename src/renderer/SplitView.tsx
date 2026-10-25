@@ -2,7 +2,7 @@ import { useRef, useState, type CSSProperties, type KeyboardEvent, type PointerE
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { IconArrowsMaximize, IconX } from '@tabler/icons-react';
-import type { Service, ServiceId, SplitCapture, SplitState } from '../shared/contracts';
+import type { Service, AppId, SplitCapture, SplitState } from '../shared/contracts';
 import { splitBounds, type Rect, type SplitBounds } from '../shared/split';
 import { ServiceLogo } from './service-visuals';
 
@@ -17,7 +17,7 @@ interface Props {
   split: SplitState;
   width: number;
   height: number;
-  onSet(id: ServiceId): void;
+  onSet(id: AppId): void;
   onToTab(): void;
   onClose(): void;
   onResize(ratio: number, persist: boolean): Promise<void>;
@@ -100,8 +100,8 @@ export function SplitView({ services, split, width, height, onSet, onToTab, onCl
   return <div ref={root} className="split-layer">
     <div className="split-slot" data-testid="split-panel-slot" aria-hidden="true" style={box(layout.panel)} />
     <div className="split-header" style={box(layout.panelHeader)}>
-      <span className="split-logo"><ServiceLogo id={service.id} /></span>
-      <select className="split-select" aria-label="App del panel" value={split.serviceId} onChange={event => onSet(event.target.value as ServiceId)}>
+      <span className="split-logo"><ServiceLogo id={service.id} icon={service.icon} /></span>
+      <select className="split-select" aria-label="App del panel" value={split.serviceId} onChange={event => onSet(event.target.value as AppId)}>
         {services.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
       </select>
       <button className="icon-button" aria-label="Abrir como pestaña" title="Abrir como pestaña" onClick={onToTab}><IconArrowsMaximize size={16} /></button>

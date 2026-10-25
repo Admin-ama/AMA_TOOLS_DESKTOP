@@ -7,5 +7,7 @@ export const BLOCKED_MESSAGE = 'Sin acceso a red interna';
 export function commandAllowedWhileBlocked(command: unknown, args: unknown[]): boolean {
   if (typeof command !== 'string') return false;
   if (command === 'panel') return typeof args[0] === 'string' && PANELS.has(args[0]);
+  // Cerrar un menú es inocuo; abrirlo no tiene sentido sin servicios y nunca debe quedar uno atascado.
+  if (command === 'overlay') return args[0] === false;
   return ALWAYS.has(command);
 }

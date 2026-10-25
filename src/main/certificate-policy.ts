@@ -1,8 +1,8 @@
-import type { ServiceId } from '../shared/contracts';
+import type { AppId } from '../shared/contracts';
 
 // Excepción explícita solicitada para el certificado interno de LibreChat.
 // No permite errores de fecha, nombre, revocación ni otros destinos/aplicaciones.
-export function allowInternalCertificate(serviceId: ServiceId | undefined, destination: string, error: string): boolean {
+export function allowInternalCertificate(serviceId: AppId | undefined, destination: string, error: string): boolean {
   if (serviceId !== 'librechat' || error !== 'net::ERR_CERT_AUTHORITY_INVALID') return false;
   try {
     const url = new URL(destination);
