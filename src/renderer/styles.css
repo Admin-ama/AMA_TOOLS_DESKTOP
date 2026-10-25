@@ -48,6 +48,7 @@ button { transition:background .18s, color .18s, border-color .18s; }
 .service-logo-portal { width:28px; height:28px; border-radius:7px; }
 .service-logo-emailai { color:var(--accent); }
 .service-logo-stirling { width:28px; height:28px; border-radius:6px; }
+.service-logo-buk { width:28px; height:28px; border-radius:7px; }
 .service-logo-teams { color:#7b83eb; }
 .service-logo-custom { width:28px; height:28px; border-radius:6px; object-fit:contain; }
 .service-logo-custom-fallback { color:var(--teal); }
