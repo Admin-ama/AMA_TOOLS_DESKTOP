@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { CATEGORIES } from '../../src/shared/contracts';
-import { SERVICES, isAppId, allowedNavigation, allowedDownload, isPdfUrl, partitionFor, contentBounds, remotePreferences, customService, catalogOf, sameServiceOrigin } from '../../src/main/policy';
+import { CATEGORIES, GLOBAL_APP_IDS } from '../../src/shared/contracts';
+import { SERVICES, isAppId, allowedNavigation, allowedDownload, isPdfUrl, partitionFor, contentBounds, remotePreferences, customService, catalogOf, sameServiceOrigin, groupMembers, windowTarget } from '../../src/main/policy';
 
 describe('registro y aislamiento', () => {
-  it('registra las siete direcciones reales', () => {
+  it('registra las doce direcciones reales', () => {
     expect(SERVICES.map(s => s.url)).toEqual([
       'http://172.16.8.73:8087/', 'http://172.16.8.73:5678/',
       'https://172.16.8.73/', 'https://app.amatime.com/',
       'https://email-category-ai.vercel.app/', 'http://172.16.8.73:8080/',
       'https://teams.microsoft.com/v2/',
+      'https://m365.cloud.microsoft/', 'https://outlook.office.com/mail/', 'https://amatime.sharepoint.com/',
+      'https://make.powerautomate.com/', 'https://forms.office.com/',
     ]);
   });
   it('cada servicio pertenece a una categoría válida y cada categoría tiene servicios', () => {
@@ -69,27 +71,106 @@ describe('registro y aislamiento', () => {
 
 describe('Microsoft Teams', () => {
   const teams = SERVICES.find(s => s.id === 'teams')!;
-  it('es una app global de Comunicación, con el login de Microsoft declarado', () => {
-    expect(teams).toMatchObject({ name: 'Microsoft Teams', shortName: 'Teams', category: 'comunicacion', url: 'https://teams.microsoft.com/v2/' });
-    expect(teams.authOrigins).toEqual(['https://login.microsoftonline.com', 'https://login.live.com', 'https://login.microsoft.com', 'https://aadcdn.msauth.net', 'https://aadcdn.msftauth.net']);
+  it('es una app global de Comunicación del grupo Microsoft', () => {
+    expect(teams).toMatchObject({ name: 'Microsoft Teams', shortName: 'Teams', category: 'comunicacion', url: 'https://teams.microsoft.com/v2/', group: 'microsoft' });
   });
-  it('navega a Teams, su login y sus sufijos explícitos, solo por https', () => {
-    for (const url of ['https://teams.microsoft.com/v2/', 'https://teams.cloud.microsoft/', 'https://eu.teams.microsoft.com/api/x', 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize', 'https://login.live.com/oauth20_authorize.srf', 'https://aadcdn.msauth.net/shared/x.js', 'https://www.office.com/', 'https://products.office.com/', 'https://learn.microsoft.com/']) {
-      expect(allowedNavigation(url, teams), url).toBe(true);
-    }
-  });
-  it('rechaza hosts que solo se parecen, http, credenciales y esquemas ajenos', () => {
-    for (const url of ['http://teams.microsoft.com/', 'https://evil-teams.microsoft.com.attacker.com/', 'https://teams.microsoft.com.attacker.com/', 'https://microsoft.com.evil.test/', 'https://notmicrosoft.com/', 'https://evilteams.cloud.microsoft.evil.test/', 'https://evil-office.com/', 'https://user:pw@teams.microsoft.com/', 'javascript:alert(1)', 'file:///secret', 'not a url']) {
-      expect(allowedNavigation(url, teams), url).toBe(false);
-    }
-  });
-  it('los sufijos de Teams no se aplican a otras apps', () => {
-    for (const id of ['huly', 'librechat', 'emailai']) expect(allowedNavigation('https://teams.microsoft.com/v2/', SERVICES.find(s => s.id === id)!)).toBe(false);
-    expect(allowedNavigation('https://www.office.com/', SERVICES.find(s => s.id === 'emailai')!)).toBe(false);
-  });
-  it('las descargas siguen limitadas al origen de la app', () => {
+  it('las descargas siguen limitadas al origen de la app o al grupo', () => {
     expect(allowedDownload('https://teams.microsoft.com/v2/file.pdf', teams)).toBe(true);
-    expect(allowedDownload('https://www.office.com/file.pdf', teams)).toBe(false);
+    expect(allowedDownload('https://evil.test/file.pdf', teams)).toBe(false);
+  });
+});
+
+describe('catálogo de Microsoft 365', () => {
+  const byId = (id: string) => SERVICES.find(s => s.id === id)!;
+  const added = [
+    ['copilot', 'Copilot M365', 'Copilot', 'control', 'https://m365.cloud.microsoft/'],
+    ['outlook', 'Outlook', 'Outlook', 'comunicacion', 'https://outlook.office.com/mail/'],
+    ['sharepoint', 'SharePoint', 'SharePoint', 'operacion', 'https://amatime.sharepoint.com/'],
+    ['powerautomate', 'Power Automate', 'Power Automate', 'automatizacion', 'https://make.powerautomate.com/'],
+    ['forms', 'Microsoft Forms', 'Forms', 'automatizacion', 'https://forms.office.com/'],
+  ] as const;
+  it('incluye las apps nuevas con su categoría y url', () => {
+    for (const [id, name, shortName, category, url] of added) expect(byId(id), id).toMatchObject({ name, shortName, category, url, group: 'microsoft' });
+  });
+  it('dentro de su categoría respeta el orden pedido', () => {
+    const order = (category: string) => SERVICES.filter(s => s.category === category).map(s => s.id);
+    expect(order('control')).toEqual(['librechat', 'copilot']);
+    expect(order('comunicacion')).toEqual(['teams', 'outlook']);
+    expect(order('operacion')).toEqual(['huly', 'portal', 'sharepoint']);
+  });
+  it('GLOBAL_APP_IDS coincide con el catálogo', () => { expect([...GLOBAL_APP_IDS]).toEqual(SERVICES.map(s => s.id)); });
+  it('el grupo Microsoft son exactamente Teams y las apps nuevas; Copilot se fija por defecto', () => {
+    expect(groupMembers('outlook', SERVICES).map(s => s.id).sort()).toEqual(['copilot', 'forms', 'outlook', 'powerautomate', 'sharepoint', 'teams']);
+    expect(groupMembers('huly', SERVICES)).toEqual([SERVICES.find(s => s.id === 'huly')]);
+    expect(SERVICES.filter(s => s.pinByDefault).map(s => s.id)).toEqual(['copilot']);
+  });
+  it('comparten una única partición persistente; el resto, la suya', () => {
+    for (const s of SERVICES.filter(x => x.group)) expect(partitionFor(s.id, true, s.group)).toBe('persist:amatime-microsoft');
+    expect(partitionFor('outlook', false, 'microsoft')).toBe('amatime-microsoft');
+    expect(partitionFor('huly', true, undefined)).toBe('persist:amatime-huly');
+    expect(remotePreferences('forms', true, 'microsoft').partition).toBe('persist:amatime-microsoft');
+  });
+});
+
+describe('navegación del grupo Microsoft', () => {
+  const members = SERVICES.filter(s => s.group === 'microsoft');
+  const allowed = [
+    'https://login.microsoftonline.com/common/oauth2/v2.0/authorize', 'https://login.microsoft.com/', 'https://login.live.com/oauth20_authorize.srf',
+    'https://aadcdn.msauth.net/shared/x.js', 'https://aadcdn.msftauth.net/x.js', 'https://a.b.msauth.net/', 'https://x.msftauth.net/',
+    'https://teams.microsoft.com/v2/', 'https://eu.teams.microsoft.com/api/x', 'https://teams.cloud.microsoft/', 'https://m365.cloud.microsoft/chat', 'https://forms.cloud.microsoft/',
+    'https://www.office.com/', 'https://outlook.office.com/mail/', 'https://x.office.net/', 'https://word-edit.officeapps.live.com/we/wordeditorframe.aspx',
+    'https://www.microsoft365.com/', 'https://outlook.office365.com/owa/', 'https://amatime.sharepoint.com/sites/x', 'https://amatime-my.sharepoint.com/personal/u',
+    'https://make.powerautomate.com/', 'https://us.powerautomate.com/', 'https://make.powerapps.com/', 'https://x.powerplatform.com/', 'https://flow.microsoft.com/',
+    'https://forms.office.com/Pages/x', 'https://learn.microsoft.com/',
+  ];
+  const rejected = [
+    'http://outlook.office.com/', 'https://evil-office.com/', 'https://office.com.attacker.net/', 'https://notmicrosoft.com/', 'https://microsoft.com.evil.test/', 'https://evilmsauth.net/',
+    'https://othertenant.sharepoint.com/', 'https://amatime.sharepoint.com.evil.test/', 'https://evil-amatime.sharepoint.com/', 'https://sharepoint.com/', 'https://amatime-my.sharepoint.com.evil.test/',
+    'https://user:pw@outlook.office.com/', 'https://evil.test/', 'javascript:alert(1)', 'file:///secret', 'not a url',
+  ];
+  it('todo miembro navega a los destinos permitidos por https', () => {
+    for (const member of members) for (const url of allowed) expect(allowedNavigation(url, member), `${member.id} ${url}`).toBe(true);
+  });
+  it('rechaza hosts parecidos, otros tenants de SharePoint, http, credenciales y esquemas ajenos', () => {
+    for (const member of members) for (const url of rejected) expect(allowedNavigation(url, member), `${member.id} ${url}`).toBe(false);
+  });
+  it('la lista del grupo no se aplica a otras apps', () => {
+    for (const id of ['huly', 'librechat', 'emailai']) for (const url of ['https://teams.microsoft.com/v2/', 'https://outlook.office.com/', 'https://amatime.sharepoint.com/']) expect(allowedNavigation(url, SERVICES.find(s => s.id === id)!), `${id} ${url}`).toBe(false);
+  });
+  it('descarga archivos de destinos permitidos del grupo, no de otros', () => {
+    const outlook = SERVICES.find(s => s.id === 'outlook')!;
+    expect(allowedDownload('https://amatime.sharepoint.com/sites/x/_layouts/15/download.aspx?id=1', outlook)).toBe(true);
+    expect(allowedDownload('https://outlook.office.com/owa/attachment.ashx', outlook)).toBe(true);
+    for (const url of ['https://othertenant.sharepoint.com/a.zip', 'http://outlook.office.com/a.zip', 'https://evil.test/a.zip']) expect(allowedDownload(url, outlook), url).toBe(false);
+    expect(allowedDownload('https://amatime.sharepoint.com/a.zip', SERVICES.find(s => s.id === 'huly')!)).toBe(false);
+  });
+});
+
+describe('ventanas nuevas dentro del grupo Microsoft', () => {
+  const source = (id: string) => SERVICES.find(s => s.id === id)!;
+  it('un enlace al origen de otro miembro abre una pestaña de ese miembro', () => {
+    expect(windowTarget('https://amatime.sharepoint.com/:w:/r/sites/x/doc.docx', source('outlook'), SERVICES)).toBe('sharepoint');
+    expect(windowTarget('https://forms.office.com/r/abc', source('teams'), SERVICES)).toBe('forms');
+    expect(windowTarget('https://teams.microsoft.com/l/meetup-join/x', source('outlook'), SERVICES)).toBe('teams');
+  });
+  it('sin origen exacto elige el miembro con el dominio más parecido', () => {
+    expect(windowTarget('https://www.office.com/launch/word', source('sharepoint'), SERVICES)).toBe('outlook');
+    expect(windowTarget('https://amatime-my.sharepoint.com/personal/u', source('outlook'), SERVICES)).toBe('sharepoint');
+  });
+  it('si ninguno encaja, o hay empate con el origen, se queda en la misma app', () => {
+    expect(windowTarget('https://word-edit.officeapps.live.com/we/x', source('sharepoint'), SERVICES)).toBe('sharepoint');
+    expect(windowTarget('https://amatime.sharepoint.com/x', source('sharepoint'), SERVICES)).toBe('sharepoint');
+    expect(windowTarget('https://login.live.com/x', source('copilot'), SERVICES)).toBe('copilot');
+  });
+  it('un destino no permitido no abre nada; fuera del grupo solo el mismo origen', () => {
+    expect(windowTarget('https://evil.test/', source('outlook'), SERVICES)).toBeNull();
+    expect(windowTarget('https://othertenant.sharepoint.com/', source('outlook'), SERVICES)).toBeNull();
+    expect(windowTarget('https://172.16.8.73:8087/x', source('huly'), SERVICES)).toBeNull();
+    expect(windowTarget('http://172.16.8.73:8087/x', source('huly'), SERVICES)).toBe('huly');
+  });
+  it('con todos los miembros en el mismo origen (e2e) gana la app de origen', () => {
+    const same = SERVICES.map(s => s.group ? { ...s, url: 'http://127.0.0.1:9/' + s.id } : s);
+    expect(windowTarget('http://127.0.0.1:9/x', same.find(s => s.id === 'forms')!, same)).toBe('forms');
   });
 });
 
@@ -99,9 +180,9 @@ describe('páginas del usuario', () => {
   it('se describen como una app de la categoría "mine" con su icono', () => {
     expect(service).toMatchObject({ id: app.id, name: 'Wiki interna', shortName: 'Wiki interna', category: 'mine', url: app.url, custom: true, icon: 'data:image/png;base64,QUJD' });
   });
-  it('solo navegan dentro de su origen: sin login externo ni sufijos', () => {
+  it('solo navegan dentro de su origen: sin login externo ni grupo', () => {
     expect(service.authOrigins).toBeUndefined();
-    expect(service.hostSuffixes).toBeUndefined();
+    expect(service.group).toBeUndefined();
     expect(allowedNavigation('https://wiki.empresa.com/otra', service)).toBe(true);
     for (const url of ['https://login.microsoftonline.com/', 'https://evil.test/', 'http://wiki.empresa.com/', 'https://sub.wiki.empresa.com/', 'https://u:p@wiki.empresa.com/', 'javascript:alert(1)']) expect(allowedNavigation(url, service), url).toBe(false);
     expect(sameServiceOrigin('https://wiki.empresa.com/x', service)).toBe(true);

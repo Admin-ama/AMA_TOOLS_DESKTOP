@@ -1,5 +1,10 @@
 import { type AppId, type CustomApp, type Service } from '../shared/contracts';
 
+/** Navegación del grupo Microsoft (login, Teams, Office, SharePoint del tenant, Power Platform, Forms): una lista para todas las apps del grupo. */
+const MICROSOFT_HOSTS: readonly string[] = ['login.microsoftonline.com', 'login.live.com', 'outlook.office365.com', 'amatime.sharepoint.com', 'amatime-my.sharepoint.com'];
+/** Sufijos con frontera de punto; *.sharepoint.com NO está: solo los dos hosts exactos del tenant. */
+const MICROSOFT_SUFFIXES: readonly string[] = ['msauth.net', 'msftauth.net', 'cloud.microsoft', 'office.com', 'office.net', 'officeapps.live.com', 'microsoft365.com', 'powerautomate.com', 'powerapps.com', 'powerplatform.com', 'microsoft.com'];
+
 export const SERVICES: Service[] = [
   { id: 'huly', name: 'Huly Workspace', shortName: 'Huly', category: 'operacion', url: 'http://172.16.8.73:8087/' },
   { id: 'n8n', name: 'n8n Automations', shortName: 'n8n', category: 'automatizacion', url: 'http://172.16.8.73:5678/' },
@@ -9,10 +14,13 @@ export const SERVICES: Service[] = [
   { id: 'stirling', name: 'Stirling PDF', shortName: 'Stirling PDF', category: 'automatizacion', url: 'http://172.16.8.73:8080/' },
   {
     id: 'teams', name: 'Microsoft Teams', shortName: 'Teams', category: 'comunicacion', url: 'https://teams.microsoft.com/v2/',
-    authOrigins: ['https://login.microsoftonline.com', 'https://login.live.com', 'https://login.microsoft.com', 'https://aadcdn.msauth.net', 'https://aadcdn.msftauth.net'],
-    // Teams v2 salta entre dominios de Microsoft; lista explícita, sin más comodines que estos sufijos.
-    hostSuffixes: ['teams.microsoft.com', 'teams.cloud.microsoft', 'office.com', 'microsoft.com'],
+    group: 'microsoft',
   },
+  { id: 'copilot', name: 'Copilot M365', shortName: 'Copilot', category: 'control', url: 'https://m365.cloud.microsoft/', group: 'microsoft', pinByDefault: true },
+  { id: 'outlook', name: 'Outlook', shortName: 'Outlook', category: 'comunicacion', url: 'https://outlook.office.com/mail/', group: 'microsoft' },
+  { id: 'sharepoint', name: 'SharePoint', shortName: 'SharePoint', category: 'operacion', url: 'https://amatime.sharepoint.com/', group: 'microsoft' },
+  { id: 'powerautomate', name: 'Power Automate', shortName: 'Power Automate', category: 'automatizacion', url: 'https://make.powerautomate.com/', group: 'microsoft' },
+  { id: 'forms', name: 'Microsoft Forms', shortName: 'Forms', category: 'automatizacion', url: 'https://forms.office.com/', group: 'microsoft' },
 ];
 /** Una página del usuario es una app más del catálogo: solo su origen, sin login externo. */
 export function customService(app: CustomApp): Service {
@@ -35,28 +43,60 @@ export function sameServiceOrigin(destination: string, service: Service): boolea
 export function hostMatchesSuffix(host: string, suffixes: readonly string[]): boolean {
   return suffixes.some(suffix => host === suffix || host.endsWith(`.${suffix}`));
 }
-// Navegación de la vista: su origen, el login externo declarado (p. ej. MSAL loginRedirect) o sus sufijos de host (https).
-export function allowedNavigation(destination: string, service: Service): boolean {
-  if (sameServiceOrigin(destination, service)) return true;
+/** Destino https (sin credenciales) permitido por la lista del grupo; las apps sin grupo nunca. */
+export function groupAllows(destination: string, group: Service['group']): boolean {
+  if (group !== 'microsoft') return false;
   try {
     const url = new URL(destination);
     if (url.protocol !== 'https:' || url.username || url.password) return false;
-    return (service.authOrigins ?? []).includes(url.origin) || hostMatchesSuffix(url.hostname, service.hostSuffixes ?? []);
+    return MICROSOFT_HOSTS.includes(url.hostname) || hostMatchesSuffix(url.hostname, MICROSOFT_SUFFIXES);
   } catch { return false; }
 }
-// Descargas: solo archivos servidos por el propio origen del servicio.
+// Navegación de la vista: su origen, el login externo declarado (p. ej. MSAL loginRedirect) o la lista de su grupo (https).
+export function allowedNavigation(destination: string, service: Service): boolean {
+  if (sameServiceOrigin(destination, service) || groupAllows(destination, service.group)) return true;
+  try {
+    const url = new URL(destination);
+    if (url.protocol !== 'https:' || url.username || url.password) return false;
+    return (service.authOrigins ?? []).includes(url.origin);
+  } catch { return false; }
+}
+// Descargas: archivos del propio origen del servicio o, en el grupo Microsoft, de destinos permitidos del grupo (SharePoint, adjuntos).
 export function allowedDownload(destination: string, service: Service): boolean {
-  return sameServiceOrigin(destination, service);
+  return sameServiceOrigin(destination, service) || groupAllows(destination, service.group);
+}
+/** Apps que comparten sesión con el id (incluida ella); sin grupo, solo ella. */
+export function groupMembers(id: AppId, catalog: readonly Service[]): Service[] {
+  const service = catalog.find(item => item.id === id);
+  if (!service) return [];
+  return service.group ? catalog.filter(item => item.group === service.group) : [service];
+}
+const sharedLabels = (a: string, b: string) => { const x = a.split('.').reverse(), y = b.split('.').reverse(); let n = 0; while (n < x.length && n < y.length && x[n] === y[n]) n++; return n; };
+/**
+ * App en cuya pestaña se abre una ventana nueva (window.open) pedida por source; null = bloquear.
+ * Grupo: el miembro cuyo origen coincide con el destino; si no, el de dominio más parecido (2+ etiquetas); en empate o sin parecido, la propia app.
+ */
+export function windowTarget(destination: string, source: Service, catalog: readonly Service[]): AppId | null {
+  if (!allowedNavigation(destination, source)) return null;
+  if (!source.group) return source.id;
+  const members = groupMembers(source.id, catalog);
+  const exact = members.filter(member => sameServiceOrigin(destination, member));
+  if (exact.length) return exact.some(member => member.id === source.id) ? source.id : exact[0].id;
+  const host = new URL(destination).hostname;
+  const score = (member: Service) => sharedLabels(host, new URL(member.url).hostname);
+  let best = source, top = score(source);
+  for (const member of members) if (score(member) > top) { best = member; top = score(member); }
+  return top >= 2 ? best.id : source.id;
 }
 export function isPdfUrl(destination: string): boolean {
   try { return new URL(destination).pathname.toLowerCase().endsWith('.pdf'); } catch { return false; }
 }
-/** Cada app (global o propia) tiene su partición; los ids propios ya llevan el prefijo `custom-`. */
-export function partitionFor(id: AppId, persistent: boolean): string {
-  return `${persistent ? 'persist:' : ''}amatime-${id}`;
+/** Cada app (global o propia) tiene su partición; las del mismo grupo comparten una (SSO). Los ids propios ya llevan el prefijo `custom-`. */
+export function partitionFor(id: AppId, persistent: boolean, group?: Service['group']): string {
+  return `${persistent ? 'persist:' : ''}amatime-${group ?? id}`;
 }
-export function remotePreferences(id: AppId, persistent: boolean) {
-  return { partition: partitionFor(id, persistent), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, allowRunningInsecureContent: false };
+export function remotePreferences(id: AppId, persistent: boolean, group?: Service['group']) {
+  return { partition: partitionFor(id, persistent, group), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, allowRunningInsecureContent: false };
 }
 export { contentBounds } from '../shared/layout';
 export { splitBounds, SPLIT } from '../shared/split';

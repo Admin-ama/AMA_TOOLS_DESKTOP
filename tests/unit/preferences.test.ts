@@ -5,18 +5,18 @@ import path from 'node:path';
 
 describe('preferencias sin secretos', () => {
   it('usa tema oscuro y particiones persistentes por defecto', () => {
-    expect(normalizePreferences(null)).toEqual({ theme: 'dark', remember: { huly: true, n8n: true, librechat: true, portal: true, emailai: true, stirling: true, teams: true }, pinned: ['librechat', 'portal', 'huly', 'n8n', 'emailai', 'stirling'], desktopApps: [], customApps: [], splitRatio: 0.38, splitService: 'librechat' });
+    expect(normalizePreferences(null)).toEqual({ theme: 'dark', remember: { huly: true, n8n: true, librechat: true, portal: true, emailai: true, stirling: true, teams: true, copilot: true, outlook: true, sharepoint: true, powerautomate: true, forms: true }, pinned: ['librechat', 'copilot', 'portal', 'huly', 'n8n', 'emailai', 'stirling'], seenCatalog: ['copilot'], desktopApps: [], customApps: [], splitRatio: 0.38, splitService: 'librechat' });
   });
   it('acepta solo valores booleanos y temas conocidos', () => {
-    expect(normalizePreferences({ theme: 'light', remember: { huly: false, n8n: 'false' }, password: 'secret' })).toEqual({ theme: 'light', remember: { huly: false, n8n: true, librechat: true, portal: true, emailai: true, stirling: true, teams: true }, pinned: ['librechat', 'portal', 'huly', 'n8n', 'emailai', 'stirling'], desktopApps: [], customApps: [], splitRatio: 0.38, splitService: 'librechat' });
+    expect(normalizePreferences({ theme: 'light', remember: { huly: false, n8n: 'false' }, password: 'secret' })).toEqual({ theme: 'light', remember: { ...{ huly: true, n8n: true, librechat: true, portal: true, emailai: true, stirling: true, teams: true, copilot: true, outlook: true, sharepoint: true, powerautomate: true, forms: true }, huly: false }, pinned: ['librechat', 'copilot', 'portal', 'huly', 'n8n', 'emailai', 'stirling'], seenCatalog: ['copilot'], desktopApps: [], customApps: [], splitRatio: 0.38, splitService: 'librechat' });
     expect(normalizePreferences({ theme: 'injected' }).theme).toBe('dark');
   });
   it('filtra apps fijadas inválidas y duplicadas, conservando el orden', () => {
-    expect(normalizePreferences({ pinned: ['stirling', 'huly', 'stirling', 'evil', 3, 'constructor'] }).pinned).toEqual(['stirling', 'huly']);
+    expect(normalizePreferences({ seenCatalog: ['copilot'], pinned: ['stirling', 'huly', 'stirling', 'evil', 3, 'constructor'] }).pinned).toEqual(['stirling', 'huly']);
   });
   it('permite no fijar ninguna app y cae al valor por defecto si el campo no es una lista', () => {
-    expect(normalizePreferences({ pinned: [] }).pinned).toEqual([]);
-    expect(normalizePreferences({ pinned: 'huly' }).pinned).toEqual(['librechat', 'portal', 'huly', 'n8n', 'emailai', 'stirling']);
+    expect(normalizePreferences({ seenCatalog: ['copilot'], pinned: [] }).pinned).toEqual([]);
+    expect(normalizePreferences({ pinned: 'huly' }).pinned).toEqual(['librechat', 'copilot', 'portal', 'huly', 'n8n', 'emailai', 'stirling']);
   });
 });
 
@@ -79,20 +79,61 @@ describe('páginas del usuario en preferencias', () => {
     expect(normalizePreferences({ customApps: [app], remember: { [id]: false } }).remember[id]).toBe(false);
   });
   it('fijadas y panel lateral aceptan ids propios existentes', () => {
-    const result = normalizePreferences({ customApps: [app], pinned: ['huly', id], splitService: id });
+    const result = normalizePreferences({ customApps: [app], seenCatalog: ['copilot'], pinned: ['huly', id], splitService: id });
     expect(result.pinned).toEqual(['huly', id]);
     expect(result.splitService).toBe(id);
   });
   it('descarta ids desconocidos (también custom borradas) en fijadas, recordar y panel lateral', () => {
     const ghost = 'custom-ffffffff-0000-0000-0000-000000000000';
-    const result = normalizePreferences({ customApps: [app], pinned: [ghost, id, 'evil'], remember: { [ghost]: false, [id]: false, evil: false }, splitService: ghost });
+    const result = normalizePreferences({ customApps: [app], seenCatalog: ['copilot'], pinned: [ghost, id, 'evil'], remember: { [ghost]: false, [id]: false, evil: false }, splitService: ghost });
     expect(result.pinned).toEqual([id]);
-    expect(Object.keys(result.remember)).toEqual(['huly', 'n8n', 'librechat', 'portal', 'emailai', 'stirling', 'teams', id]);
+    expect(Object.keys(result.remember)).toEqual(['huly', 'n8n', 'librechat', 'portal', 'emailai', 'stirling', 'teams', 'copilot', 'outlook', 'sharepoint', 'powerautomate', 'forms', id]);
     expect(result.splitService).toBe('librechat');
   });
   it('Teams es una app global: se puede fijar y recordar', () => {
-    expect(normalizePreferences({ pinned: ['teams'], remember: { teams: false } })).toMatchObject({ pinned: ['teams'], remember: { teams: false } });
+    expect(normalizePreferences({ seenCatalog: ['copilot'], pinned: ['teams'], remember: { teams: false } })).toMatchObject({ pinned: ['teams'], remember: { teams: false } });
     expect(normalizePreferences({ splitService: 'teams' }).splitService).toBe('teams');
+  });
+});
+
+describe('apps de Microsoft 365 en preferencias', () => {
+  const group = ['teams', 'copilot', 'outlook', 'sharepoint', 'powerautomate', 'forms'];
+  it('usuario nuevo: Copilot queda fijado justo debajo de LibreChat y registrado como visto', () => {
+    const result = normalizePreferences(null);
+    expect(result.pinned.slice(0, 2)).toEqual(['librechat', 'copilot']);
+    expect(result.seenCatalog).toEqual(['copilot']);
+    expect(normalizePreferences({ pinned: 'x' }).pinned).toContain('copilot');
+  });
+  it('usuario existente: Copilot se fija una vez, después de LibreChat', () => {
+    expect(normalizePreferences({ pinned: ['portal', 'librechat', 'huly'] })).toMatchObject({ pinned: ['portal', 'librechat', 'copilot', 'huly'], seenCatalog: ['copilot'] });
+  });
+  it('usuario existente sin LibreChat fijado: Copilot va al principio', () => {
+    expect(normalizePreferences({ pinned: ['huly', 'n8n'] }).pinned).toEqual(['copilot', 'huly', 'n8n']);
+    expect(normalizePreferences({ pinned: [] }).pinned).toEqual(['copilot']);
+  });
+  it('si Copilot ya estaba fijado no se duplica y se marca como visto', () => {
+    expect(normalizePreferences({ pinned: ['huly', 'copilot'] })).toMatchObject({ pinned: ['huly', 'copilot'], seenCatalog: ['copilot'] });
+  });
+  it('quitar Copilot de la barra después se respeta (es idempotente)', () => {
+    const migrated = normalizePreferences({ pinned: ['librechat', 'huly'] });
+    const unpinned = normalizePreferences({ ...migrated, pinned: migrated.pinned.filter(id => id !== 'copilot') });
+    expect(unpinned.pinned).toEqual(['librechat', 'huly']);
+    expect(normalizePreferences(unpinned)).toEqual(unpinned);
+  });
+  it('las demás apps nuevas no se fijan por defecto', () => {
+    const pinned = normalizePreferences({ pinned: ['librechat'] }).pinned;
+    for (const id of ['outlook', 'sharepoint', 'powerautomate', 'forms', 'teams']) expect(pinned).not.toContain(id);
+  });
+  it('seenCatalog descarta basura y no admite ids que no piden fijarse', () => {
+    expect(normalizePreferences({ seenCatalog: 'x' }).seenCatalog).toEqual(['copilot']);
+    expect(normalizePreferences({ pinned: ['huly'], seenCatalog: ['outlook', 3, 'evil'] }).seenCatalog).toEqual(['copilot']);
+  });
+  it('recordar sesión es común al grupo: basta un miembro en false para que todos lo estén', () => {
+    const off = normalizePreferences({ remember: { forms: false } }).remember;
+    for (const id of group) expect(off[id], id).toBe(false);
+    expect(off.huly).toBe(true);
+    const on = normalizePreferences({ remember: { outlook: true } }).remember;
+    for (const id of group) expect(on[id], id).toBe(true);
   });
 });
 

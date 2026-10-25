@@ -44,7 +44,7 @@ test.beforeEach(async ({}, testInfo) => {
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('Missing server port');
-  const config = Object.fromEntries(['huly', 'n8n', 'librechat', 'portal', 'emailai', 'stirling', 'teams'].map(id => [id, `http://127.0.0.1:${address.port}/${id}`]));
+  const config = Object.fromEntries(['huly', 'n8n', 'librechat', 'portal', 'emailai', 'stirling', 'teams', 'copilot', 'outlook', 'sharepoint', 'powerautomate', 'forms'].map(id => [id, `http://127.0.0.1:${address.port}/${id}`]));
   await writeFile(path.join(directory, 'services.json'), JSON.stringify(config));
   await writeFile(path.join(directory, 'installed.json'), '[]');
   app = await electron.launch({ args: ['.'], env: { ...process.env, AMA_E2E: '1', AMA_TEST_UPDATES: testInfo.title.includes('[updates]') ? '1' : '0', AMA_TEST_CONFIG: path.join(directory, 'services.json'), AMA_TEST_INSTALLED_APPS: path.join(directory, 'installed.json'), AMA_TEST_USER_DATA: path.join(directory, 'data') } });
@@ -208,8 +208,8 @@ test('launcher agrupa por categorías, fija y desfija apps y abre apps no fijada
   const launcher = page.getByRole('region', { name: 'Todas las aplicaciones' });
   await expect(launcher).toBeVisible();
   for (const name of ['Control', 'Operación', 'Comunicación', 'Automatización y herramientas']) await expect(launcher.getByRole('heading', { name })).toBeVisible();
-  await expect(launcher.getByRole('button', { name: /^Abrir (?!.*a la derecha)/ })).toHaveCount(7);
-  await expect(launcher.getByRole('button', { name: /^Abrir .* a la derecha$/ })).toHaveCount(7);
+  await expect(launcher.getByRole('button', { name: /^Abrir (?!.*a la derecha)/ })).toHaveCount(12);
+  await expect(launcher.getByRole('button', { name: /^Abrir .* a la derecha$/ })).toHaveCount(12);
   // Teams es global pero no está fijado por defecto: solo vive en Comunicación.
   await expect(launcher.getByRole('button', { name: 'Fijar Microsoft Teams en la barra lateral' })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Servicios' }).getByRole('button', { name: 'Abrir Microsoft Teams' })).toHaveCount(0);
@@ -227,7 +227,7 @@ test('launcher agrupa por categorías, fija y desfija apps y abre apps no fijada
   await page.keyboard.press('Escape');
   await expect(launcher).toHaveCount(0);
   await expect(nav.getByRole('button', { name: 'Abrir n8n Automations' })).toHaveCount(0);
-  await expect(nav.getByRole('button')).toHaveCount(5);
+  await expect(nav.getByRole('button')).toHaveCount(6);
   expect(await page.evaluate(async () => (await window.portal.snapshot()).preferences.pinned)).not.toContain('n8n');
   // Abrir una app no fijada desde el launcher: aparece temporalmente en la sidebar.
   await page.getByRole('button', { name: 'Ver todas las aplicaciones', exact: true }).click();
@@ -257,6 +257,7 @@ test('launcher anima entrada y salida y respeta reducir movimiento', async () =>
   const launcher = page.getByRole('region', { name: 'Todas las aplicaciones' });
   const opacity = () => launcher.locator('.launcher-panel').evaluate(el => getComputedStyle(el).opacity);
   await button.click();
+  await expect(launcher.locator('.launcher-panel')).toBeAttached();
   await expect.poll(() => page.evaluate(() => document.querySelector('.launcher-panel')?.getAnimations?.().length ?? 0)).toBe(0);
   const animated = await page.evaluate(() => (window as any).gsap === undefined && document.querySelector('.launcher-panel')!.hasAttribute('style'));
   expect(animated).toBe(true);
@@ -411,7 +412,7 @@ test('ojos del bot siguen el cursor aunque esté sobre la vista remota', async (
 });
 
 test('sidebar carga los logos locales de las aplicaciones', async ({}, testInfo) => {
-  await expect(page.getByRole('navigation', { name: 'Servicios' }).getByRole('button')).toHaveText(['LibreChat AI', 'Portal de Operaciones', 'Huly Workspace', 'n8n Automations', 'Email Category AI', 'Stirling PDF']);
+  await expect(page.getByRole('navigation', { name: 'Servicios' }).getByRole('button')).toHaveText(['LibreChat AI', 'Copilot M365', 'Portal de Operaciones', 'Huly Workspace', 'n8n Automations', 'Email Category AI', 'Stirling PDF']);
   await expect(page.getByRole('button', { name: 'Abrir LibreChat AI', exact: true }).locator('svg .bot-eye')).toHaveCount(2);
   for (const name of ['Huly Workspace', 'n8n Automations', 'Portal de Operaciones', 'Stirling PDF']) {
     const logo = page.getByRole('button', { name: `Abrir ${name}`, exact: true }).locator('img');
@@ -968,7 +969,7 @@ test('páginas propias: cambiar de origen cierra sus pestañas y reabre en el nu
   await expect(page.getByTestId(`${saved.id}-tab-1`)).toHaveCount(0);
   await expect.poll(async () => (await nativeViews()).length).toBe(before - 1);
   const state = await page.evaluate(async () => { const s = await window.portal.snapshot(); return { apps: s.preferences.customApps, pinned: s.preferences.pinned, remember: Object.keys(s.preferences.remember), services: s.services.length, active: s.active }; });
-  expect(state).toMatchObject({ apps: [], services: 7, active: 'librechat' });
+  expect(state).toMatchObject({ apps: [], services: 12, active: 'librechat' });
   expect(state.pinned.some(id => id.startsWith('custom-'))).toBe(false);
   expect(state.remember.some(id => id.startsWith('custom-'))).toBe(false);
 });
@@ -987,7 +988,7 @@ test('páginas propias: los comandos validan sus argumentos en el proceso princi
   });
   expect(Object.entries(outcome).filter(([, rejected]) => !rejected)).toEqual([]);
   expect(await customApps()).toEqual([]);
-  expect(await page.evaluate(async () => (await window.portal.snapshot()).services.length)).toBe(7);
+  expect(await page.evaluate(async () => (await window.portal.snapshot()).services.length)).toBe(12);
 });
 
 test('páginas propias: el límite de 30 se aplica en el proceso principal', async () => {
@@ -1134,4 +1135,55 @@ test('Teams se presenta como Chrome, sin el token de Electron', async () => {
   await expect.poll(() => app.evaluate(({ webContents }) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/teams'))?.getUserAgent() ?? '')).toMatch(/Chrome\//);
   const agent = await app.evaluate(({ webContents }) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/teams'))!.getUserAgent());
   expect(agent).not.toMatch(/Electron|amatime-tools-desktop/);
+});
+
+test('Microsoft 365: el launcher agrupa las apps nuevas por categoría y Copilot va fijado bajo LibreChat', async () => {
+  const pinned = await page.evaluate(async () => (await window.portal.snapshot()).preferences.pinned);
+  expect(pinned.slice(0, 2)).toEqual(['librechat', 'copilot']);
+  expect(pinned).not.toContain('outlook');
+  await page.getByRole('button', { name: 'Ver todas las aplicaciones', exact: true }).click();
+  const launcher = page.getByRole('region', { name: 'Todas las aplicaciones' });
+  const names = (heading: string) => launcher.locator('.launcher-category').filter({ has: page.getByRole('heading', { name: heading, exact: true }) }).locator('.launcher-name').allTextContents();
+  expect(await names('Control')).toEqual(['LibreChat AI', 'Copilot M365']);
+  expect(await names('Operación')).toEqual(['Huly Workspace', 'Portal de Operaciones', 'SharePoint']);
+  expect(await names('Comunicación')).toEqual(['Microsoft Teams', 'Outlook']);
+  expect(await names('Automatización y herramientas')).toEqual(['n8n Automations', 'Email Category AI', 'Stirling PDF', 'Power Automate', 'Microsoft Forms']);
+  await launcher.getByRole('button', { name: 'Quitar Copilot M365 de la barra lateral' }).click();
+  await expect.poll(async () => (await splitState()).preferences.pinned).not.toContain('copilot');
+  expect((await splitState()).preferences.seenCatalog).toEqual(['copilot']);
+});
+
+test('Microsoft 365: las apps del grupo comparten sesión y borrarla cierra las vistas de todo el grupo', async () => {
+  const sessions = () => app.evaluate(({ webContents }) => {
+    const find = (id: string) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/' + id));
+    const [outlook, forms, huly] = [find('outlook'), find('forms'), find('huly')];
+    return { open: { outlook: !!outlook, forms: !!forms, huly: !!huly }, shared: !!outlook && !!forms && outlook.session === forms.session, isolated: !!outlook && !!huly && outlook.session !== huly.session };
+  });
+  await page.evaluate(() => window.portal.activate('outlook'));
+  await expect(page.getByTestId('outlook-tab-1')).toHaveAttribute('aria-selected', 'true');
+  await page.evaluate(() => window.portal.activate('forms'));
+  await expect(page.getByTestId('forms-tab-1')).toHaveAttribute('aria-selected', 'true');
+  await expect.poll(async () => (await sessions()).shared).toBe(true);
+  expect((await sessions()).isolated).toBe(true);
+  await page.evaluate(() => window.portal.panel('settings'));
+  await expect(page.getByText('Compartida con las apps de Microsoft 365')).toHaveCount(6);
+  await page.evaluate(() => window.portal.clearSession('forms'));
+  await expect.poll(async () => (await sessions()).open).toEqual({ outlook: false, forms: false, huly: true });
+});
+
+test('Microsoft 365: recordar sesión es común al grupo', async () => {
+  await page.evaluate(() => window.portal.remember('outlook', false));
+  const remember = await page.evaluate(async () => (await window.portal.snapshot()).preferences.remember);
+  for (const id of ['teams', 'copilot', 'outlook', 'sharepoint', 'powerautomate', 'forms']) expect(remember[id], id).toBe(false);
+  expect(remember.huly).toBe(true);
+});
+
+test('Microsoft 365: una ventana nueva de una app del grupo abre pestaña de la app y se presenta como Chrome', async () => {
+  await page.evaluate(() => window.portal.activate('outlook'));
+  await expect(page.getByTestId('outlook-tab-1')).toHaveAttribute('aria-selected', 'true');
+  await waitForPage();
+  const agent = await app.evaluate(({ webContents }) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/outlook'))!.getUserAgent());
+  expect(agent).not.toMatch(/Electron|amatime-tools-desktop/);
+  await app.evaluate(({ webContents }) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/outlook'))!.executeJavaScript("window.open(location.origin + '/outlook/adjunto')", true));
+  await expect(page.getByTestId('outlook-tab-2')).toBeVisible();
 });

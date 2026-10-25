@@ -1,5 +1,5 @@
 /** Apps globales del catálogo (código); las páginas del usuario tienen ids `custom-<uuid>`. */
-export const GLOBAL_APP_IDS = ['huly', 'n8n', 'librechat', 'portal', 'emailai', 'stirling', 'teams'] as const;
+export const GLOBAL_APP_IDS = ['huly', 'n8n', 'librechat', 'portal', 'emailai', 'stirling', 'teams', 'copilot', 'outlook', 'sharepoint', 'powerautomate', 'forms'] as const;
 export type AppId = string;
 export const STARTUP_SERVICE: AppId = 'librechat';
 export type Theme = 'dark' | 'light';
@@ -14,13 +14,15 @@ export type CategoryId = typeof CATEGORIES[number]['id'] | 'mine';
 /** Sección del launcher y de la sidebar para las páginas definidas por el usuario. */
 export const MINE_CATEGORY = { id: 'mine', label: 'Mis páginas' } as const;
 /** Apps fijadas por defecto: LibreChat es el centro de mando; después operación y herramientas. */
-export const DEFAULT_PINNED: readonly AppId[] = ['librechat', 'portal', 'huly', 'n8n', 'emailai', 'stirling'];
+export const DEFAULT_PINNED: readonly AppId[] = ['librechat', 'copilot', 'portal', 'huly', 'n8n', 'emailai', 'stirling'];
 export interface Service {
   id: AppId; name: string; shortName: string; category: CategoryId; url: string;
   /** Orígenes https exactos de login externo (SSO). */
   authOrigins?: string[];
-  /** Sufijos de host (https) a los que también puede navegar la vista; sin comodines más allá de esta lista. */
-  hostSuffixes?: string[];
+  /** Apps del mismo grupo comparten una sola sesión (partición) y la lista de navegación del grupo. */
+  group?: 'microsoft';
+  /** Se fija en la barra lateral una vez (usuarios nuevos y existentes); después manda el usuario. */
+  pinByDefault?: boolean;
   /** Solo páginas del usuario. */
   custom?: boolean; icon?: string;
 }
@@ -40,7 +42,7 @@ export const DEFAULT_SPLIT_SERVICE: AppId = 'librechat';
 export interface SplitState { serviceId: AppId; ratio: number }
 /** Capturas (data URL) de ambas vistas para pintarlas mientras se arrastra el divisor. */
 export interface SplitCapture { main: string | null; panel: string | null }
-export interface Preferences { theme: Theme; remember: Record<AppId, boolean>; pinned: AppId[]; desktopApps: DesktopApp[]; customApps: CustomApp[]; splitRatio: number; splitService: AppId }
+export interface Preferences { theme: Theme; remember: Record<AppId, boolean>; pinned: AppId[]; /** Apps con pinByDefault ya ofrecidas: quitarlas de la barra después se respeta. */ seenCatalog: AppId[]; desktopApps: DesktopApp[]; customApps: CustomApp[]; splitRatio: number; splitService: AppId }
 export type PublicPreferences = Omit<Preferences, 'desktopApps'>;
 export interface UpdateState {
   status: 'disabled' | 'idle' | 'checking' | 'available' | 'current' | 'downloading' | 'downloaded' | 'installing' | 'error';

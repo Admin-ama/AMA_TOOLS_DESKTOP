@@ -1,15 +1,18 @@
 import { WebContentsView, session, type BrowserWindow } from 'electron';
 import { type ApplicationTab, type Service, type AppId, type ServiceState, type Snapshot, type Preferences, type SplitCapture } from '../shared/contracts';
 import { permissionAllowed, sanitizeUserAgent } from './permissions';
-import { allowedNavigation, allowedDownload, isPdfUrl, sameServiceOrigin, contentBounds, splitBounds, partitionFor, remotePreferences, catalogOf } from './policy';
+import { allowedNavigation, allowedDownload, isPdfUrl, sameServiceOrigin, contentBounds, splitBounds, partitionFor, remotePreferences, catalogOf, groupMembers, windowTarget } from './policy';
 import { ApplicationTabs } from './application-tabs';
 import { isZoomPercent, PAGE_ZOOM } from '../shared/zoom';
 import { allowInternalCertificate } from './certificate-policy';
 
 interface Entry { view: WebContentsView; disposed: boolean; failed: boolean }
 /** Lo que cambia entre una pestaña y el panel lateral; el resto (guardas, sesión, descargas, certificados) es común. */
-interface Hooks { attach(entry: Entry): void; state(): ServiceState; set(state: ServiceState): void; title(title: string): void; openWindow(url: string, web: Electron.WebContents): void }
+interface Hooks { attach(entry: Entry): void; state(): ServiceState; set(state: ServiceState): void; title(title: string): void; openWindow(url: string, web: Electron.WebContents, target: AppId): void }
 const securedSessions = new WeakSet<Electron.Session>();
+/** Las sesiones del grupo se comparten entre apps: permisos y descargas se resuelven por vista (webContents), no por sesión. */
+const viewServices = new WeakMap<Electron.WebContents, Service>();
+const sessionGroups = new WeakMap<Electron.Session, Service['group']>();
 
 export class ServiceViewManager {
   private views = new Map<string, Entry>();
@@ -144,8 +147,9 @@ export class ServiceViewManager {
 
   /** Borra la sesión guardada (persistente y temporal) de una app sin tocar sus pestañas. */
   async wipeStorage(id: AppId) {
+    const group = this.services.find(service => service.id === id)?.group;
     for (const persistent of [true, false]) {
-      const isolated = session.fromPartition(partitionFor(id, persistent));
+      const isolated = session.fromPartition(partitionFor(id, persistent, group));
       await isolated.closeAllConnections();
       await isolated.clearStorageData();
       await isolated.clearCache();
@@ -175,7 +179,7 @@ export class ServiceViewManager {
     const service = this.services.find(item => item.id === serviceId)!;
     const current = this.panelEntry?.view.webContents.getURL();
     this.closeSplit();
-    this.openTab(serviceId, current && sameServiceOrigin(current, service) ? current : undefined);
+    this.openTab(serviceId, current && allowedNavigation(current, service) ? current : undefined);
   }
 
   async capture(): Promise<SplitCapture> {
@@ -223,7 +227,7 @@ export class ServiceViewManager {
 
   openTab(serviceId: AppId = this.active, url?: string, focus = true) {
     const service = this.services.find(item => item.id === serviceId)!;
-    if (url && !sameServiceOrigin(url, service)) throw new Error('Destino de pestaña inválido');
+    if (url && !allowedNavigation(url, service)) throw new Error('Destino de pestaña inválido');
     const tab = this.tabs.open(serviceId, focus);
     if (focus) this.panel = 'service';
     this.ensureView(tab, url);
@@ -283,13 +287,14 @@ export class ServiceViewManager {
       state: () => this.tabs.all.find(item => item.id === id)!.state,
       set: state => this.update(id, state),
       title: title => { this.tabs.updateTitle(id, title); this.changed(); },
-      openWindow: target => this.openTab(service.id, target, service.id === this.active && this.panel === 'service'),
+      // Grupo Microsoft: el enlace se abre como pestaña de la app a la que pertenece (p. ej. un documento de SharePoint desde Outlook).
+      openWindow: (target, _web, appId) => this.openTab(appId, target, service.id === this.active && this.panel === 'service'),
     }, url);
   }
 
   /** Vista remota de un servicio con todas las guardas (navegación, ventanas, descargas, certificados, permisos). */
   private build(service: Service, hooks: Hooks, url?: string) {
-    const view = new WebContentsView({ webPreferences: remotePreferences(service.id, this.preferences.remember[service.id] ?? true) });
+    const view = new WebContentsView({ webPreferences: remotePreferences(service.id, this.preferences.remember[service.id] ?? true, service.group) });
     const entry: Entry = { view, disposed: false, failed: false };
     hooks.attach(entry);
     view.setBackgroundColor('#020617');
@@ -302,19 +307,23 @@ export class ServiceViewManager {
         callback(true);
       } else callback(false);
     });
-    // Teams rechaza el UA de Electron. La sesión no basta: cada webContents copia su UA al crearse.
-    if (service.id === 'teams') web.setUserAgent(sanitizeUserAgent(web.getUserAgent()));
+    viewServices.set(web, service);
+    // Microsoft rechaza el UA de Electron. La sesión no basta: cada webContents copia su UA al crearse.
+    if (service.group) web.setUserAgent(sanitizeUserAgent(web.getUserAgent()));
     if (!securedSessions.has(web.session)) {
-      // Todo denegado, salvo Teams (llamadas, avisos, copiar, pantalla completa) y solo desde sus orígenes.
-      web.session.setPermissionRequestHandler((_web, permission, callback, details) => callback(permissionAllowed(service, permission, details.requestingUrl)));
-      web.session.setPermissionCheckHandler((_web, permission, requestingOrigin) => permissionAllowed(service, permission, requestingOrigin));
+      // Todo denegado, salvo lo que el grupo Microsoft concede a cada app y solo desde orígenes del grupo.
+      // Sin vista asociada (service worker) solo rige el mínimo del grupo: copiar.
+      const serviceOf = (wc: Electron.WebContents | null) => (wc ? viewServices.get(wc) : undefined) ?? { id: '', group: sessionGroups.get(web.session) };
+      web.session.setPermissionRequestHandler((wc, permission, callback, details) => callback(permissionAllowed(serviceOf(wc), permission, details.requestingUrl)));
+      web.session.setPermissionCheckHandler((wc, permission, requestingOrigin) => permissionAllowed(serviceOf(wc), permission, requestingOrigin));
       web.session.setDisplayMediaRequestHandler((_request, callback) => callback({})); // Compartir pantalla: no implementado.
-      // Teams rechaza el UA de Electron.
-      if (service.id === 'teams') web.session.setUserAgent(sanitizeUserAgent(web.session.getUserAgent()));
-      // La sesión es por servicio: solo se permite bajar archivos de su propio origen (diálogo "Guardar como" nativo).
-      web.session.on('will-download', (event, item) => {
-        if (!allowedDownload(item.getURL(), service)) event.preventDefault();
+      if (service.group) web.session.setUserAgent(sanitizeUserAgent(web.session.getUserAgent()));
+      // Solo se baja del origen de la app (o de destinos del grupo Microsoft); diálogo "Guardar como" nativo.
+      web.session.on('will-download', (event, item, wc) => {
+        const owner = wc ? viewServices.get(wc) : undefined;
+        if (!owner || !allowedDownload(item.getURL(), owner)) event.preventDefault();
       });
+      sessionGroups.set(web.session, service.group);
       securedSessions.add(web.session);
     }
     const guard = (event: Electron.Event, target: string) => {
@@ -334,8 +343,9 @@ export class ServiceViewManager {
       if (entry.disposed) return { action: 'deny' };
       // Los enlaces internos que abren ventana crean otra pestaña de esta aplicación (o navegan el panel).
       // Enlaces "Descargar" a PDF (target=_blank): bajar el archivo en vez de abrir una pestaña vacía.
+      const target = windowTarget(details.url, service, this.services);
       if (sameServiceOrigin(details.url, service) && isPdfUrl(details.url)) web.downloadURL(details.url);
-      else if (sameServiceOrigin(details.url, service)) hooks.openWindow(details.url, web);
+      else if (target) hooks.openWindow(details.url, web, target);
       else {
         let origin = 'URL inválida';
         try { origin = new URL(details.url).origin; } catch { /* se registra como inválida */ }
@@ -381,11 +391,14 @@ export class ServiceViewManager {
     this.views.delete(id);
   }
 
+  /** Borra la sesión de una app; si comparte sesión (grupo Microsoft) se cierran las vistas de todo el grupo. */
   async clearSession(id: AppId) {
-    if (this.split?.serviceId === id) this.closeSplit();
-    for (const tab of this.tabs.all) if (tab.serviceId === id) this.destroyView(tab.id);
+    const ids = groupMembers(id, this.services).map(service => service.id);
+    if (!ids.includes(id)) ids.push(id);
+    if (this.split && ids.includes(this.split.serviceId)) this.closeSplit();
+    for (const tab of this.tabs.all) if (ids.includes(tab.serviceId)) this.destroyView(tab.id);
     await this.wipeStorage(id);
-    this.tabs.reset(id);
+    for (const member of ids) this.tabs.reset(member);
     this.changed();
     // No recrear mientras Ajustes está abierto; evita que una página escriba otra sesión inmediatamente.
   }

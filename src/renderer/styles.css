@@ -108,6 +108,7 @@ button { transition:background .18s, color .18s, border-color .18s; }
 .session-info { flex:1; min-width:0; }
 .session-info h3 { font-size:.73rem; margin:0; }
 .session-info p { font-size:.63rem; overflow-wrap:anywhere; }
+.session-info .session-hint { color:var(--teal); font-weight:600; margin-top:.15rem; }
 .remember-label { display:flex; align-items:center; gap:.4rem; font-size:.63rem; color:var(--muted); }
 input[type=checkbox] { accent-color:var(--accent); width:1rem; height:1rem; }
 .destructive:hover { color:var(--danger); background:#ef444410; }

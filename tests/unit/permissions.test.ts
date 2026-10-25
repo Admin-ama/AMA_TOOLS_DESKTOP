@@ -1,29 +1,43 @@
 import { describe, expect, it } from 'vitest';
 import { SERVICES, customService } from '../../src/main/policy';
-import { permissionAllowed, sanitizeUserAgent, TEAMS_PERMISSIONS } from '../../src/main/permissions';
+import { permissionAllowed, permissionsFor, sanitizeUserAgent } from '../../src/main/permissions';
 
-const teams = SERVICES.find(s => s.id === 'teams')!;
-const origins = ['https://teams.microsoft.com/v2/', 'https://teams.microsoft.com', 'https://teams.cloud.microsoft/', 'https://eu.teams.microsoft.com/', 'https://x.teams.cloud.microsoft/'];
+const svc = (id: string) => SERVICES.find(s => s.id === id)!;
+const teams = svc('teams');
+const origins = ['https://teams.microsoft.com/v2/', 'https://teams.cloud.microsoft/', 'https://eu.teams.microsoft.com/', 'https://outlook.office.com/mail/', 'https://m365.cloud.microsoft/', 'https://amatime.sharepoint.com/', 'https://forms.office.com/'];
+const TEAMS = ['clipboard-sanitized-write', 'fullscreen', 'media', 'notifications'];
 
 describe('permisos del dispositivo', () => {
-  it('Teams recibe solo audio/video, notificaciones, portapapeles seguro y pantalla completa desde sus orígenes', () => {
-    expect([...TEAMS_PERMISSIONS].sort()).toEqual(['clipboard-sanitized-write', 'fullscreen', 'media', 'notifications']);
-    for (const permission of TEAMS_PERMISSIONS) for (const origin of origins) expect(permissionAllowed(teams, permission, origin), `${permission} ${origin}`).toBe(true);
+  it('cada app del grupo recibe solo lo suyo', () => {
+    expect([...permissionsFor(teams)].sort()).toEqual(TEAMS);
+    for (const id of ['outlook', 'copilot']) expect([...permissionsFor(svc(id))].sort(), id).toEqual(['clipboard-sanitized-write', 'notifications']);
+    for (const id of ['sharepoint', 'powerautomate', 'forms']) expect([...permissionsFor(svc(id))], id).toEqual(['clipboard-sanitized-write']);
   });
-  it('Teams deniega todo lo demás, incluida la captura de pantalla', () => {
+  it('concede esos permisos desde cualquier origen permitido del grupo', () => {
+    for (const permission of TEAMS) for (const origin of origins) expect(permissionAllowed(teams, permission, origin), permission + ' ' + origin).toBe(true);
+    for (const id of ['outlook', 'copilot']) for (const permission of ['notifications', 'clipboard-sanitized-write']) expect(permissionAllowed(svc(id), permission, origins[3]), id + permission).toBe(true);
+    for (const id of ['sharepoint', 'powerautomate', 'forms']) expect(permissionAllowed(svc(id), 'clipboard-sanitized-write', origins[5]), id).toBe(true);
+  });
+  it('Outlook, Copilot y el resto no reciben cámara, micrófono ni pantalla completa', () => {
+    for (const id of ['outlook', 'copilot']) for (const permission of ['media', 'fullscreen']) expect(permissionAllowed(svc(id), permission, origins[3]), id + permission).toBe(false);
+    for (const id of ['sharepoint', 'powerautomate', 'forms']) for (const permission of ['media', 'fullscreen', 'notifications']) expect(permissionAllowed(svc(id), permission, origins[5]), id + permission).toBe(false);
+  });
+  it('deniega todo lo demás, incluida la captura de pantalla', () => {
     for (const permission of ['display-capture', 'geolocation', 'midi', 'midiSysex', 'clipboard-read', 'openExternal', 'hid', 'usb', 'serial', 'pointerLock', 'idle-detection', 'window-management', 'unknown', '']) {
-      expect(permissionAllowed(teams, permission, origins[0]), permission).toBe(false);
+      for (const service of SERVICES.filter(s => s.group)) expect(permissionAllowed(service, permission, origins[0]), service.id + permission).toBe(false);
     }
   });
-  it('Teams deniega los permisos si quien los pide no es un origen de Teams', () => {
-    for (const origin of ['https://evil.com/', 'http://teams.microsoft.com/', 'https://teams.microsoft.com.attacker.com/', 'https://evil-teams.microsoft.com.attacker.com/', 'https://www.office.com/', 'https://login.microsoftonline.com/', 'https://user:pw@teams.microsoft.com/', 'http://127.0.0.1:9000/teams', 'not a url', '', undefined]) {
+  it('deniega los permisos si quien los pide no es un origen permitido del grupo', () => {
+    for (const origin of ['https://evil.com/', 'http://teams.microsoft.com/', 'https://teams.microsoft.com.attacker.com/', 'https://evil-office.com/', 'https://othertenant.sharepoint.com/', 'https://user:pw@teams.microsoft.com/', 'http://127.0.0.1:9000/teams', 'not a url', '', undefined]) {
       expect(permissionAllowed(teams, 'media', origin as string), String(origin)).toBe(false);
+      expect(permissionAllowed(svc('outlook'), 'notifications', origin as string), String(origin)).toBe(false);
     }
   });
-  it('las demás apps y las páginas propias lo deniegan todo', () => {
+  it('las apps fuera del grupo y las páginas propias lo deniegan todo', () => {
     const wiki = customService({ id: 'custom-0a1b2c3d-aaaa', name: 'Wiki', url: 'https://wiki.com/' });
-    for (const service of [...SERVICES.filter(s => s.id !== 'teams'), wiki, undefined]) {
-      for (const permission of TEAMS_PERMISSIONS) expect(permissionAllowed(service, permission, origins[0])).toBe(false);
+    for (const service of [...SERVICES.filter(s => !s.group), wiki, undefined]) {
+      for (const permission of TEAMS) expect(permissionAllowed(service, permission, origins[0])).toBe(false);
+      expect(permissionsFor(service).size).toBe(0);
     }
   });
 });

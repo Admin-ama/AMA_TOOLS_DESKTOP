@@ -2,6 +2,7 @@ import { readFile, writeFile, rename, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { GLOBAL_APP_IDS, DEFAULT_PINNED, type DesktopApp, type Preferences, type AppId, DEFAULT_SPLIT_RATIO, DEFAULT_SPLIT_SERVICE } from '../shared/contracts';
 import { normalizeCustomApps } from '../shared/custom-apps';
+import { SERVICES } from './policy';
 import { MAX_DESKTOP_APPS, MAX_DESKTOP_APP_NAME, validAumid } from './desktop-apps';
 
 /** `ids`: catálogo vigente (globales + páginas propias); lo desconocido se descarta. */
@@ -32,6 +33,30 @@ export function normalizeSplitRatio(input: unknown): number {
 export function normalizeSplitService(input: unknown, ids: readonly AppId[] = GLOBAL_APP_IDS): AppId {
   return ids.find(id => id === input) ?? DEFAULT_SPLIT_SERVICE;
 }
+/** Apps globales que se fijan una vez en la barra (Copilot). */
+const PIN_BY_DEFAULT: readonly AppId[] = SERVICES.filter(service => service.pinByDefault).map(service => service.id);
+/** Migra las apps nuevas con pinByDefault: las no vistas se fijan (tras LibreChat, o al frente) y se marcan vistas; lo ya visto lo decide el usuario. */
+export function migratePinned(pinned: readonly AppId[], seenInput: unknown): { pinned: AppId[]; seenCatalog: AppId[] } {
+  const seen = new Set(Array.isArray(seenInput) ? seenInput.filter((id): id is AppId => PIN_BY_DEFAULT.includes(id)) : []);
+  const result = [...pinned];
+  for (const id of PIN_BY_DEFAULT) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    if (result.includes(id)) continue;
+    const after = result.indexOf('librechat');
+    result.splice(after + 1, 0, id); // sin LibreChat after = -1: al frente
+  }
+  return { pinned: result, seenCatalog: PIN_BY_DEFAULT.filter(id => seen.has(id)) };
+}
+/** Las apps de un grupo comparten sesión: se recuerda solo si todas lo piden. */
+function syncGroupRemember(remember: Record<AppId, boolean>): Record<AppId, boolean> {
+  for (const group of new Set(SERVICES.map(service => service.group).filter(Boolean))) {
+    const ids = SERVICES.filter(service => service.group === group).map(service => service.id);
+    const value = ids.every(id => remember[id] !== false);
+    for (const id of ids) remember[id] = value;
+  }
+  return remember;
+}
 export function normalizePreferences(input: unknown): Preferences {
   const source = input && typeof input === 'object' ? input as Record<string, unknown> : {};
   const remember = source.remember && typeof source.remember === 'object' ? source.remember as Record<string, unknown> : {};
@@ -39,8 +64,8 @@ export function normalizePreferences(input: unknown): Preferences {
   const ids: AppId[] = [...GLOBAL_APP_IDS, ...customApps.map(app => app.id)];
   return {
     theme: source.theme === 'light' ? 'light' : 'dark',
-    remember: Object.fromEntries(ids.map(id => [id, Object.hasOwn(remember, id) && typeof remember[id] === 'boolean' ? remember[id] : true])),
-    pinned: normalizePinned(source.pinned, ids),
+    remember: syncGroupRemember(Object.fromEntries(ids.map(id => [id, Object.hasOwn(remember, id) && typeof remember[id] === 'boolean' ? remember[id] : true]))),
+    ...migratePinned(normalizePinned(source.pinned, ids), source.seenCatalog),
     desktopApps: normalizeDesktopApps(source.desktopApps),
     customApps,
     splitRatio: normalizeSplitRatio(source.splitRatio),

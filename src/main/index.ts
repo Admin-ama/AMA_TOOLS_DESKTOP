@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { SERVICES, isAppId } from './policy';
+import { SERVICES, isAppId, groupMembers } from './policy';
 import { SHELL_LAYOUT } from '../shared/layout';
 import { STARTUP_SERVICE, DEFAULT_SPLIT_SERVICE, type SplashPhase } from '../shared/contracts';
 import { checkCustomName, checkCustomUrl, isCustomId, MAX_CUSTOM_APPS } from '../shared/custom-apps';
@@ -222,7 +222,8 @@ async function createWindow() {
           const serviceId = id();
           if (typeof args[1] !== 'boolean') throw new Error('Preferencia inválida');
           await manager.clearSession(serviceId);
-          preferences.remember[serviceId] = args[1];
+          // La sesión del grupo Microsoft es una sola: la preferencia vale para todas sus apps.
+          for (const member of groupMembers(serviceId, manager.services)) preferences.remember[member.id] = args[1];
           await savePreferences(preferencesFile, preferences);
           break;
         }
