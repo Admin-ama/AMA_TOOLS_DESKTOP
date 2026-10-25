@@ -7,17 +7,20 @@ const MOTION = '(prefers-reduced-motion: no-preference)';
 
 interface Props {
   apps: DesktopAppView[];
+  /** Office fijo: siempre arriba, sin menú para quitarlo. */
+  office: DesktopAppView[];
   forticlient: boolean;
   blocked: boolean;
   full: boolean;
   onForticlient(): void;
   onAdd(): void;
   onOpen(id: string): void;
+  onOffice(id: string): void;
   onRemove(id: string): void;
 }
 
 /** Accesos directos a apps de escritorio del equipo; solo conoce id, nombre e icono, nunca rutas. */
-export function DesktopDock({ apps, forticlient, blocked, full, onForticlient, onAdd, onOpen, onRemove }: Props) {
+export function DesktopDock({ apps, office, forticlient, blocked, full, onForticlient, onAdd, onOpen, onOffice, onRemove }: Props) {
   const [menu, setMenu] = useState<{ id: string; top: number }>();
   useEffect(() => {
     if (!menu) return;
@@ -41,6 +44,11 @@ export function DesktopDock({ apps, forticlient, blocked, full, onForticlient, o
   return <aside className="dock" aria-label="Aplicaciones de escritorio">
     <div className="dock-list">
       {forticlient && <button className="nav-item dock-item" aria-label="Abrir FortiClient" data-tooltip="Abrir FortiClient" data-tooltip-side="left" onClick={onForticlient}><IconShieldLock size={24} stroke={1.65} /></button>}
+      {office.length > 0 && <div className="dock-office" role="group" aria-label="Microsoft Office">
+        {office.map(app => <button key={app.id} className="nav-item dock-item" aria-label={`Abrir ${app.name}`} data-tooltip={app.name} data-tooltip-side="left" onClick={() => onOffice(app.id)} onContextMenu={event => event.preventDefault()}>
+          {app.icon ? <img className="dock-icon" src={app.icon} alt="" draggable={false} /> : <IconAppWindow size={24} stroke={1.65} />}
+        </button>)}
+      </div>}
       {apps.map(app => <button key={app.id} ref={node => { if (node) nodes.current.set(app.id, node); else nodes.current.delete(app.id); }} className="nav-item dock-item" aria-label={`Abrir ${app.name} (escritorio)`} data-tooltip={app.name} data-tooltip-side="left" onClick={() => onOpen(app.id)}
         onContextMenu={event => { event.preventDefault(); const dock = event.currentTarget.closest('.dock')!.getBoundingClientRect(); setMenu({ id: app.id, top: event.clientY - dock.top }); }}>
         {app.icon ? <img className="dock-icon" src={app.icon} alt="" draggable={false} /> : <IconAppWindow size={24} stroke={1.65} />}

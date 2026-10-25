@@ -37,7 +37,7 @@ export class ServiceViewManager {
   /** Catálogo vigente: globales + páginas del usuario (preferencias). */
   get services(): Service[] { return catalogOf(this.globals, this.preferences.customApps); }
 
-  snapshot(): Omit<Snapshot, 'splash' | 'updates' | 'network' | 'desktopApps'> {
+  snapshot(): Omit<Snapshot, 'splash' | 'updates' | 'network' | 'desktopApps' | 'officeApps'> {
     // Las rutas de las apps de escritorio nunca salen del proceso principal.
     const { desktopApps: _paths, ...preferences } = this.preferences;
     return { services: this.services, active: this.active, activeTabId: this.tabs.activeTabId, zoomPercent: this.zoomLevels.get(this.active) ?? PAGE_ZOOM.default, tabs: this.tabs.all, states: this.tabs.serviceStates(this.services.map(service => service.id)), preferences, panel: this.panel, split: this.split ? { ...this.split } : null };

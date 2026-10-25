@@ -1,7 +1,7 @@
 import { test, expect, _electron as electron, type ElectronApplication, type Page } from '@playwright/test';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -47,7 +47,10 @@ test.beforeEach(async ({}, testInfo) => {
   const config = Object.fromEntries(['huly', 'n8n', 'librechat', 'portal', 'emailai', 'stirling', 'teams', 'copilot', 'outlook', 'sharepoint', 'powerautomate', 'forms', 'costeador', 'buk'].map(id => [id, `http://127.0.0.1:${address.port}/${id}`]));
   await writeFile(path.join(directory, 'services.json'), JSON.stringify(config));
   await writeFile(path.join(directory, 'installed.json'), '[]');
-  app = await electron.launch({ args: ['.'], env: { ...process.env, AMA_E2E: '1', AMA_TEST_UPDATES: testInfo.title.includes('[updates]') ? '1' : '0', AMA_TEST_SPLASH_MS: testInfo.title.includes('[arranque]') ? '4000' : '', AMA_TEST_ADMINS: testInfo.title.includes('[admins]') ? JSON.stringify({ costeador: { name: 'Julio Prueba', email: 'julio.prueba@amatime.com' } }) : '', AMA_TEST_CONFIG: path.join(directory, 'services.json'), AMA_TEST_INSTALLED_APPS: path.join(directory, 'installed.json'), AMA_TEST_USER_DATA: path.join(directory, 'data') } });
+  // [office]: Office falso (Word, Excel y Outlook; sin PowerPoint) en una carpeta temporal.
+  const officeRoot = path.join(directory, 'office');
+  if (testInfo.title.includes('[office]')) { await mkdir(officeRoot, { recursive: true }); for (const exe of ['WINWORD.EXE', 'EXCEL.EXE', 'OUTLOOK.EXE']) await writeFile(path.join(officeRoot, exe), 'x'); }
+  app = await electron.launch({ args: ['.'], env: { ...process.env, AMA_E2E: '1', AMA_TEST_UPDATES: testInfo.title.includes('[updates]') ? '1' : '0', AMA_TEST_SPLASH_MS: testInfo.title.includes('[arranque]') ? '4000' : '', AMA_TEST_ADMINS: testInfo.title.includes('[admins]') ? JSON.stringify({ costeador: { name: 'Julio Prueba', email: 'julio.prueba@amatime.com' } }) : '', AMA_TEST_CONFIG: path.join(directory, 'services.json'), AMA_TEST_INSTALLED_APPS: path.join(directory, 'installed.json'), AMA_TEST_USER_DATA: path.join(directory, 'data'), AMA_TEST_OFFICE_ROOT: testInfo.title.includes('[office]') ? officeRoot : '' } });
   page = await app.firstWindow();
   if (testInfo.title.includes('[arranque]')) return;
   await expect(page.getByRole('status', { name: 'Iniciando Amatime OS' })).toHaveCount(0);
@@ -1331,3 +1334,24 @@ test('[admins] Apps Amatime: la tarjeta muestra al administrador y "Pedir acceso
   const rejected = await page.evaluate(async () => { const out = []; for (const id of ['huly', 'evil', 42]) { try { await window.portal.requestAccess(id as never); out.push(false); } catch { out.push(true); } } return out; });
   expect(rejected).toEqual([true, true, true]);
 });
+
+test('[office] el dock derecho fija Word, PowerPoint, Excel y Outlook clásico (solo los instalados) sobre las apps del usuario', async () => {
+  const dock = page.getByRole('complementary', { name: 'Aplicaciones de escritorio' });
+  const office = dock.locator('.dock-office');
+  await expect(office.getByRole('button')).toHaveCount(3);
+  expect(await office.getByRole('button').evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label')))).toEqual(['Abrir Word', 'Abrir Excel', 'Abrir Outlook (clásico)']);
+  // Fijas: el clic derecho no ofrece quitarlas.
+  await office.getByRole('button', { name: 'Abrir Word' }).click({ button: 'right' });
+  await expect(dock.getByRole('menuitem')).toHaveCount(0);
+  // El renderer no conoce rutas: solo ids del catálogo fijo.
+  const snapshot = await page.evaluate(async () => (await window.portal.snapshot()).officeApps);
+  expect(snapshot.map(app => app.id)).toEqual(['office-word', 'office-excel', 'office-outlook']);
+  expect(JSON.stringify(snapshot)).not.toContain('WINWORD');
+  const rejects = await page.evaluate(async () => Promise.all([['office-powerpoint'], ['C:\\Windows\\notepad.exe'], [3]].map(args => (window.portal.openOfficeApp as (...a: unknown[]) => Promise<void>)(...args).then(() => false, () => true))));
+  expect(rejects).toEqual([true, true, true]); // los argumentos extra los descarta el preload (y main: office-apps.test)
+});
+
+test('sin Office instalado el dock no muestra accesos de Office', async () => {
+  await expect(page.locator('.dock-office button')).toHaveCount(0);
+});
+

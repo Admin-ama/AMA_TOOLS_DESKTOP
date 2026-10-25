@@ -3,7 +3,7 @@ import { commandAllowedWhileBlocked } from '../../src/main/network-gate';
 
 describe('comandos sin acceso a la red interna', () => {
   it('permite diagnóstico, reintento, FortiClient, ajustes, tema y actualizaciones', () => {
-    for (const command of ['snapshot', 'reload', 'open-forticlient', 'open-desktop-app', 'desktop-candidates', 'desktop-icons', 'desktop-link', 'theme', 'check-updates', 'download-update', 'install-update', 'snooze-update', 'tooltip-show', 'tooltip-hide']) {
+    for (const command of ['snapshot', 'reload', 'open-forticlient', 'open-desktop-app', 'open-office-app', 'desktop-candidates', 'desktop-icons', 'desktop-link', 'theme', 'check-updates', 'download-update', 'install-update', 'snooze-update', 'tooltip-show', 'tooltip-hide']) {
       expect(commandAllowedWhileBlocked(command, [])).toBe(true);
     }
   });

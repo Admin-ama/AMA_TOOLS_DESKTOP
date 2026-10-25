@@ -23,6 +23,7 @@ import { EventEmitter } from 'node:events';
 import { windowsAppDetails } from './windows-identity';
 import { NetworkMonitor, probeTarget, tcpProbe } from './network-status';
 import { FortiClientLauncher, forticlientCandidates } from './forticlient';
+import { OfficeApps, officeCandidates } from './office-apps';
 import { DesktopApps } from './desktop-apps';
 import { InstalledApps, enumerateInstalled, systemScanDeps, START_APPS_SCRIPT, START_APPS_TIMEOUT_MS, type InstalledEntry } from './installed-apps';
 import { commandAllowedWhileBlocked, BLOCKED_MESSAGE } from './network-gate';
@@ -70,6 +71,10 @@ async function createWindow() {
   let network: NetworkMonitor;
   const forticlient = new FortiClientLauncher({ candidates: forticlientCandidates(), exists: existsSync, open: file => shell.openPath(file), log: (message, detail) => console.error(message, detail) });
 
+  // Office fijo del dock. En e2e solo existe si el test apunta a una carpeta con ejecutables falsos.
+  const testOffice = testing ? process.env.AMA_TEST_OFFICE_ROOT : undefined;
+  const officeApps = new OfficeApps({ roots: testing ? (testOffice ? [testOffice] : []) : officeCandidates(), exists: existsSync, open: file => shell.openPath(file), icon: async file => (await app.getFileIcon(file, { size: 'normal' })).toDataURL(), log: (message, detail) => console.error(message, detail) });
+
   // Apps instaladas: menú Inicio + Tienda. En e2e (nunca empaquetado) un JSON puede sustituir la enumeración real.
   const readShortcut = (lnk: string) => { try { const { target, args } = shell.readShortcutLink(lnk); return { target, args }; } catch { return undefined; } };
   // stdin se cierra: PowerShell se queda esperando si hereda una tubería abierta.
@@ -106,7 +111,7 @@ async function createWindow() {
     // Si el renderer no confirma su animación de salida, la app se muestra igual.
     splashTimers.push(setTimeout(() => { finishSplash(); publish(); }, SPLASH.exitGraceMs));
   };
-  const snapshot = () => ({ ...manager.snapshot(), splash, updates: updates.snapshot, network: { status: network.status, forticlient: forticlient.available }, desktopApps: desktopApps.views() });
+  const snapshot = () => ({ ...manager.snapshot(), splash, updates: updates.snapshot, network: { status: network.status, forticlient: forticlient.available }, desktopApps: desktopApps.views(), officeApps: officeApps.views() });
   const publish = () => {
     if (!window.isDestroyed()) {
       evaluateSplash();
@@ -192,6 +197,7 @@ async function createWindow() {
         case 'add-desktop-app': await desktopApps.add(...args); break;
         case 'desktop-link': await desktopApps.link(args[0], ...args.slice(1)); break;
         case 'open-desktop-app': await desktopApps.open(args[0], ...args.slice(1)); break;
+        case 'open-office-app': await officeApps.open(args[0], ...args.slice(1)); break;
         case 'remove-desktop-app': await desktopApps.remove(args[0], ...args.slice(1)); break;
         case 'check-updates': await updates.check(); break;
         case 'download-update':
@@ -343,6 +349,7 @@ async function createWindow() {
   window.once('ready-to-show', () => window.show());
   await window.loadURL('app://bundle/index.html');
   void desktopApps.warm().then(publish);
+  void officeApps.warm().then(publish);
   network.start();
   splashTimers.push(setTimeout(publish, splashLimits.minMs), setTimeout(publish, splashLimits.maxMs));
 }

@@ -168,7 +168,7 @@ export function App() {
       </div>
     </header>
 
-    <DesktopDock apps={state.desktopApps} forticlient={state.network.forticlient} blocked={blocked} full={state.desktopApps.length >= 20} onForticlient={() => void action(() => window.portal.openForticlient())} onAdd={openPicker} onOpen={id => void action(() => window.portal.openDesktopApp(id))} onRemove={id => void action(() => window.portal.removeDesktopApp(id))} />
+    <DesktopDock apps={state.desktopApps} office={state.officeApps} forticlient={state.network.forticlient} blocked={blocked} full={state.desktopApps.length >= 20} onForticlient={() => void action(() => window.portal.openForticlient())} onAdd={openPicker} onOpen={id => void action(() => window.portal.openDesktopApp(id))} onOffice={id => void action(() => window.portal.openOfficeApp(id))} onRemove={id => void action(() => window.portal.removeDesktopApp(id))} />
 
     <main id="service-content" className="content" role="tabpanel" aria-labelledby={state.activeTabId ? `tab-${state.activeTabId}` : undefined}>
       {blocked && (state.panel === 'service' || state.panel === 'launcher') && <NetworkBlock network={state.network} onRetry={() => action(() => window.portal.reload())} onForticlient={() => action(() => window.portal.openForticlient())} />}

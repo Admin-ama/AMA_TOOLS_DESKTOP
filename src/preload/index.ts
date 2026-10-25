@@ -15,6 +15,7 @@ const api: PortalApi = {
   desktopIcons: ids => command('desktop-icons', ids),
   desktopLink: id => command('desktop-link', id),
   openDesktopApp: id => command('open-desktop-app', id),
+  openOfficeApp: id => command('open-office-app', id),
   removeDesktopApp: id => command('remove-desktop-app', id),
   zoom: percent => command('zoom', percent),
   checkUpdates: () => command('check-updates'),

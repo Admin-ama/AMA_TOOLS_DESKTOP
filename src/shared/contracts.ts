@@ -75,6 +75,8 @@ export interface Snapshot {
   states: Record<AppId, ServiceState>;
   preferences: PublicPreferences;
   desktopApps: DesktopAppView[];
+  /** Office fijo del dock (solo los instalados); sin rutas. */
+  officeApps: DesktopAppView[];
   panel: 'service' | 'settings' | 'help' | 'launcher';
   split: SplitState | null;
 }
@@ -93,6 +95,7 @@ export interface PortalApi {
   desktopIcons(ids: string[]): Promise<Record<string, string>>;
   desktopLink(candidateId: string): Promise<void>;
   openDesktopApp(id: string): Promise<void>;
+  openOfficeApp(id: string): Promise<void>;
   removeDesktopApp(id: string): Promise<void>;
   zoom(percent: number): Promise<void>;
   checkUpdates(): Promise<void>;
