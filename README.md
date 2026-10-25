@@ -1,4 +1,4 @@
-# AMATIME Tools Desktop
+# Amatime OS
 
 Contenedor Electron para **Huly, n8n, LibreChat, Portal de Operaciones y Email Category AI**. La sidebar selecciona la aplicación; la barra superior permite abrir varias pestañas de esa aplicación. **Cada aplicación usa su propio login:** este proyecto no captura credenciales ni implementa autenticación.
 

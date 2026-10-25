@@ -11,6 +11,6 @@ export function windowsAppDetails(packaged: boolean, executable: string, appPath
     appIconPath: packaged ? path.join(resourcesPath, 'amatime.ico') : developmentIcon,
     appIconIndex: 0,
     relaunchCommand: [executable, ...(!packaged ? [appPath] : [])].map(quote).join(' '),
-    relaunchDisplayName: packaged ? 'AMATIME Tools' : 'AMATIME Tools (desarrollo)',
+    relaunchDisplayName: packaged ? 'Amatime OS' : 'Amatime OS (desarrollo)',
   } satisfies Electron.AppDetailsOptions;
 }

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 it('release exige etiqueta que coincida con versión estable', () => {
   const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
@@ -18,4 +18,14 @@ it('configura release pública, sin token en el instalador y con metadatos del u
   expect(workflow.on.push.tags).toEqual(['v*']);
   expect(workflow.jobs.release.permissions.contents).toBe('write');
   expect(workflow.jobs.release.steps.at(-1).env.GH_TOKEN).toBe('${{ secrets.GITHUB_TOKEN }}');
+});
+
+describe('nombre del producto', () => {
+  it('se llama Amatime OS sin cambiar la identidad interna (sesiones, preferencias y actualizador)', async () => {
+    const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+    expect(pkg.build.productName).toBe('Amatime OS');
+    expect(pkg.build.artifactName).toBe('Amatime-OS-Setup-${version}-${arch}.${ext}');
+    expect(pkg.name).toBe('amatime-tools-desktop');
+    expect(pkg.build.appId).toBe('com.amatime.tools.desktop');
+  });
 });

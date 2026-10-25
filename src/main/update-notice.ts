@@ -34,7 +34,7 @@ export class UpdateNoticeWindow {
         icon: path.join(__dirname, '../assets/amatime.ico'),
         parent: this.parent, modal: false, frame: false, show: false, skipTaskbar: true,
         width: 400, height: 216, resizable: false, minimizable: false, maximizable: false,
-        backgroundColor: '#0b1222', title: 'Actualización de AMATIME Tools',
+        backgroundColor: '#0b1222', title: 'Actualización de Amatime OS',
         webPreferences: { preload: path.join(__dirname, '../preload/index.cjs'), sandbox: true, contextIsolation: true, nodeIntegration: false, webSecurity: true, zoomFactor: 1 },
       });
       notice.setMenu(null);

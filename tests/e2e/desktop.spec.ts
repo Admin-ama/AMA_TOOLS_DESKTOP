@@ -50,13 +50,13 @@ test.beforeEach(async ({}, testInfo) => {
   app = await electron.launch({ args: ['.'], env: { ...process.env, AMA_E2E: '1', AMA_TEST_UPDATES: testInfo.title.includes('[updates]') ? '1' : '0', AMA_TEST_SPLASH_MS: testInfo.title.includes('[arranque]') ? '4000' : '', AMA_TEST_CONFIG: path.join(directory, 'services.json'), AMA_TEST_INSTALLED_APPS: path.join(directory, 'installed.json'), AMA_TEST_USER_DATA: path.join(directory, 'data') } });
   page = await app.firstWindow();
   if (testInfo.title.includes('[arranque]')) return;
-  await expect(page.getByRole('status', { name: 'Iniciando AMATIME Tools' })).toHaveCount(0);
+  await expect(page.getByRole('status', { name: 'Iniciando Amatime OS' })).toHaveCount(0);
   await expect(page.getByTestId('librechat-tab-1')).toHaveAttribute('aria-selected', 'true');
   await switchApplication('Huly Workspace', 'huly 1');
 });
 
 test('[arranque] logo animado tapa la app hasta que el servicio de inicio carga', async ({}, testInfo) => {
-  const splash = page.getByRole('status', { name: 'Iniciando AMATIME Tools' });
+  const splash = page.getByRole('status', { name: 'Iniciando Amatime OS' });
   await expect(splash).toBeVisible();
   await expect(splash.getByRole('img', { name: 'AMA Time' })).toBeVisible();
   // Logo sobrio: sin círculo expansivo, chispas ni brillo neón.

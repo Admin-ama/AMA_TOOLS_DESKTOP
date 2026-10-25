@@ -1,4 +1,4 @@
-# Publicar versiones y actualizar AMATIME Tools
+# Publicar versiones y actualizar Amatime OS
 
 Sube una etiqueta `vX.Y.Z`: GitHub Actions comprueba el proyecto y crea una **release en borrador** con instalador Windows x64, `.blockmap` y `latest.yml`. Revisa los archivos y pulsa **Publish release** para que la app instalada encuentre la versión.
 

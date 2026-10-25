@@ -21,10 +21,10 @@ export function UpdateNotice() {
   const update = state.updates;
   const downloading = update.status === 'downloading';
   const downloaded = update.status === 'downloaded';
-  return <section className="update-notice" aria-label="Actualización de AMATIME Tools">
+  return <section className="update-notice" aria-label="Actualización de Amatime OS">
     <div className="update-notice-heading">
       {downloaded ? <IconCircleCheck size={22} /> : <IconDownload size={22} />}
-      <div><span className="eyebrow">AMATIME TOOLS · v{update.version}</span>
+      <div><span className="eyebrow">AMATIME OS · v{update.version}</span>
         <h1>{downloaded ? 'Actualización lista' : downloading ? 'Descargando actualización' : update.status === 'error' ? 'No se pudo descargar' : 'Nueva versión disponible'}</h1></div>
     </div>
     <p aria-live="polite">{error || (downloaded ? 'Guarda tus cambios. Tú decides cuándo reiniciar.' : downloading ? `Descargando ${update.progress ?? 0}%. Puedes seguir trabajando.` : update.status === 'error' ? 'Revisa tu conexión y vuelve a intentar desde Ajustes.' : 'Actualiza cuando te acomode, sin interrumpir tu trabajo.')}</p>

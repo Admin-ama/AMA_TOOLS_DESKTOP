@@ -7,7 +7,7 @@ import type { Snapshot } from '../shared/contracts';
 gsap.registerPlugin(useGSAP);
 
 const MOTION = '(prefers-reduced-motion: no-preference)';
-const TITLE = 'AMATIME TOOLS';
+const TITLE = 'AMATIME OS';
 
 function statusText(state?: Snapshot) {
   if (!state || state.network.status === 'checking') return 'Verificando red interna…';
@@ -43,7 +43,7 @@ export function Splash({ state }: { state?: Snapshot }) {
       .to(root.current, { opacity: 0, duration: 0.35, ease: 'power1.out' }, '-=0.15');
   }, { scope: root, dependencies: [leaving] });
 
-  return <div ref={root} className="splash" role="status" aria-label="Iniciando AMATIME Tools" aria-live="polite">
+  return <div ref={root} className="splash" role="status" aria-label="Iniciando Amatime OS" aria-live="polite">
     <div className="splash-stage">
       <div className="splash-mark">
         <img className="splash-logo-base" src={amaLogo} alt="AMA Time" />

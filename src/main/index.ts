@@ -50,7 +50,7 @@ async function createWindow() {
   const window = new BrowserWindow({
     icon: path.join(__dirname, '../assets/amatime.ico'),
     width: 1280, height: 820, minWidth: 900, minHeight: 600,
-    show: false, title: 'AMATIME · Portal Operacional', backgroundColor: '#020617',
+    show: false, title: 'Amatime OS', backgroundColor: '#020617',
     titleBarStyle: 'hidden', titleBarOverlay: { color: '#0b1222', symbolColor: '#94a3b8', height: SHELL_LAYOUT.headerHeight - 1 },
     webPreferences: { preload: path.join(__dirname, '../preload/index.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, zoomFactor: 1 },
   });
@@ -199,7 +199,7 @@ async function createWindow() {
           if (updates.snapshot.status !== 'downloaded') throw new Error('No hay actualización descargada');
           const result = await dialog.showMessageBox(window, {
             type: 'question', buttons: ['Cancelar', 'Instalar y reiniciar'], defaultId: 0, cancelId: 0,
-            title: 'Actualizar AMATIME Tools',
+            title: 'Actualizar Amatime OS',
             message: 'La aplicación se cerrará para instalar la actualización.',
             detail: 'Guarda los cambios pendientes en tus aplicaciones antes de continuar.',
           });
@@ -347,5 +347,5 @@ void app.whenReady().then(async () => {
   });
   await createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) void createWindow(); });
-}).catch(error => { console.error('No se pudo iniciar AMATIME Tools:', error); app.quit(); });
+}).catch(error => { console.error('No se pudo iniciar Amatime OS:', error); app.quit(); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

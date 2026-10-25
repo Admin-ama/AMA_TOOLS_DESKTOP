@@ -6,7 +6,7 @@ it('separa desarrollo de la app instalada y configura icono explícito para Expl
   expect(details.appId).toBe('com.amatime.tools.desktop.dev');
   expect(details.appIconPath).toBe('C:\\AMA Tools\\dist\\assets\\amatime.ico');
   expect(details.relaunchCommand).toBe('"C:\\node modules\\electron.exe" "C:\\AMA Tools"');
-  expect(details.relaunchDisplayName).toBe('AMATIME Tools (desarrollo)');
+  expect(details.relaunchDisplayName).toBe('Amatime OS (desarrollo)');
 });
 
 it('usa un icono físico fuera del asar y conserva el appId de instalación', () => {
@@ -14,5 +14,5 @@ it('usa un icono físico fuera del asar y conserva el appId de instalación', ()
   expect(details.appId).toBe('com.amatime.tools.desktop');
   expect(details.appIconPath.replaceAll('\\', '/')).toBe('C:/resources/amatime.ico');
   expect(details.relaunchCommand).toBe('"C:\\AMA Tools\\AMATIME Tools.exe"');
-  expect(details.relaunchDisplayName).toBe('AMATIME Tools');
+  expect(details.relaunchDisplayName).toBe('Amatime OS');
 });
