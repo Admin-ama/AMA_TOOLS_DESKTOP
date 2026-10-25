@@ -33,9 +33,11 @@ export function normalizeSplitRatio(input: unknown): number {
 export function normalizeSplitService(input: unknown, ids: readonly AppId[] = GLOBAL_APP_IDS): AppId {
   return ids.find(id => id === input) ?? DEFAULT_SPLIT_SERVICE;
 }
-/** Apps globales que se fijan una vez en la barra (Copilot). */
+/** Apps globales que se fijan una vez en la barra, en orden de catálogo (Copilot, Buk). */
 const PIN_BY_DEFAULT: readonly AppId[] = SERVICES.filter(service => service.pinByDefault).map(service => service.id);
-/** Migra las apps nuevas con pinByDefault: las no vistas se fijan (tras LibreChat, o al frente) y se marcan vistas; lo ya visto lo decide el usuario. */
+/** Cadena de anclaje: cada app por defecto va bajo la anterior que esté fijada (LibreChat → Copilot → Buk). */
+const PIN_CHAIN: readonly AppId[] = ['librechat', ...PIN_BY_DEFAULT];
+/** Migra las apps nuevas con pinByDefault: las no vistas se fijan (bajo la anterior de la cadena, o al frente) y se marcan vistas; lo ya visto lo decide el usuario. */
 export function migratePinned(pinned: readonly AppId[], seenInput: unknown): { pinned: AppId[]; seenCatalog: AppId[] } {
   const seen = new Set(Array.isArray(seenInput) ? seenInput.filter((id): id is AppId => PIN_BY_DEFAULT.includes(id)) : []);
   const result = [...pinned];
@@ -43,8 +45,8 @@ export function migratePinned(pinned: readonly AppId[], seenInput: unknown): { p
     if (seen.has(id)) continue;
     seen.add(id);
     if (result.includes(id)) continue;
-    const after = result.indexOf('librechat');
-    result.splice(after + 1, 0, id); // sin LibreChat after = -1: al frente
+    const anchor = PIN_CHAIN.slice(0, PIN_CHAIN.indexOf(id)).reverse().find(previous => result.includes(previous));
+    result.splice(anchor ? result.indexOf(anchor) + 1 : 0, 0, id);
   }
   return { pinned: result, seenCatalog: PIN_BY_DEFAULT.filter(id => seen.has(id)) };
 }

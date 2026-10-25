@@ -229,7 +229,7 @@ test('launcher agrupa por categorías, fija y desfija apps y abre apps no fijada
   await page.keyboard.press('Escape');
   await expect(launcher).toHaveCount(0);
   await expect(nav.getByRole('button', { name: 'Abrir n8n Automations' })).toHaveCount(0);
-  await expect(nav.getByRole('button')).toHaveCount(6);
+  await expect(nav.getByRole('button')).toHaveCount(7);
   expect(await page.evaluate(async () => (await window.portal.snapshot()).preferences.pinned)).not.toContain('n8n');
   // Abrir una app no fijada desde el launcher: aparece temporalmente en la sidebar.
   await page.getByRole('button', { name: 'Ver todas las aplicaciones', exact: true }).click();
@@ -414,9 +414,9 @@ test('ojos del bot siguen el cursor aunque esté sobre la vista remota', async (
 });
 
 test('sidebar carga los logos locales de las aplicaciones', async ({}, testInfo) => {
-  expect(await page.getByRole('navigation', { name: 'Servicios' }).getByRole('button').evaluateAll(buttons => buttons.map(button => button.getAttribute('data-tooltip')))).toEqual(['LibreChat AI', 'Copilot M365', 'Portal de Operaciones', 'Huly Workspace', 'n8n Automations', 'Email Category AI', 'Stirling PDF']);
+  expect(await page.getByRole('navigation', { name: 'Servicios' }).getByRole('button').evaluateAll(buttons => buttons.map(button => button.getAttribute('data-tooltip')))).toEqual(['LibreChat AI', 'Copilot M365', 'Buk', 'Portal de Operaciones', 'Huly Workspace', 'n8n Automations', 'Email Category AI', 'Stirling PDF']);
   await expect(page.getByRole('button', { name: 'Abrir LibreChat AI', exact: true }).locator('svg .bot-eye')).toHaveCount(2);
-  for (const name of ['Huly Workspace', 'n8n Automations', 'Portal de Operaciones', 'Stirling PDF']) {
+  for (const name of ['Huly Workspace', 'n8n Automations', 'Portal de Operaciones', 'Stirling PDF', 'Buk']) {
     const logo = page.getByRole('button', { name: `Abrir ${name}`, exact: true }).locator('img');
     await expect(logo).toBeVisible();
     await expect.poll(() => logo.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
@@ -1146,13 +1146,13 @@ test('Microsoft 365: el launcher agrupa las apps nuevas por categoría y Copilot
   await page.getByRole('button', { name: 'Ver todas las aplicaciones', exact: true }).click();
   const launcher = page.getByRole('region', { name: 'Todas las aplicaciones' });
   const names = (heading: string) => launcher.locator('.launcher-category').filter({ has: page.getByRole('heading', { name: heading, exact: true }) }).locator('.launcher-name').allTextContents();
-  expect(await names('Control')).toEqual(['LibreChat AI', 'Copilot M365']);
-  expect(await names('Operación')).toEqual(['Huly Workspace', 'SharePoint', 'Buk']);
+  expect(await names('Control')).toEqual(['LibreChat AI', 'Copilot M365', 'Buk']);
+  expect(await names('Operación')).toEqual(['Huly Workspace', 'SharePoint']);
   expect(await names('Comunicación')).toEqual(['Microsoft Teams', 'Outlook']);
   expect(await names('Automatización y herramientas')).toEqual(['n8n Automations', 'Email Category AI', 'Stirling PDF', 'Power Automate', 'Microsoft Forms']);
   await launcher.getByRole('button', { name: 'Quitar Copilot M365 de la barra lateral' }).click();
   await expect.poll(async () => (await splitState()).preferences.pinned).not.toContain('copilot');
-  expect((await splitState()).preferences.seenCatalog).toEqual(['copilot']);
+  expect((await splitState()).preferences.seenCatalog).toEqual(['copilot', 'buk']);
 });
 
 test('Microsoft 365: las apps del grupo comparten sesión y borrarla cierra las vistas de todo el grupo', async () => {
@@ -1241,6 +1241,7 @@ test('tooltip nativo de la barra lateral aparece sobre la vista nativa, se desli
 
 test('tooltip del header aparece debajo y el del dock a la izquierda', async () => {
   const tab = page.getByTestId('huly-tab-1');
+  await expect(tab).toHaveText('Página /huly'); // con el título definitivo: el tooltip no se reescribe mientras está abierto
   await tab.hover();
   await expect.poll(async () => (await tooltipState())?.text === (await tab.innerText()).trim()).toBe(true); // título completo de la pestaña (el título de la página puede llegar después)
   const below = (await tooltipState())!;

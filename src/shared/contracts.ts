@@ -16,7 +16,7 @@ export type CategoryId = typeof CATEGORIES[number]['id'] | 'mine';
 /** Sección del launcher y de la sidebar para las páginas definidas por el usuario. */
 export const MINE_CATEGORY = { id: 'mine', label: 'Mis páginas' } as const;
 /** Apps fijadas por defecto: LibreChat es el centro de mando; después operación y herramientas. */
-export const DEFAULT_PINNED: readonly AppId[] = ['librechat', 'copilot', 'portal', 'huly', 'n8n', 'emailai', 'stirling'];
+export const DEFAULT_PINNED: readonly AppId[] = ['librechat', 'copilot', 'buk', 'portal', 'huly', 'n8n', 'emailai', 'stirling'];
 export interface AppAdmin { name: string; email: string }
 export interface Service {
   id: AppId; name: string; shortName: string; category: CategoryId; url: string;

@@ -94,16 +94,16 @@ describe('catálogo de Microsoft 365', () => {
   });
   it('dentro de su categoría respeta el orden pedido', () => {
     const order = (category: string) => SERVICES.filter(s => s.category === category).map(s => s.id);
-    expect(order('control')).toEqual(['librechat', 'copilot']);
+    expect(order('control')).toEqual(['librechat', 'copilot', 'buk']);
     expect(order('comunicacion')).toEqual(['teams', 'outlook']);
-    expect(order('operacion')).toEqual(['huly', 'sharepoint', 'buk']);
+    expect(order('operacion')).toEqual(['huly', 'sharepoint']);
     expect(order('amatime')).toEqual(['portal', 'costeador']);
   });
   it('GLOBAL_APP_IDS coincide con el catálogo', () => { expect([...GLOBAL_APP_IDS]).toEqual(SERVICES.map(s => s.id)); });
-  it('el grupo Microsoft son exactamente Teams y las apps nuevas; Copilot se fija por defecto', () => {
+  it('el grupo Microsoft son exactamente Teams y las apps nuevas; Copilot y Buk se fijan por defecto', () => {
     expect(groupMembers('outlook', SERVICES).map(s => s.id).sort()).toEqual(['copilot', 'forms', 'outlook', 'powerautomate', 'sharepoint', 'teams']);
     expect(groupMembers('huly', SERVICES)).toEqual([SERVICES.find(s => s.id === 'huly')]);
-    expect(SERVICES.filter(s => s.pinByDefault).map(s => s.id)).toEqual(['copilot']);
+    expect(SERVICES.filter(s => s.pinByDefault).map(s => s.id)).toEqual(['copilot', 'buk']);
   });
   it('comparten una única partición persistente; el resto, la suya', () => {
     for (const s of SERVICES.filter(x => x.group)) expect(partitionFor(s.id, true, s.group)).toBe('persist:amatime-microsoft');
@@ -198,8 +198,8 @@ describe('páginas del usuario', () => {
 });
 
 describe('Buk (RRHH)', () => {
-  it('es una app web de Operación con su login de Amatime, sin grupo ni administrador', () => {
-    expect(SERVICES.find(service => service.id === 'buk')).toEqual({ id: 'buk', name: 'Buk', shortName: 'Buk', category: 'operacion', url: 'https://amatime.buk.cl/users/sign_in' });
+  it('es una app web de Control (pegada bajo Copilot) con su login de Amatime, sin grupo ni administrador, fijada por defecto', () => {
+    expect(SERVICES.find(service => service.id === 'buk')).toEqual({ id: 'buk', name: 'Buk', shortName: 'Buk', category: 'control', url: 'https://amatime.buk.cl/users/sign_in', pinByDefault: true });
     expect(GLOBAL_APP_IDS).toContain('buk');
   });
 });
