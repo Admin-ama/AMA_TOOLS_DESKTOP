@@ -7,6 +7,7 @@ import { Launcher } from './Launcher';
 import { AppContextMenu, anchorOf, isMenuKey, type MenuAction, type MenuAnchor } from './AppContextMenu';
 import { NetworkBlock } from './NetworkBlock';
 import { DesktopDock } from './DesktopDock';
+import { DesktopPicker } from './DesktopPicker';
 import { StatusBar } from './StatusBar';
 import { Splash } from './Splash';
 import { SplitView } from './SplitView';
@@ -24,6 +25,7 @@ export function App() {
   // "Editar…" desde el menú abre el launcher con el formulario de esa página; cada petición es un objeto nuevo.
   const [editRequest, setEditRequest] = useState<{ id: AppId } | null>(null);
   const trigger = useRef<HTMLElement | null>(null);
+  const [picker, setPicker] = useState(false);
   useEffect(() => {
     const unsubscribe = window.portal.onChange(setState);
     void window.portal.snapshot().then(setState).catch(() => setError('No se pudo conectar con el contenedor. Reinicia la aplicación.'));
@@ -38,6 +40,7 @@ export function App() {
   useEffect(() => { if (state && state.panel !== 'launcher') setEditRequest(null); }, [state?.panel]);
   // Sin red las vistas ya están ocultas y los botones deshabilitados: el menú no debe quedar flotando.
   useEffect(() => { if (menu && state && state.network.status !== 'connected') { setMenu(null); void window.portal.overlay(false).catch(() => undefined); } }, [menu, state?.network.status]);
+  useEffect(() => { if (picker && state && state.network.status !== 'connected') { setPicker(false); void window.portal.overlay(false).catch(() => undefined); } }, [picker, state?.network.status]);
   useEffect(() => { if (state?.activeTabId) document.getElementById(`tab-${state.activeTabId}`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }, [state?.activeTabId]);
 
   async function action(task: () => Promise<void>, success = '') {
@@ -73,6 +76,16 @@ export function App() {
     setMenu(null);
     void window.portal.overlay(false).catch(() => undefined);
     if (restoreFocus) trigger.current?.focus();
+  }
+  // Selector de apps instaladas: mismo mecanismo que el menú, las vistas nativas se ocultan mientras está abierto.
+  function openPicker() {
+    setPicker(true);
+    void window.portal.overlay(true).catch(() => undefined);
+  }
+  function closePicker() {
+    setPicker(false);
+    void window.portal.overlay(false).catch(() => undefined);
+    document.querySelector<HTMLElement>('.dock-add')?.focus();
   }
   function runMenu(choice: MenuAction) {
     if (!menu) return;
@@ -153,7 +166,7 @@ export function App() {
       </div>
     </header>
 
-    <DesktopDock apps={state.desktopApps} forticlient={state.network.forticlient} blocked={blocked} full={state.desktopApps.length >= 20} onForticlient={() => void action(() => window.portal.openForticlient())} onAdd={() => void action(() => window.portal.addDesktopApp())} onOpen={id => void action(() => window.portal.openDesktopApp(id))} onRemove={id => void action(() => window.portal.removeDesktopApp(id))} />
+    <DesktopDock apps={state.desktopApps} forticlient={state.network.forticlient} blocked={blocked} full={state.desktopApps.length >= 20} onForticlient={() => void action(() => window.portal.openForticlient())} onAdd={openPicker} onOpen={id => void action(() => window.portal.openDesktopApp(id))} onRemove={id => void action(() => window.portal.removeDesktopApp(id))} />
 
     <main id="service-content" className="content" role="tabpanel" aria-labelledby={state.activeTabId ? `tab-${state.activeTabId}` : undefined}>
       {blocked && (state.panel === 'service' || state.panel === 'launcher') && <NetworkBlock network={state.network} onRetry={() => action(() => window.portal.reload())} onForticlient={() => action(() => window.portal.openForticlient())} />}
@@ -194,7 +207,7 @@ export function App() {
     {!blocked && state.panel === 'service' && state.split && <SplitView services={state.services} split={state.split} width={size.width} height={size.height} onSet={id => void action(() => window.portal.splitSet(id))} onToTab={() => void action(() => window.portal.splitToTab())} onClose={() => void action(() => window.portal.splitClose())} onResize={(ratio, persist) => window.portal.splitResize(ratio, persist)} onCapture={() => window.portal.splitCapture()} onDrag={active => window.portal.splitDrag(active)} />}
 
     <StatusBar network={state.network.status} version={state.updates.currentVersion} />
-  </div>{menu && state.services.some(item => item.id === menu.id) && <AppContextMenu service={state.services.find(item => item.id === menu.id)!} pinned={state.preferences.pinned.includes(menu.id)} anchor={menu.anchor} onAction={runMenu} onClose={closeMenu} />}{state.splash !== 'done' && <Splash key="splash" state={state} />}</>;
+  </div>{picker && <DesktopPicker onClose={closePicker} onLink={id => { closePicker(); void action(() => window.portal.desktopLink(id)); }} onBrowse={() => { closePicker(); void action(() => window.portal.addDesktopApp()); }} />}{menu && state.services.some(item => item.id === menu.id) && <AppContextMenu service={state.services.find(item => item.id === menu.id)!} pinned={state.preferences.pinned.includes(menu.id)} anchor={menu.anchor} onAction={runMenu} onClose={closeMenu} />}{state.splash !== 'done' && <Splash key="splash" state={state} />}</>;
 }
 
 

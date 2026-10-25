@@ -46,7 +46,8 @@ test.beforeEach(async ({}, testInfo) => {
   if (!address || typeof address === 'string') throw new Error('Missing server port');
   const config = Object.fromEntries(['huly', 'n8n', 'librechat', 'portal', 'emailai', 'stirling', 'teams'].map(id => [id, `http://127.0.0.1:${address.port}/${id}`]));
   await writeFile(path.join(directory, 'services.json'), JSON.stringify(config));
-  app = await electron.launch({ args: ['.'], env: { ...process.env, AMA_E2E: '1', AMA_TEST_UPDATES: testInfo.title.includes('[updates]') ? '1' : '0', AMA_TEST_CONFIG: path.join(directory, 'services.json'), AMA_TEST_USER_DATA: path.join(directory, 'data') } });
+  await writeFile(path.join(directory, 'installed.json'), '[]');
+  app = await electron.launch({ args: ['.'], env: { ...process.env, AMA_E2E: '1', AMA_TEST_UPDATES: testInfo.title.includes('[updates]') ? '1' : '0', AMA_TEST_CONFIG: path.join(directory, 'services.json'), AMA_TEST_INSTALLED_APPS: path.join(directory, 'installed.json'), AMA_TEST_USER_DATA: path.join(directory, 'data') } });
   page = await app.firstWindow();
   if (testInfo.title.includes('[arranque]')) return;
   await expect(page.getByRole('status', { name: 'Iniciando AMATIME Tools' })).toHaveCount(0);
@@ -296,6 +297,9 @@ test('apps de escritorio: vincular con diálogo del proceso principal, abrir por
   const dock = page.getByRole('complementary', { name: 'Aplicaciones de escritorio' });
   await expect(dock).toBeVisible();
   await dock.getByRole('button', { name: 'Vincular aplicación de escritorio' }).click();
+  // El selector ofrece "Examinar…" como alternativa avanzada: abre el diálogo nativo de siempre.
+  await page.getByRole('dialog', { name: 'Vincular aplicación de escritorio' }).getByRole('button', { name: /Examinar/ }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   const item = dock.getByRole('button', { name: 'Abrir Fake Tool (escritorio)' });
   await expect(item).toBeVisible();
   // Ni el snapshot ni el DOM conocen la ruta; solo el archivo de preferencias del proceso principal.
@@ -320,6 +324,64 @@ test('apps de escritorio: vincular con diálogo del proceso principal, abrir por
   await page.getByRole('menuitem', { name: 'Quitar Fake Tool de la barra' }).click();
   await expect(item).toHaveCount(0);
   expect(JSON.parse(await readFile(preferencesFile, 'utf8')).desktopApps).toEqual([]);
+});
+
+test('apps de escritorio: selector de apps instaladas vincula por id, oculta vistas nativas y rechaza ids desconocidos', async () => {
+  const exe = path.join(directory, 'Fake Installed.exe');
+  const other = path.join(directory, 'Other App.exe');
+  const aumid = 'Fake.Calc_8wekyb3d8bbwe!App';
+  await writeFile(exe, 'MZ'); await writeFile(other, 'MZ');
+  await writeFile(path.join(directory, 'installed.json'), JSON.stringify([{ name: 'Fake Installed', kind: 'path', path: exe }, { name: 'Other App', kind: 'path', path: other }, { name: 'Calculadora Falsa', kind: 'aumid', aumid }]));
+  // Nada se lanza de verdad: ni shell.openPath ni explorer.
+  await app.evaluate(({ shell }) => { shell.openPath = (async () => '') as never; });
+  const nativeVisible = () => app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].contentView.children.some(view => (view as any).getVisible?.()));
+  const dock = page.getByRole('complementary', { name: 'Aplicaciones de escritorio' });
+  const dialog = page.getByRole('dialog', { name: 'Vincular aplicación de escritorio' });
+  const preferencesFile = path.join(directory, 'data', 'preferences.json');
+  expect(await nativeVisible()).toBe(true);
+  await dock.getByRole('button', { name: 'Vincular aplicación de escritorio' }).click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Fake Installed' })).toBeVisible();
+  await expect.poll(nativeVisible).toBe(false);
+  // Búsqueda sin acentos ni mayúsculas.
+  await dialog.getByRole('textbox', { name: 'Buscar aplicación instalada' }).fill('CALC');
+  await expect(dialog.getByRole('button', { name: 'Calculadora Falsa' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Fake Installed' })).toHaveCount(0);
+  await dialog.getByRole('textbox', { name: 'Buscar aplicación instalada' }).fill('zzz');
+  await expect(dialog.getByText('Sin resultados')).toBeVisible();
+  // Esc cierra y devuelve las vistas nativas.
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect.poll(nativeVisible).toBe(true);
+  // Vincular con un clic.
+  await dock.getByRole('button', { name: 'Vincular aplicación de escritorio' }).click();
+  await dialog.getByRole('button', { name: 'Fake Installed' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(dock.getByRole('button', { name: 'Abrir Fake Installed (escritorio)' })).toBeVisible();
+  await expect.poll(nativeVisible).toBe(true);
+  expect(JSON.parse(await readFile(preferencesFile, 'utf8')).desktopApps).toMatchObject([{ name: 'Fake Installed', kind: 'path', path: exe }]);
+  // Ya vinculada: aparece marcada y deshabilitada; una app empaquetada se guarda por AUMID.
+  await dock.getByRole('button', { name: 'Vincular aplicación de escritorio' }).click();
+  await expect(dialog.getByRole('button', { name: 'Fake Installed (ya vinculada)' })).toBeDisabled();
+  expect(await page.evaluate(() => document.documentElement.innerHTML)).not.toContain('amatime-e2e-');
+  await dialog.getByRole('button', { name: 'Calculadora Falsa' }).click();
+  await expect(dock.getByRole('button', { name: 'Abrir Calculadora Falsa (escritorio)' })).toBeVisible();
+  expect(JSON.parse(await readFile(preferencesFile, 'utf8')).desktopApps).toMatchObject([{ kind: 'path' }, { name: 'Calculadora Falsa', kind: 'aumid', aumid }]);
+  const snapshot = JSON.stringify(await page.evaluate(() => window.portal.snapshot()));
+  expect(snapshot).not.toContain('amatime-e2e-');
+  expect(snapshot).not.toContain('Fake.Calc_');
+  // El renderer no puede vincular nada que main no haya enumerado.
+  const candidates = await page.evaluate(() => window.portal.desktopCandidates());
+  expect(JSON.stringify(candidates)).not.toContain('amatime-e2e-');
+  expect(candidates.filter(item => item.linked).map(item => item.name).sort()).toEqual(['Calculadora Falsa', 'Fake Installed']);
+  const rejected = await page.evaluate(async ([file, id]) => {
+    const link = window.portal.desktopLink as (...args: unknown[]) => Promise<void>;
+    const results = [];
+    for (const args of [['cand-desconocido'], [file], [id], [''], [3], [undefined], ['cand-x', '--flag']]) { try { await link(...args); results.push(false); } catch { results.push(true); } }
+    return results;
+  }, [exe, aumid]);
+  expect(rejected).toEqual([true, true, true, true, true, true, true]);
+  expect(JSON.parse(await readFile(preferencesFile, 'utf8')).desktopApps).toHaveLength(2);
 });
 
 test('barra de estado inferior muestra red, versión y reloj alineada con la vista nativa', async ({}, testInfo) => {

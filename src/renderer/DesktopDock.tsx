@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import gsap from 'gsap';
 import { IconAppWindow, IconPlus, IconShieldLock, IconTrash } from '@tabler/icons-react';
 import type { DesktopAppView } from '../shared/contracts';
+
+const MOTION = '(prefers-reduced-motion: no-preference)';
 
 interface Props {
   apps: DesktopAppView[];
@@ -24,11 +27,21 @@ export function DesktopDock({ apps, forticlient, blocked, full, onForticlient, o
     window.addEventListener('keydown', key);
     return () => { window.removeEventListener('click', close); window.removeEventListener('keydown', key); };
   }, [menu]);
+  // Un icono recién vinculado entra con un pequeño pop (respeta movimiento reducido); la primera carga no anima.
+  const known = useRef<Set<string> | null>(null);
+  const nodes = useRef(new Map<string, HTMLElement>());
+  useEffect(() => {
+    const fresh = known.current ? apps.filter(app => !known.current!.has(app.id)).map(app => nodes.current.get(app.id)).filter((node): node is HTMLElement => !!node) : [];
+    known.current = new Set(apps.map(app => app.id));
+    if (!fresh.length) return;
+    const mm = gsap.matchMedia();
+    mm.add(MOTION, () => { gsap.fromTo(fresh, { scale: 0.4, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.38, ease: 'back.out(2.2)', clearProps: 'transform,opacity' }); });
+  }, [apps]);
   const target = apps.find(app => app.id === menu?.id);
   return <aside className="dock" aria-label="Aplicaciones de escritorio">
     <div className="dock-list">
       {forticlient && <button className="nav-item dock-item" aria-label="Abrir FortiClient" title="Abrir FortiClient" onClick={onForticlient}><IconShieldLock size={24} stroke={1.65} /></button>}
-      {apps.map(app => <button key={app.id} className="nav-item dock-item" aria-label={`Abrir ${app.name} (escritorio)`} title={app.name} onClick={() => onOpen(app.id)}
+      {apps.map(app => <button key={app.id} ref={node => { if (node) nodes.current.set(app.id, node); else nodes.current.delete(app.id); }} className="nav-item dock-item" aria-label={`Abrir ${app.name} (escritorio)`} title={app.name} onClick={() => onOpen(app.id)}
         onContextMenu={event => { event.preventDefault(); const dock = event.currentTarget.closest('.dock')!.getBoundingClientRect(); setMenu({ id: app.id, top: event.clientY - dock.top }); }}>
         {app.icon ? <img className="dock-icon" src={app.icon} alt="" draggable={false} /> : <IconAppWindow size={24} stroke={1.65} />}
       </button>)}
