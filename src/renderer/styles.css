@@ -246,11 +246,6 @@ input[type=checkbox] { accent-color:var(--accent); width:1rem; height:1rem; }
 .picker-browse { display:flex; align-items:center; gap:.45rem; background:transparent; color:var(--teal); font-size:.85rem; font-weight:700; }
 .picker-browse:hover { text-decoration:underline; }
 @media (prefers-reduced-motion:reduce) { .picker-skeleton { animation:none; } .picker-card { transition:none; } }
-.picker-body::-webkit-scrollbar { width:8px; }
-.picker-body::-webkit-scrollbar-track { background:transparent; }
-.picker-body::-webkit-scrollbar-thumb { border-radius:8px; background:#ffffff1f; }
-.picker-body::-webkit-scrollbar-thumb:hover { background:#0ea5a080; }
-.picker-body::-webkit-scrollbar-button { display:none; }
 
 .tooltip-root, .tooltip-root body, .tooltip-root #root { background: transparent; overflow: hidden; }
 .tip-stage { position: fixed; inset: 0; pointer-events: none; user-select: none; }
@@ -260,3 +255,13 @@ input[type=checkbox] { accent-color:var(--accent); width:1rem; height:1rem; }
 .tip-pill[data-side='right'] .tip-arrow { border-width: 0 0 1px 1px; }
 .tip-pill[data-side='left'] .tip-arrow { border-width: 1px 1px 0 0; }
 .tip-pill[data-side='bottom'] .tip-arrow { border-width: 1px 0 0 1px; }
+
+/* Barras de scroll sutiles en todo el shell: finas, sin flechas, casi invisibles hasta pasar el mouse. */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background-color: transparent; }
+::-webkit-scrollbar-corner { background-color: transparent; }
+::-webkit-scrollbar-button { display: none; }
+::-webkit-scrollbar-thumb { border-radius: 8px; border: 2px solid transparent; background: #ffffff1a; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: #0ea5a080; }
+:root[data-theme='light'] ::-webkit-scrollbar-thumb { background-color: #0f172a26; }
+:root[data-theme='light'] ::-webkit-scrollbar-thumb:hover { background-color: #0ea5a099; }

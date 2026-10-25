@@ -1282,3 +1282,12 @@ test('IPC del tooltip valida argumentos y la ventana del tooltip no puede llamar
   const hide = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().endsWith('#tooltip'))!.webContents.executeJavaScript("window.portal.tooltipHide().then(() => 'permitido', error => String(error.message))"));
   expect(hide).toContain('Remitente no autorizado');
 });
+
+test('las barras de scroll del shell son finas, sin flechas y con pulgar sutil', async () => {
+  const rules = await page.evaluate(() => [...document.styleSheets].flatMap(sheet => [...sheet.cssRules]).map(rule => rule.cssText).filter(text => text.includes('::-webkit-scrollbar')));
+  const global = (selector: string) => rules.find(text => text.startsWith(selector + ' ') || text.startsWith(selector + '{'));
+  expect(global('::-webkit-scrollbar')).toMatch(/width: 8px/);
+  expect(global('::-webkit-scrollbar-button')).toMatch(/display: none/);
+  expect(global('::-webkit-scrollbar-track')).toMatch(/background-color: (transparent|rgba\(0, 0, 0, 0\))/);
+  expect(global('::-webkit-scrollbar-thumb')).toMatch(/border-radius/);
+});
