@@ -204,6 +204,9 @@ describe('Apps Amatime (internas, con administrador)', () => {
     expect(SERVICES.find(service => service.id === 'costeador')).toMatchObject({ name: 'Costeador', category: 'amatime', url: 'https://julio-sepulveda-costeo-bulk-copacki.vercel.app/' });
     expect(SERVICES.find(service => service.id === 'portal')).toMatchObject({ category: 'amatime' });
     expect(GLOBAL_APP_IDS).toContain('costeador');
+    expect(SERVICES.find(service => service.id === 'costeador')!.admin).toEqual({ name: 'Julio Sepúlveda', email: 'jsepulveda@amatime.com' });
+    // El Portal es de AMA: sin administrador individual.
+    expect(SERVICES.find(service => service.id === 'portal')!.admin).toBeUndefined();
   });
   it('solo las Apps Amatime declaran administrador, siempre con nombre y correo válidos', () => {
     for (const service of SERVICES.filter(service => service.admin)) {
