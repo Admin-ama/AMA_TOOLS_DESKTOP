@@ -8,12 +8,6 @@ gsap.registerPlugin(useGSAP);
 
 const MOTION = '(prefers-reduced-motion: no-preference)';
 const TITLE = 'AMATIME TOOLS';
-// Chispas que convergen al corazón antes de encender el circuito; posiciones fijas para que el arranque sea siempre igual.
-const SPARKS = Array.from({ length: 18 }, (_, index) => {
-  const angle = (index / 18) * Math.PI * 2;
-  const distance = 220 + (index % 3) * 70;
-  return { x: Math.cos(angle) * distance, y: Math.sin(angle) * distance, delay: (index % 6) * 0.04 };
-});
 
 function statusText(state?: Snapshot) {
   if (!state || state.network.status === 'checking') return 'Verificando red interna…';
@@ -30,17 +24,12 @@ export function Splash({ state }: { state?: Snapshot }) {
     const mm = gsap.matchMedia();
     mm.add(MOTION, () => {
       gsap.timeline({ defaults: { ease: 'power3.out' } })
-        .from('.splash-spark', { x: (index: number) => SPARKS[index].x, y: (index: number) => SPARKS[index].y, opacity: 0, scale: 0.4, duration: 0.7, ease: 'power2.in', delay: (index: number) => SPARKS[index].delay })
-        .to('.splash-spark', { opacity: 0, scale: 0, duration: 0.2 }, '-=0.05')
-        // El circuito se "enciende" de abajo hacia arriba, con parpadeo de neón.
-        .fromTo('.splash-logo-base', { clipPath: 'inset(100% 0 0 0)' }, { clipPath: 'inset(0% 0 0 0)', duration: 0.9, ease: 'power2.inOut' }, '-=0.3')
-        .fromTo('.splash-logo-glow', { opacity: 0 }, { keyframes: { opacity: [0, 1, 0.25, 1, 0.5, 1] }, duration: 0.55, ease: 'none' }, '-=0.35')
-        .fromTo('.splash-ring', { scale: 0.6, opacity: 0.7 }, { scale: 2.4, opacity: 0, duration: 1.1, ease: 'expo.out' }, '-=0.25')
-        .from('.splash-title span', { opacity: 0, y: 12, filter: 'blur(6px)', duration: 0.45, stagger: 0.035 }, '-=0.9')
+        // Logo sobrio: aparece con un fundido y un leve acercamiento.
+        .from('.splash-logo-base', { opacity: 0, scale: 0.94, y: 8, duration: 0.8 })
+        .from('.splash-title span', { opacity: 0, y: 12, filter: 'blur(6px)', duration: 0.45, stagger: 0.035 }, '-=0.4')
         .from('.splash-tagline, .splash-progress, .splash-status', { opacity: 0, y: 8, duration: 0.4, stagger: 0.08 }, '-=0.3');
-      // Pulso de energía que recorre las pistas del logo mientras carga.
-      gsap.fromTo('.splash-shine', { xPercent: -120 }, { xPercent: 120, duration: 1.6, ease: 'power1.inOut', repeat: -1, repeatDelay: 0.4, delay: 1.6 });
-      gsap.to('.splash-logo-glow', { opacity: 0.55, duration: 1.2, ease: 'sine.inOut', yoyo: true, repeat: -1, delay: 2.2 });
+      // Brillo sutil que recorre el logo mientras carga.
+      gsap.fromTo('.splash-shine', { xPercent: -120 }, { xPercent: 120, duration: 1.8, ease: 'power1.inOut', repeat: -1, repeatDelay: 1.2, delay: 1.2 });
     });
     return () => mm.revert();
   }, { scope: root });
@@ -57,9 +46,6 @@ export function Splash({ state }: { state?: Snapshot }) {
   return <div ref={root} className="splash" role="status" aria-label="Iniciando AMATIME Tools" aria-live="polite">
     <div className="splash-stage">
       <div className="splash-mark">
-        <span className="splash-ring" aria-hidden="true" />
-        {SPARKS.map((_, index) => <span key={index} className="splash-spark" aria-hidden="true" />)}
-        <img className="splash-logo-glow" src={amaLogo} alt="" aria-hidden="true" />
         <img className="splash-logo-base" src={amaLogo} alt="AMA Time" />
         <span className="splash-shine" aria-hidden="true" style={{ '--logo': `url("${amaLogo}")` } as CSSProperties}><span /></span>
       </div>

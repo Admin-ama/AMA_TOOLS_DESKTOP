@@ -86,7 +86,8 @@ async function createWindow() {
   }, installed);
   // Pantalla de arranque: tapa la vista nativa vacía hasta que el servicio de inicio carga (o no hay red).
   const splashStart = Date.now();
-  const splashLimits = testing ? { ...SPLASH, minMs: 400 } : SPLASH;
+  // En e2e el logo dura poco; el test de arranque pide más tiempo para inspeccionarlo sin carreras.
+  const splashLimits = testing ? { ...SPLASH, minMs: Number(process.env.AMA_TEST_SPLASH_MS) || 400 } : SPLASH;
   let splash: SplashPhase = 'loading';
   const splashTimers: NodeJS.Timeout[] = [];
   const finishSplash = () => { if (splash === 'done') return; splash = 'done'; manager.endSplash(); };

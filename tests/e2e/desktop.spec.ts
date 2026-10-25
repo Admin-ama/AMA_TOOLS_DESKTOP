@@ -47,7 +47,7 @@ test.beforeEach(async ({}, testInfo) => {
   const config = Object.fromEntries(['huly', 'n8n', 'librechat', 'portal', 'emailai', 'stirling', 'teams', 'copilot', 'outlook', 'sharepoint', 'powerautomate', 'forms'].map(id => [id, `http://127.0.0.1:${address.port}/${id}`]));
   await writeFile(path.join(directory, 'services.json'), JSON.stringify(config));
   await writeFile(path.join(directory, 'installed.json'), '[]');
-  app = await electron.launch({ args: ['.'], env: { ...process.env, AMA_E2E: '1', AMA_TEST_UPDATES: testInfo.title.includes('[updates]') ? '1' : '0', AMA_TEST_CONFIG: path.join(directory, 'services.json'), AMA_TEST_INSTALLED_APPS: path.join(directory, 'installed.json'), AMA_TEST_USER_DATA: path.join(directory, 'data') } });
+  app = await electron.launch({ args: ['.'], env: { ...process.env, AMA_E2E: '1', AMA_TEST_UPDATES: testInfo.title.includes('[updates]') ? '1' : '0', AMA_TEST_SPLASH_MS: testInfo.title.includes('[arranque]') ? '4000' : '', AMA_TEST_CONFIG: path.join(directory, 'services.json'), AMA_TEST_INSTALLED_APPS: path.join(directory, 'installed.json'), AMA_TEST_USER_DATA: path.join(directory, 'data') } });
   page = await app.firstWindow();
   if (testInfo.title.includes('[arranque]')) return;
   await expect(page.getByRole('status', { name: 'Iniciando AMATIME Tools' })).toHaveCount(0);
@@ -59,6 +59,8 @@ test('[arranque] logo animado tapa la app hasta que el servicio de inicio carga'
   const splash = page.getByRole('status', { name: 'Iniciando AMATIME Tools' });
   await expect(splash).toBeVisible();
   await expect(splash.getByRole('img', { name: 'AMA Time' })).toBeVisible();
+  // Logo sobrio: sin círculo expansivo, chispas ni brillo neón.
+  expect(await splash.locator('.splash-ring, .splash-spark, .splash-logo-glow').count()).toBe(0);
   // Mientras se ve el logo, ninguna vista nativa puede pintar encima.
   expect(await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].contentView.children.some(view => (view as any).getVisible?.()))).toBe(false);
   await page.screenshot({ path: testInfo.outputPath('splash.png') });
