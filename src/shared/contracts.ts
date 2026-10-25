@@ -114,6 +114,11 @@ export interface PortalApi {
   overlay(active: boolean): Promise<void>;
   /** Oculta las vistas nativas mientras se arrastra el divisor. */
   splitDrag(active: boolean): Promise<void>;
+  /** Tooltip nativo sobre un ancla (px CSS del shell). Texto plano de hasta 120 caracteres. */
+  tooltipShow(text: string, rect: { x: number; y: number; width: number; height: number }, side: 'right' | 'left' | 'bottom'): Promise<void>;
+  tooltipHide(): Promise<void>;
+  /** Solo la ventana del tooltip: el proceso principal le empuja qué mostrar. */
+  onTooltip(listener: (push: import('./tooltip').TooltipPush) => void): () => void;
   onChange(listener: (snapshot: Snapshot) => void): () => void;
   /** Cursor position in shell coordinates, also while hovering a remote service view. */
   onCursor(listener: (point: { x: number; y: number }) => void): () => void;

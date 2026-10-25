@@ -101,16 +101,16 @@ test('[updates] aviso sigue tamaño y minimización del padre y cerrar equivale 
   await expect(notice.getByRole('heading', { name: 'Nueva versión disponible' })).toBeVisible();
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!.setContentSize(900, 600));
   await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
-    const child = BrowserWindow.getAllWindows().find(w => w.getParentWindow())!;
+    const child = BrowserWindow.getAllWindows().find(w => w.webContents.getURL().endsWith('#update-notice'))!;
     const parent = child.getParentWindow()!.getContentBounds();
     const bounds = child.getBounds();
     return { right: parent.x + parent.width - bounds.x - bounds.width, bottom: parent.y + parent.height - bounds.y - bounds.height };
   })).toEqual({ right: 16, bottom: 16 });
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!.minimize());
-  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.getParentWindow())!.isVisible())).toBe(false);
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().endsWith('#update-notice'))!.isVisible())).toBe(false);
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!.restore());
-  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.getParentWindow())!.isVisible())).toBe(true);
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.getParentWindow())!.close());
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().endsWith('#update-notice'))!.isVisible())).toBe(true);
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().endsWith('#update-notice'))!.close());
   await expect.poll(() => page.evaluate(async () => (await window.portal.snapshot()).updates.noticeVisible)).toBe(false);
 });
 
@@ -121,7 +121,7 @@ test('[updates] aviso aparece al restaurar si la versión se encontró con la ve
   await expect.poll(() => app.windows().some(w => w.url().endsWith('#update-notice'))).toBe(true);
   await new Promise(resolve => setTimeout(resolve, 1500));
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!.restore());
-  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.getParentWindow())!.isVisible())).toBe(true);
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().endsWith('#update-notice'))!.isVisible())).toBe(true);
 });
 
 test('[updates] descarga por consentimiento y permite posponer sin reinicio automático', async () => {
@@ -414,7 +414,7 @@ test('ojos del bot siguen el cursor aunque esté sobre la vista remota', async (
 });
 
 test('sidebar carga los logos locales de las aplicaciones', async ({}, testInfo) => {
-  await expect(page.getByRole('navigation', { name: 'Servicios' }).getByRole('button')).toHaveText(['LibreChat AI', 'Copilot M365', 'Portal de Operaciones', 'Huly Workspace', 'n8n Automations', 'Email Category AI', 'Stirling PDF']);
+  expect(await page.getByRole('navigation', { name: 'Servicios' }).getByRole('button').evaluateAll(buttons => buttons.map(button => button.getAttribute('data-tooltip')))).toEqual(['LibreChat AI', 'Copilot M365', 'Portal de Operaciones', 'Huly Workspace', 'n8n Automations', 'Email Category AI', 'Stirling PDF']);
   await expect(page.getByRole('button', { name: 'Abrir LibreChat AI', exact: true }).locator('svg .bot-eye')).toHaveCount(2);
   for (const name of ['Huly Workspace', 'n8n Automations', 'Portal de Operaciones', 'Stirling PDF']) {
     const logo = page.getByRole('button', { name: `Abrir ${name}`, exact: true }).locator('img');
@@ -1213,4 +1213,72 @@ test('apps de escritorio: con muchas apps el selector queda dentro de la ventana
   await expect(dialog.getByRole('button', { name: 'App 000' })).toHaveCount(0);
   await dialog.getByRole('tab', { name: /Todas/ }).click();
   await expect(dialog.getByRole('button', { name: 'App 000' })).toBeVisible();
+});
+
+// Tooltips nativos: ventana hija transparente que flota sobre las vistas del contenido.
+const tooltipState = () => app.evaluate(async ({ BrowserWindow }) => {
+  const win = BrowserWindow.getAllWindows().find(w => w.webContents.getURL().endsWith('#tooltip'));
+  if (!win || win.isDestroyed() || !win.isVisible()) return null;
+  const main = BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!;
+  return { bounds: win.getBounds(), content: main.getContentBounds(), text: (await win.webContents.executeJavaScript("document.querySelector('.tip-label')?.textContent ?? ''")) as string, focusable: win.isFocusable(), focused: win.isFocused(), parented: win.getParentWindow() === main, mainFocused: main.isFocused() };
+});
+
+test('tooltip nativo de la barra lateral aparece sobre la vista nativa, se desliza entre iconos y se oculta', async () => {
+  await page.mouse.move(600, 400); // el clic de beforeEach dejó el puntero sobre el icono: sin salir no hay mouseover nuevo
+  await page.getByRole('button', { name: 'Abrir Huly Workspace', exact: true }).hover();
+  await expect.poll(async () => (await tooltipState())?.text).toBe('Huly Workspace');
+  const first = (await tooltipState())!;
+  // Empieza justo a la derecha de la sidebar: encima de la vista nativa, no del DOM.
+  expect(first.bounds.x).toBeGreaterThanOrEqual(first.content.x + 64);
+  expect(first.parented).toBe(true);
+  expect(first.focusable).toBe(false);
+  expect(first.focused).toBe(false);
+  await page.getByRole('button', { name: 'Abrir LibreChat AI', exact: true }).hover();
+  await expect.poll(async () => (await tooltipState())?.text).toBe('LibreChat AI');
+  await page.mouse.move(600, 400);
+  await expect.poll(() => tooltipState()).toBeNull();
+});
+
+test('tooltip del header aparece debajo y el del dock a la izquierda', async () => {
+  const tab = page.getByTestId('huly-tab-1');
+  await tab.hover();
+  await expect.poll(async () => (await tooltipState())?.text === (await tab.innerText()).trim()).toBe(true); // título completo de la pestaña (el título de la página puede llegar después)
+  const below = (await tooltipState())!;
+  const box = (await tab.boundingBox())!;
+  expect(below.bounds.y).toBeGreaterThanOrEqual(below.content.y + box.y + box.height + 7);
+  await page.getByRole('button', { name: 'Recargar servicio', exact: true }).hover();
+  await expect.poll(async () => (await tooltipState())?.text).toBe('Recargar servicio');
+  await page.getByRole('button', { name: 'Cambiar a tema claro', exact: true }).hover();
+  await expect.poll(async () => (await tooltipState())?.text).toBe('Cambiar a tema claro');
+  const theme = (await tooltipState())!;
+  expect(theme.bounds.x + theme.bounds.width).toBeLessThanOrEqual(theme.content.x + theme.content.width);
+  await page.getByRole('complementary', { name: 'Aplicaciones de escritorio' }).getByRole('button', { name: 'Vincular aplicación de escritorio' }).hover();
+  await expect.poll(async () => (await tooltipState())?.text).toBe('Vincular aplicación de escritorio');
+  const dock = (await tooltipState())!;
+  expect(dock.bounds.x + dock.bounds.width).toBeLessThanOrEqual(dock.content.x + dock.content.width - 56);
+  await page.keyboard.press('Escape');
+  await expect.poll(() => tooltipState()).toBeNull();
+});
+
+test('el tooltip se oculta al hacer clic', async () => {
+  await page.getByRole('button', { name: 'Ver todas las aplicaciones', exact: true }).hover();
+  await expect.poll(async () => (await tooltipState())?.text).toBe('Aplicaciones');
+  await page.getByRole('button', { name: 'Ver todas las aplicaciones', exact: true }).click();
+  await expect.poll(() => tooltipState()).toBeNull();
+});
+
+test('IPC del tooltip valida argumentos y la ventana del tooltip no puede llamar comandos', async () => {
+  await page.getByRole('button', { name: 'Ajustes', exact: true }).hover();
+  await expect.poll(async () => (await tooltipState())?.text).toBe('Ajustes');
+  const rejected = await page.evaluate(async () => {
+    const bad = [[], ['', { x: 0, y: 0, width: 1, height: 1 }, 'right'], ['x'.repeat(121), { x: 0, y: 0, width: 1, height: 1 }, 'right'], ['a', { x: NaN, y: 0, width: 1, height: 1 }, 'right'], ['a', { x: 0, y: 0, width: 1, height: 1 }, 'top'], ['a', null, 'right']] as unknown[][];
+    const out: boolean[] = [];
+    for (const args of bad) out.push(await (window.portal as any).tooltipShow(...args).then(() => false, () => true));
+    return out;
+  });
+  expect(rejected).toEqual([true, true, true, true, true, true]);
+  const fromTooltip = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().endsWith('#tooltip'))!.webContents.executeJavaScript("window.portal.snapshot().then(() => 'permitido', error => String(error.message))"));
+  expect(fromTooltip).toContain('Remitente no autorizado');
+  const hide = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().endsWith('#tooltip'))!.webContents.executeJavaScript("window.portal.tooltipHide().then(() => 'permitido', error => String(error.message))"));
+  expect(hide).toContain('Remitente no autorizado');
 });

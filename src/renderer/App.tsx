@@ -12,6 +12,7 @@ import { StatusBar } from './StatusBar';
 import { Splash } from './Splash';
 import { SplitView } from './SplitView';
 import { ServiceLogo, AppIcon } from './service-visuals';
+import { useTooltips } from './use-tooltips';
 
 const updateLabels = { disabled: 'Las actualizaciones están disponibles en la app instalada de Windows.', idle: 'Puedes buscar una nueva versión.', checking: 'Buscando actualizaciones…', available: 'Hay una nueva versión disponible.', current: 'Tienes la última versión disponible.', downloading: 'Descargando actualización…', downloaded: 'La actualización está lista para instalar.', installing: 'Instalando actualización…', error: 'No se pudo actualizar. Revisa la conexión a GitHub y vuelve a intentar.' };
 
@@ -36,6 +37,7 @@ export function App() {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+  useTooltips(!!menu || picker || (!!state && state.panel !== 'service'));
   useEffect(() => { if (state) document.documentElement.dataset.theme = state.preferences.theme; }, [state?.preferences.theme]);
   useEffect(() => { if (state && state.panel !== 'launcher') setEditRequest(null); }, [state?.panel]);
   // Sin red las vistas ya están ocultas y los botones deshabilitados: el menú no debe quedar flotando.
@@ -121,20 +123,20 @@ export function App() {
   // Misma clave en ambos returns: la animación del logo no se reinicia al llegar el primer estado.
   return <><div key="shell" className="app-shell" style={{ '--sidebar-width': `${SHELL_LAYOUT.sidebarWidth}px`, '--header-height': `${SHELL_LAYOUT.headerHeight}px`, '--right-sidebar-width': `${SHELL_LAYOUT.rightSidebarWidth}px`, '--status-bar-height': `${SHELL_LAYOUT.statusBarHeight}px` } as CSSProperties}>
     <aside className="sidebar" aria-label="Navegación principal">
-      <div className="brand"><button className={`nav-item launcher-button ${state.panel === 'launcher' ? 'active' : ''}`} disabled={blocked} aria-label="Ver todas las aplicaciones" aria-pressed={state.panel === 'launcher'} onClick={() => panel(state.panel === 'launcher' ? 'service' : 'launcher')}><IconLayoutGrid size={24} stroke={1.65} /><span className="nav-tooltip">Aplicaciones</span></button></div>
+      <div className="brand"><button className={`nav-item launcher-button ${state.panel === 'launcher' ? 'active' : ''}`} disabled={blocked} aria-label="Ver todas las aplicaciones" data-tooltip="Aplicaciones" data-tooltip-side="right" aria-pressed={state.panel === 'launcher'} onClick={() => panel(state.panel === 'launcher' ? 'service' : 'launcher')}><IconLayoutGrid size={24} stroke={1.65} /></button></div>
       <nav className="service-nav" aria-label="Servicios">
         {sidebarGroups.map(group => <div className="nav-group" role="group" aria-label={group.label} key={group.label}>
         {group.ids.map(item => {
-          return <button key={item.id} className={`nav-item ${state.active === item.id && state.panel === 'service' ? 'active' : ''}`} disabled={blocked} aria-label={`Abrir ${item.name}`} aria-current={state.active === item.id && state.panel === 'service' ? 'page' : undefined} aria-haspopup="menu" onClick={() => activate(item.id)} onContextMenu={event => { event.preventDefault(); openMenu(item.id, event.currentTarget); }} onKeyDown={event => { if (isMenuKey(event)) { event.preventDefault(); openMenu(item.id, event.currentTarget); } }}>
-            <ServiceLogo id={item.id} icon={item.icon} /><span className="nav-tooltip">{item.name}</span>
+          return <button key={item.id} className={`nav-item ${state.active === item.id && state.panel === 'service' ? 'active' : ''}`} disabled={blocked} aria-label={`Abrir ${item.name}`} data-tooltip={item.name} data-tooltip-side="right" aria-current={state.active === item.id && state.panel === 'service' ? 'page' : undefined} aria-haspopup="menu" onClick={() => activate(item.id)} onContextMenu={event => { event.preventDefault(); openMenu(item.id, event.currentTarget); }} onKeyDown={event => { if (isMenuKey(event)) { event.preventDefault(); openMenu(item.id, event.currentTarget); } }}>
+            <ServiceLogo id={item.id} icon={item.icon} />
             {state.states[item.id].status === 'ready' && <span className="nav-dot" />}
           </button>;
         })}
         </div>)}
       </nav>
       <div className="sidebar-bottom">
-        <button className={`nav-item ${state.panel === 'settings' ? 'active' : ''}`} aria-label="Ajustes" onClick={() => panel('settings')}><IconSettings size={22} stroke={1.65} /><span className="nav-tooltip">Ajustes</span></button>
-        <button className={`nav-item ${state.panel === 'help' ? 'active' : ''}`} aria-label="Ayuda" onClick={() => panel('help')}><IconHelpHexagon size={22} stroke={1.65} /><span className="nav-tooltip">Ayuda y seguridad</span></button>
+        <button className={`nav-item ${state.panel === 'settings' ? 'active' : ''}`} aria-label="Ajustes" data-tooltip="Ajustes" data-tooltip-side="right" onClick={() => panel('settings')}><IconSettings size={22} stroke={1.65} /></button>
+        <button className={`nav-item ${state.panel === 'help' ? 'active' : ''}`} aria-label="Ayuda" data-tooltip="Ayuda y seguridad" data-tooltip-side="right" onClick={() => panel('help')}><IconHelpHexagon size={22} stroke={1.65} /></button>
       </div>
     </aside>
 
@@ -145,24 +147,24 @@ export function App() {
           const label = tab.title || service.shortName;
           const selected = state.activeTabId === tab.id;
           return <div key={tab.id} className={`tab-group ${selected ? 'selected' : ''}`}>
-            <button id={`tab-${tab.id}`} data-testid={`${tab.serviceId}-tab-${tab.number}`} role="tab" title={label} aria-selected={selected} disabled={blocked} aria-controls="service-content" tabIndex={selected ? 0 : -1} className={`app-tab ${selected ? 'selected' : ''}`} onClick={() => selectTab(tab.id)} onKeyDown={event => tabKey(event, index)}>
+            <button id={`tab-${tab.id}`} data-testid={`${tab.serviceId}-tab-${tab.number}`} role="tab" data-tooltip={label} data-tooltip-side="bottom" aria-selected={selected} disabled={blocked} aria-controls="service-content" tabIndex={selected ? 0 : -1} className={`app-tab ${selected ? 'selected' : ''}`} onClick={() => selectTab(tab.id)} onKeyDown={event => tabKey(event, index)}>
               <AppIcon id={tab.serviceId} icon={service.icon} /><span>{label}</span>
             </button>
-            <button className="close-tab" data-testid={`close-${tab.serviceId}-tab-${tab.number}`} aria-label={`Cerrar ${label}`} title={`Cerrar ${label}`} onClick={() => void action(() => window.portal.closeTab(tab.id))}><IconX size={13} /></button>
+            <button className="close-tab" data-testid={`close-${tab.serviceId}-tab-${tab.number}`} aria-label={`Cerrar ${label}`} data-tooltip={`Cerrar ${label}`} data-tooltip-side="bottom" onClick={() => void action(() => window.portal.closeTab(tab.id))}><IconX size={13} /></button>
           </div>;
         })}
       </div>
-      <button className="icon-button new-tab" disabled={blocked} aria-label={`Abrir nueva pestaña de ${service.shortName}`} title={`Abrir nueva pestaña de ${service.shortName}`} onClick={() => void action(() => window.portal.openTab())}><IconPlus size={19} /></button>
+      <button className="icon-button new-tab" disabled={blocked} aria-label={`Abrir nueva pestaña de ${service.shortName}`} data-tooltip={`Nueva pestaña de ${service.shortName}`} data-tooltip-side="bottom" onClick={() => void action(() => window.portal.openTab())}><IconPlus size={19} /></button>
       </div>
       <div className="header-actions">
         <div className="zoom-control" role="group" aria-label="Zoom de la aplicación">
-          <button className="icon-button" aria-label="Reducir zoom" title="Reducir zoom" disabled={blocked || state.panel !== 'service' || state.zoomPercent <= PAGE_ZOOM.min} onClick={() => void action(() => window.portal.zoom(Math.max(PAGE_ZOOM.min, state.zoomPercent - PAGE_ZOOM.step)))}><IconMinus size={15} /></button>
-          <button className="zoom-percent" aria-label="Restablecer zoom" title="Restablecer zoom al 100%" disabled={blocked || state.panel !== 'service'} onClick={() => void action(() => window.portal.zoom(PAGE_ZOOM.default))}>{state.zoomPercent}%</button>
-          <button className="icon-button" aria-label="Aumentar zoom" title="Aumentar zoom" disabled={blocked || state.panel !== 'service' || state.zoomPercent >= PAGE_ZOOM.max} onClick={() => void action(() => window.portal.zoom(Math.min(PAGE_ZOOM.max, state.zoomPercent + PAGE_ZOOM.step)))}><IconPlus size={15} /></button>
+          <button className="icon-button" aria-label="Reducir zoom" data-tooltip="Reducir zoom" data-tooltip-side="bottom" disabled={blocked || state.panel !== 'service' || state.zoomPercent <= PAGE_ZOOM.min} onClick={() => void action(() => window.portal.zoom(Math.max(PAGE_ZOOM.min, state.zoomPercent - PAGE_ZOOM.step)))}><IconMinus size={15} /></button>
+          <button className="zoom-percent" aria-label="Restablecer zoom" data-tooltip="Restablecer zoom al 100%" data-tooltip-side="bottom" disabled={blocked || state.panel !== 'service'} onClick={() => void action(() => window.portal.zoom(PAGE_ZOOM.default))}>{state.zoomPercent}%</button>
+          <button className="icon-button" aria-label="Aumentar zoom" data-tooltip="Aumentar zoom" data-tooltip-side="bottom" disabled={blocked || state.panel !== 'service' || state.zoomPercent >= PAGE_ZOOM.max} onClick={() => void action(() => window.portal.zoom(Math.min(PAGE_ZOOM.max, state.zoomPercent + PAGE_ZOOM.step)))}><IconPlus size={15} /></button>
         </div>
-        <button className="icon-button" aria-label="Recargar servicio" title="Recargar servicio" onClick={() => void action(() => window.portal.reload())}><IconRefresh size={19} /></button>
-        <button className={`icon-button ${state.split ? 'toggled' : ''}`} aria-label={state.split ? 'Cerrar panel lateral' : 'Abrir panel lateral'} aria-pressed={!!state.split} title={state.split ? 'Cerrar panel lateral' : 'Abrir panel lateral'} disabled={blocked && !state.split} onClick={() => void action(() => state.split ? window.portal.splitClose() : window.portal.splitOpen())}><IconLayoutSidebarRight size={19} /></button>
-        <button className="icon-button" aria-label={light ? 'Cambiar a tema oscuro' : 'Cambiar a tema claro'} title="Cambiar tema del portal" onClick={toggleTheme}>{light ? <IconSun size={19} /> : <IconMoon size={19} />}</button>
+        <button className="icon-button" aria-label="Recargar servicio" data-tooltip="Recargar servicio" data-tooltip-side="bottom" onClick={() => void action(() => window.portal.reload())}><IconRefresh size={19} /></button>
+        <button className={`icon-button ${state.split ? 'toggled' : ''}`} aria-label={state.split ? 'Cerrar panel lateral' : 'Abrir panel lateral'} aria-pressed={!!state.split} data-tooltip={state.split ? 'Cerrar panel lateral' : 'Abrir panel lateral'} data-tooltip-side="bottom" disabled={blocked && !state.split} onClick={() => void action(() => state.split ? window.portal.splitClose() : window.portal.splitOpen())}><IconLayoutSidebarRight size={19} /></button>
+        <button className="icon-button" aria-label={light ? 'Cambiar a tema oscuro' : 'Cambiar a tema claro'} data-tooltip={light ? 'Cambiar a tema oscuro' : 'Cambiar a tema claro'} data-tooltip-side="bottom" onClick={toggleTheme}>{light ? <IconSun size={19} /> : <IconMoon size={19} />}</button>
       </div>
     </header>
 

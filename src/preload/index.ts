@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { PortalApi, Snapshot } from '../shared/contracts';
+import type { TooltipPush } from '../shared/tooltip';
 const command = (name: string, ...args: unknown[]) => ipcRenderer.invoke('portal:command', name, ...args);
 const api: PortalApi = {
   snapshot: () => command('snapshot'),
@@ -37,6 +38,13 @@ const api: PortalApi = {
   customEdit: (id, input) => command('custom-edit', id, input),
   customRemove: id => command('custom-remove', id),
   overlay: active => command('overlay', active),
+  tooltipShow: (text, rect, side) => command('tooltip-show', text, rect, side),
+  tooltipHide: () => command('tooltip-hide'),
+  onTooltip: listener => {
+    const handler = (_event: Electron.IpcRendererEvent, push: TooltipPush) => listener(push);
+    ipcRenderer.on('tooltip:push', handler);
+    return () => ipcRenderer.removeListener('tooltip:push', handler);
+  },
   onChange: listener => {
     const handler = (_event: Electron.IpcRendererEvent, snapshot: Snapshot) => listener(snapshot);
     ipcRenderer.on('portal:changed', handler);

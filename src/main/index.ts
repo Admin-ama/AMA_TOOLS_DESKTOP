@@ -17,6 +17,8 @@ import { CursorTracker } from './cursor-tracker';
 import { autoUpdater } from 'electron-updater';
 import { UpdateController, type UpdateBackend } from './update-controller';
 import { UpdateNoticeWindow, UPDATE_NOTICE_URL } from './update-notice';
+import { TooltipWindow } from './tooltip-window';
+import { parseTooltipShow } from '../shared/tooltip';
 import { EventEmitter } from 'node:events';
 import { windowsAppDetails } from './windows-identity';
 import { NetworkMonitor, probeTarget, tcpProbe } from './network-status';
@@ -59,6 +61,7 @@ async function createWindow() {
   window.webContents.on('zoom-changed', () => window.webContents.setZoomFactor(1));
   let updates: UpdateController;
   const notice = new UpdateNoticeWindow(window, () => updates.snooze());
+  const tooltip = new TooltipWindow(window, () => preferences.theme);
   let network: NetworkMonitor;
   const forticlient = new FortiClientLauncher({ candidates: forticlientCandidates(), exists: existsSync, open: file => shell.openPath(file), log: (message, detail) => console.error(message, detail) });
 
@@ -145,6 +148,9 @@ async function createWindow() {
     // Solo lectura y potencialmente lentos (PowerShell): fuera de la cola para no retener cerrar el selector u otros comandos.
     if (command === 'desktop-candidates') return desktopApps.candidates(args[0], ...args.slice(1));
     if (command === 'desktop-icons') return desktopApps.candidateIcons(args[0], ...args.slice(1));
+    // Puramente visuales y sensibles a la latencia: también fuera de la cola. La ventana del tooltip nunca llega aquí (no es remitente autorizado).
+    if (command === 'tooltip-show') { tooltip.show(parseTooltipShow(args)); return; }
+    if (command === 'tooltip-hide') { tooltip.hide(); return; }
     const run = async () => {
       if (network.status !== 'connected' && !commandAllowedWhileBlocked(command, args)) throw new Error(BLOCKED_MESSAGE);
       const id = () => { if (!isAppId(args[0], manager.services)) throw new Error('Servicio inválido'); return args[0]; };
@@ -275,6 +281,7 @@ async function createWindow() {
         }
         case 'overlay': {
           if (typeof args[0] !== 'boolean') throw new Error('Estado inválido');
+          if (args[0]) tooltip.hide();
           manager.setOverlay(args[0]);
           break;
         }
@@ -317,7 +324,7 @@ async function createWindow() {
     return result;
   });
   window.on('focus', () => void network.check());
-  window.on('close', () => { network.dispose(); cursor.dispose(); clearTimeout(initialCheck); clearInterval(periodicCheck); splashTimers.forEach(clearTimeout); if (testUpdates) (app as EventEmitter).removeListener('ama:test-update', testUpdate); notice.dispose(); updates.dispose(); manager.dispose(); });
+  window.on('close', () => { network.dispose(); cursor.dispose(); clearTimeout(initialCheck); clearInterval(periodicCheck); splashTimers.forEach(clearTimeout); if (testUpdates) (app as EventEmitter).removeListener('ama:test-update', testUpdate); notice.dispose(); tooltip.dispose(); updates.dispose(); manager.dispose(); });
   window.on('closed', () => ipcMain.removeHandler('portal:command'));
   window.once('ready-to-show', () => window.show());
   await window.loadURL('app://bundle/index.html');

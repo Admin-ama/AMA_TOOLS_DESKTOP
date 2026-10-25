@@ -40,13 +40,13 @@ export function DesktopDock({ apps, forticlient, blocked, full, onForticlient, o
   const target = apps.find(app => app.id === menu?.id);
   return <aside className="dock" aria-label="Aplicaciones de escritorio">
     <div className="dock-list">
-      {forticlient && <button className="nav-item dock-item" aria-label="Abrir FortiClient" title="Abrir FortiClient" onClick={onForticlient}><IconShieldLock size={24} stroke={1.65} /></button>}
-      {apps.map(app => <button key={app.id} ref={node => { if (node) nodes.current.set(app.id, node); else nodes.current.delete(app.id); }} className="nav-item dock-item" aria-label={`Abrir ${app.name} (escritorio)`} title={app.name} onClick={() => onOpen(app.id)}
+      {forticlient && <button className="nav-item dock-item" aria-label="Abrir FortiClient" data-tooltip="Abrir FortiClient" data-tooltip-side="left" onClick={onForticlient}><IconShieldLock size={24} stroke={1.65} /></button>}
+      {apps.map(app => <button key={app.id} ref={node => { if (node) nodes.current.set(app.id, node); else nodes.current.delete(app.id); }} className="nav-item dock-item" aria-label={`Abrir ${app.name} (escritorio)`} data-tooltip={app.name} data-tooltip-side="left" onClick={() => onOpen(app.id)}
         onContextMenu={event => { event.preventDefault(); const dock = event.currentTarget.closest('.dock')!.getBoundingClientRect(); setMenu({ id: app.id, top: event.clientY - dock.top }); }}>
         {app.icon ? <img className="dock-icon" src={app.icon} alt="" draggable={false} /> : <IconAppWindow size={24} stroke={1.65} />}
       </button>)}
     </div>
-    <button className="nav-item dock-add" aria-label="Vincular aplicación de escritorio" title={full ? 'Máximo de aplicaciones alcanzado' : 'Vincular aplicación de escritorio'} disabled={blocked || full} onClick={onAdd}><IconPlus size={22} stroke={1.65} /></button>
+    <button className="nav-item dock-add" aria-label="Vincular aplicación de escritorio" data-tooltip={full ? 'Máximo de aplicaciones alcanzado' : 'Vincular aplicación de escritorio'} data-tooltip-side="left" disabled={blocked || full} onClick={onAdd}><IconPlus size={22} stroke={1.65} /></button>
     {menu && target && <div className="dock-menu" role="menu" style={{ top: menu.top }}>
       <button role="menuitem" className="icon-button destructive" aria-label={`Quitar ${target.name} de la barra`} title="Quitar de la barra" onClick={() => { setMenu(undefined); onRemove(target.id); }}><IconTrash size={18} /></button>
     </div>}
