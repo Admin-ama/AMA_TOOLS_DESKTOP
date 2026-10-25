@@ -302,6 +302,8 @@ export class ServiceViewManager {
         callback(true);
       } else callback(false);
     });
+    // Teams rechaza el UA de Electron. La sesión no basta: cada webContents copia su UA al crearse.
+    if (service.id === 'teams') web.setUserAgent(sanitizeUserAgent(web.getUserAgent()));
     if (!securedSessions.has(web.session)) {
       // Todo denegado, salvo Teams (llamadas, avisos, copiar, pantalla completa) y solo desde sus orígenes.
       web.session.setPermissionRequestHandler((_web, permission, callback, details) => callback(permissionAllowed(service, permission, details.requestingUrl)));

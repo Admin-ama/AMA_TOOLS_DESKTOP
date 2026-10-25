@@ -1065,3 +1065,11 @@ test('menú contextual: overlay libera las vistas aunque el menú siga abierto y
   const rejected = await page.evaluate(async () => { try { await (window.portal as any).overlay('yes'); return false; } catch { return true; } });
   expect(rejected).toBe(true);
 });
+
+test('Teams se presenta como Chrome, sin el token de Electron', async () => {
+  await page.evaluate(() => window.portal.activate('teams'));
+  await expect(page.getByTestId('teams-tab-1')).toHaveAttribute('aria-selected', 'true');
+  await expect.poll(() => app.evaluate(({ webContents }) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/teams'))?.getUserAgent() ?? '')).toMatch(/Chrome\//);
+  const agent = await app.evaluate(({ webContents }) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/teams'))!.getUserAgent());
+  expect(agent).not.toMatch(/Electron|amatime-tools-desktop/);
+});
