@@ -2,7 +2,7 @@ import { readFile, writeFile, rename, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { GLOBAL_APP_IDS, DEFAULT_PINNED, type DesktopApp, type Preferences, type AppId, DEFAULT_SPLIT_RATIO, DEFAULT_SPLIT_SERVICE } from '../shared/contracts';
 import { normalizeCustomApps } from '../shared/custom-apps';
-import { MAX_DESKTOP_APPS, MAX_DESKTOP_APP_NAME } from './desktop-apps';
+import { MAX_DESKTOP_APPS, MAX_DESKTOP_APP_NAME, validAumid } from './desktop-apps';
 
 /** `ids`: catálogo vigente (globales + páginas propias); lo desconocido se descarta. */
 export function normalizePinned(input: unknown, ids: readonly AppId[] = GLOBAL_APP_IDS): AppId[] {
@@ -16,12 +16,13 @@ export function normalizeDesktopApps(input: unknown): DesktopApp[] {
   const apps: DesktopApp[] = [];
   for (const item of input) {
     if (!item || typeof item !== 'object') continue;
-    const { id, name, path: file } = item as Record<string, unknown>;
-    if (typeof id !== 'string' || !id || seen.has(id) || typeof name !== 'string' || typeof file !== 'string' || !path.isAbsolute(file)) continue;
+    const { id, name, kind, path: file, aumid } = item as Record<string, unknown>;
+    if (typeof id !== 'string' || !id || seen.has(id) || typeof name !== 'string') continue;
     const clean = name.trim().slice(0, MAX_DESKTOP_APP_NAME);
     if (!clean) continue;
-    seen.add(id);
-    apps.push({ id, name: clean, path: file });
+    // Entradas antiguas no traen kind: eran rutas.
+    if (kind === 'aumid') { if (!validAumid(aumid)) continue; seen.add(id); apps.push({ id, name: clean, kind: 'aumid', aumid }); }
+    else if (kind === undefined || kind === 'path') { if (typeof file !== 'string' || !path.isAbsolute(file)) continue; seen.add(id); apps.push({ id, name: clean, kind: 'path', path: file }); }
   }
   return apps.slice(0, MAX_DESKTOP_APPS);
 }

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { app, BrowserWindow, ipcMain, protocol, nativeTheme, Menu, dialog, screen, shell, net } from 'electron';
 import { existsSync } from 'node:fs';
+import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { SERVICES, isAppId } from './policy';
@@ -21,6 +22,7 @@ import { windowsAppDetails } from './windows-identity';
 import { NetworkMonitor, probeTarget, tcpProbe } from './network-status';
 import { FortiClientLauncher, forticlientCandidates } from './forticlient';
 import { DesktopApps } from './desktop-apps';
+import { InstalledApps, enumerateInstalled, systemScanDeps, START_APPS_SCRIPT, START_APPS_TIMEOUT_MS, type InstalledEntry } from './installed-apps';
 import { commandAllowedWhileBlocked, BLOCKED_MESSAGE } from './network-gate';
 import { SPLASH, splashReady } from './splash';
 
@@ -59,6 +61,17 @@ async function createWindow() {
   const notice = new UpdateNoticeWindow(window, () => updates.snooze());
   let network: NetworkMonitor;
   const forticlient = new FortiClientLauncher({ candidates: forticlientCandidates(), exists: existsSync, open: file => shell.openPath(file), log: (message, detail) => console.error(message, detail) });
+
+  // Apps instaladas: menú Inicio + Tienda. En e2e (nunca empaquetado) un JSON puede sustituir la enumeración real.
+  const readShortcut = (lnk: string) => { try { const { target, args } = shell.readShortcutLink(lnk); return { target, args }; } catch { return undefined; } };
+  // stdin se cierra: PowerShell se queda esperando si hereda una tubería abierta.
+  const runStartApps = () => new Promise<string>((resolve, reject) => execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', START_APPS_SCRIPT], { timeout: START_APPS_TIMEOUT_MS, windowsHide: true, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 }, (error, stdout) => error ? reject(error) : resolve(stdout)).stdin?.end());
+  const testInstalled = testing ? process.env.AMA_TEST_INSTALLED_APPS : undefined;
+  const installed = new InstalledApps({
+    enumerate: testInstalled ? async () => JSON.parse(await readFile(testInstalled, 'utf8')) as InstalledEntry[] : () => enumerateInstalled(systemScanDeps(readShortcut), runStartApps),
+    icon: async file => (await app.getFileIcon(file, { size: 'normal' })).toDataURL(),
+    now: () => Date.now(),
+  });
   const desktopApps = new DesktopApps(preferences, {
     pickFile: async () => {
       const result = await dialog.showOpenDialog(window, { title: 'Vincular aplicación de escritorio', properties: ['openFile'], filters: [{ name: 'Aplicaciones y accesos directos', extensions: ['exe', 'lnk', 'url'] }] });
@@ -68,8 +81,9 @@ async function createWindow() {
     icon: async file => (await app.getFileIcon(file, { size: 'normal' })).toDataURL(),
     save: next => savePreferences(preferencesFile, next),
     id: () => randomUUID(),
+    openAumid: async aumid => { await new Promise<void>(resolve => execFile('explorer.exe', ['shell:AppsFolder\\' + aumid], { windowsHide: true }, () => resolve())); },
     log: (message, detail) => console.error(message, detail),
-  });
+  }, installed);
   // Pantalla de arranque: tapa la vista nativa vacía hasta que el servicio de inicio carga (o no hay red).
   const splashStart = Date.now();
   const splashLimits = testing ? { ...SPLASH, minMs: 400 } : SPLASH;
@@ -127,6 +141,9 @@ async function createWindow() {
     const shellSender = event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame && event.senderFrame.url === 'app://bundle/index.html';
     const noticeSender = notice.window && !notice.window.isDestroyed() && event.sender === notice.window.webContents && event.senderFrame === notice.window.webContents.mainFrame && event.senderFrame.url === UPDATE_NOTICE_URL;
     if (!shellSender && !(noticeSender && ['snapshot', 'download-update', 'install-update', 'snooze-update'].includes(command as string))) throw new Error('Remitente no autorizado');
+    // Solo lectura y potencialmente lentos (PowerShell): fuera de la cola para no retener cerrar el selector u otros comandos.
+    if (command === 'desktop-candidates') return desktopApps.candidates(args[0], ...args.slice(1));
+    if (command === 'desktop-icons') return desktopApps.candidateIcons(args[0], ...args.slice(1));
     const run = async () => {
       if (network.status !== 'connected' && !commandAllowedWhileBlocked(command, args)) throw new Error(BLOCKED_MESSAGE);
       const id = () => { if (!isAppId(args[0], manager.services)) throw new Error('Servicio inválido'); return args[0]; };
@@ -161,6 +178,7 @@ async function createWindow() {
         }
         case 'open-forticlient': await forticlient.open(...args); break;
         case 'add-desktop-app': await desktopApps.add(...args); break;
+        case 'desktop-link': await desktopApps.link(args[0], ...args.slice(1)); break;
         case 'open-desktop-app': await desktopApps.open(args[0], ...args.slice(1)); break;
         case 'remove-desktop-app': await desktopApps.remove(args[0], ...args.slice(1)); break;
         case 'check-updates': await updates.check(); break;

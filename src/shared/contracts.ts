@@ -28,9 +28,12 @@ export interface Service {
 export interface CustomApp { id: AppId; name: string; url: string; icon?: string }
 export interface ServiceState { status: PageStatus; message?: string }
 export interface ApplicationTab { id: string; serviceId: AppId; number: number; title: string; state: ServiceState }
-export interface DesktopApp { id: string; name: string; path: string }
+/** path: .exe/.lnk/.url/carpeta; aumid: app empaquetada (Tienda) que se lanza por su AppUserModelID. */
+export interface DesktopApp { id: string; name: string; kind: 'path' | 'aumid'; path?: string; aumid?: string }
 /** Lo único que ve el renderer de una app de escritorio: nunca la ruta. */
 export interface DesktopAppView { id: string; name: string; icon?: string }
+/** App instalada que ofrece el selector: id opaco (nunca ruta ni AUMID). */
+export interface DesktopCandidate { id: string; name: string; kind: 'path' | 'aumid'; icon?: string; linked?: boolean }
 export const DEFAULT_SPLIT_RATIO = 0.38;
 export const DEFAULT_SPLIT_SERVICE: AppId = 'librechat';
 /** Panel lateral: ratio = fracción del área de contenido que ocupa el panel. */
@@ -76,6 +79,11 @@ export interface PortalApi {
   reload(): Promise<void>;
   openForticlient(): Promise<void>;
   addDesktopApp(): Promise<void>;
+  /** Apps instaladas en el equipo (menú Inicio y Tienda); refresh vuelve a escanear. */
+  desktopCandidates(refresh?: boolean): Promise<DesktopCandidate[]>;
+  /** Iconos (data URL) de los candidatos pedidos, por id. */
+  desktopIcons(ids: string[]): Promise<Record<string, string>>;
+  desktopLink(candidateId: string): Promise<void>;
   openDesktopApp(id: string): Promise<void>;
   removeDesktopApp(id: string): Promise<void>;
   zoom(percent: number): Promise<void>;

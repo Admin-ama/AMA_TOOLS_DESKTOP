@@ -45,7 +45,20 @@ describe('apps de escritorio en preferencias', () => {
       { id: '', name: 'Sin id', path: abs }, { id: 'b', name: '', path: abs }, { id: 'c', name: 'Rel', path: 'a.exe' },
       { id: 'd', name: 'Num', path: 3 }, null, 'x',
     ] }).desktopApps;
-    expect(result).toEqual([{ id: 'a', name: 'Excel', path: abs }]);
+    expect(result).toEqual([{ id: 'a', name: 'Excel', kind: 'path', path: abs }]);
+  });
+  it('migra entradas antiguas (sin kind) a kind path y valida las de kind aumid', () => {
+    const aumid = 'Microsoft.WindowsCalculator_8wekyb3d8bbwe!App';
+    const result = normalizePreferences({ desktopApps: [
+      { id: 'old', name: 'Viejo', path: abs },
+      { id: 'p', name: 'Ruta', kind: 'path', path: abs, aumid: 'ignorado' },
+      { id: 'store', name: 'Calculadora', kind: 'aumid', aumid, path: abs },
+      { id: 'bad1', name: 'Inyección', kind: 'aumid', aumid: 'foo;calc' },
+      { id: 'bad2', name: 'Sin aumid', kind: 'aumid' },
+      { id: 'bad3', name: 'Kind raro', kind: 'shell', path: abs },
+      { id: 'bad4', name: 'Ruta como aumid', kind: 'aumid', aumid: abs },
+    ] }).desktopApps;
+    expect(result).toEqual([{ id: 'old', name: 'Viejo', kind: 'path', path: abs }, { id: 'p', name: 'Ruta', kind: 'path', path: abs }, { id: 'store', name: 'Calculadora', kind: 'aumid', aumid }]);
   });
   it('limita a 20 apps y exige lista', () => {
     const many = Array.from({ length: 30 }, (_, i) => ({ id: `i${i}`, name: `n${i}`, path: abs }));
