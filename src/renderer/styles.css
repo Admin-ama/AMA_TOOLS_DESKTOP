@@ -46,7 +46,7 @@ button { transition:background .18s, color .18s, border-color .18s; }
 .bot-eye { transform-box:fill-box; transform-origin:center; animation:bot-blink 4.5s infinite; }
 @keyframes bot-blink { 0%, 92%, 100% { transform:scaleY(1); } 95% { transform:scaleY(.1); } }
 .service-logo-portal { width:28px; height:28px; border-radius:7px; }
-.service-logo-emailai { color:var(--accent); }
+.service-logo-emailai { width:30px; height:30px; filter:drop-shadow(0 4px 8px #0ea5a038); }
 .service-logo-stirling { width:28px; height:28px; border-radius:6px; }
 .service-logo-buk { width:28px; height:28px; border-radius:7px; }
 .service-logo-teams { color:#7b83eb; }

@@ -416,6 +416,8 @@ test('ojos del bot siguen el cursor aunque esté sobre la vista remota', async (
 test('sidebar carga los logos locales de las aplicaciones', async ({}, testInfo) => {
   expect(await page.getByRole('navigation', { name: 'Servicios' }).getByRole('button').evaluateAll(buttons => buttons.map(button => button.getAttribute('data-tooltip')))).toEqual(['LibreChat AI', 'Copilot M365', 'Buk', 'Portal de Operaciones', 'Huly Workspace', 'n8n Automations', 'Email Category AI', 'Stirling PDF']);
   await expect(page.getByRole('button', { name: 'Abrir LibreChat AI', exact: true }).locator('svg .bot-eye')).toHaveCount(2);
+  // Email AI: azulejo propio (sobre + destellos), no el icono de línea genérico.
+  await expect(page.getByRole('button', { name: 'Abrir Email Category AI', exact: true }).locator('svg.service-logo-emailai .mail-spark')).toHaveCount(2);
   for (const name of ['Huly Workspace', 'n8n Automations', 'Portal de Operaciones', 'Stirling PDF', 'Buk']) {
     const logo = page.getByRole('button', { name: `Abrir ${name}`, exact: true }).locator('img');
     await expect(logo).toBeVisible();

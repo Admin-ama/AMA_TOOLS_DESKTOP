@@ -7,6 +7,7 @@ import amaAppLogo from '../../images/icon_144x144.png';
 import stirlingLogo from '../../images/stirling.png';
 import bukLogo from '../../images/buk_logo.jpg';
 import { AmaBot } from './AmaBot';
+import { EmailAiLogo } from './EmailAiLogo';
 import { MicrosoftLogo, isMicrosoftLogo } from './microsoft-logos';
 
 const icons = { huly: IconCalendarEvent, n8n: IconGitBranch, librechat: IconMessageCircle2, portal: IconServerCog, emailai: IconMailAi, stirling: IconFileTypePdf, teams: IconBrandTeams, costeador: IconCalculator, buk: IconUsersGroup } as const;
@@ -23,7 +24,7 @@ export function AppIcon({ id, icon, size = 16, stroke = 1.8 }: { id: AppId; icon
 /** Logo de una aplicación; el mismo dibujo en la sidebar y en el launcher. */
 export function ServiceLogo({ id, icon }: { id: AppId; icon?: string }) {
   if (id === 'librechat') return <AmaBot className="service-logo service-logo-librechat" />;
-  if (id === 'emailai') return <IconMailAi className="service-logo service-logo-emailai" size={26} stroke={1.65} />;
+  if (id === 'emailai') return <EmailAiLogo className="service-logo service-logo-emailai" />;
   if (id === 'teams') return <IconBrandTeams className="service-logo service-logo-teams" size={28} stroke={1.5} />;
   // Apps Amatime sin logo propio: azulejo con los colores de la marca.
   if (id === 'costeador') return <span className="service-logo service-logo-tile" aria-hidden="true"><IconCalculator size={20} stroke={1.8} /></span>;
