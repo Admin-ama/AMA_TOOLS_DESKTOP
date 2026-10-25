@@ -1,5 +1,5 @@
 /** Apps globales del catálogo (código); las páginas del usuario tienen ids `custom-<uuid>`. */
-export const GLOBAL_APP_IDS = ['huly', 'n8n', 'librechat', 'portal', 'emailai', 'stirling', 'teams', 'copilot', 'outlook', 'sharepoint', 'powerautomate', 'forms', 'costeador'] as const;
+export const GLOBAL_APP_IDS = ['huly', 'n8n', 'librechat', 'portal', 'emailai', 'stirling', 'teams', 'copilot', 'outlook', 'sharepoint', 'powerautomate', 'forms', 'costeador', 'buk'] as const;
 export type AppId = string;
 export const STARTUP_SERVICE: AppId = 'librechat';
 export type Theme = 'dark' | 'light';

@@ -5,10 +5,10 @@ import path from 'node:path';
 
 describe('preferencias sin secretos', () => {
   it('usa tema oscuro y particiones persistentes por defecto', () => {
-    expect(normalizePreferences(null)).toEqual({ theme: 'dark', remember: { huly: true, n8n: true, librechat: true, portal: true, emailai: true, stirling: true, teams: true, copilot: true, outlook: true, sharepoint: true, powerautomate: true, forms: true, costeador: true }, pinned: ['librechat', 'copilot', 'portal', 'huly', 'n8n', 'emailai', 'stirling'], seenCatalog: ['copilot'], desktopApps: [], customApps: [], splitRatio: 0.38, splitService: 'librechat' });
+    expect(normalizePreferences(null)).toEqual({ theme: 'dark', remember: { huly: true, n8n: true, librechat: true, portal: true, emailai: true, stirling: true, teams: true, copilot: true, outlook: true, sharepoint: true, powerautomate: true, forms: true, costeador: true, buk: true }, pinned: ['librechat', 'copilot', 'portal', 'huly', 'n8n', 'emailai', 'stirling'], seenCatalog: ['copilot'], desktopApps: [], customApps: [], splitRatio: 0.38, splitService: 'librechat' });
   });
   it('acepta solo valores booleanos y temas conocidos', () => {
-    expect(normalizePreferences({ theme: 'light', remember: { huly: false, n8n: 'false' }, password: 'secret' })).toEqual({ theme: 'light', remember: { ...{ huly: true, n8n: true, librechat: true, portal: true, emailai: true, stirling: true, teams: true, copilot: true, outlook: true, sharepoint: true, powerautomate: true, forms: true, costeador: true }, huly: false }, pinned: ['librechat', 'copilot', 'portal', 'huly', 'n8n', 'emailai', 'stirling'], seenCatalog: ['copilot'], desktopApps: [], customApps: [], splitRatio: 0.38, splitService: 'librechat' });
+    expect(normalizePreferences({ theme: 'light', remember: { huly: false, n8n: 'false' }, password: 'secret' })).toEqual({ theme: 'light', remember: { ...{ huly: true, n8n: true, librechat: true, portal: true, emailai: true, stirling: true, teams: true, copilot: true, outlook: true, sharepoint: true, powerautomate: true, forms: true, costeador: true, buk: true }, huly: false }, pinned: ['librechat', 'copilot', 'portal', 'huly', 'n8n', 'emailai', 'stirling'], seenCatalog: ['copilot'], desktopApps: [], customApps: [], splitRatio: 0.38, splitService: 'librechat' });
     expect(normalizePreferences({ theme: 'injected' }).theme).toBe('dark');
   });
   it('filtra apps fijadas inválidas y duplicadas, conservando el orden', () => {
@@ -87,7 +87,7 @@ describe('páginas del usuario en preferencias', () => {
     const ghost = 'custom-ffffffff-0000-0000-0000-000000000000';
     const result = normalizePreferences({ customApps: [app], seenCatalog: ['copilot'], pinned: [ghost, id, 'evil'], remember: { [ghost]: false, [id]: false, evil: false }, splitService: ghost });
     expect(result.pinned).toEqual([id]);
-    expect(Object.keys(result.remember)).toEqual(['huly', 'n8n', 'librechat', 'portal', 'emailai', 'stirling', 'teams', 'copilot', 'outlook', 'sharepoint', 'powerautomate', 'forms', 'costeador', id]);
+    expect(Object.keys(result.remember)).toEqual(['huly', 'n8n', 'librechat', 'portal', 'emailai', 'stirling', 'teams', 'copilot', 'outlook', 'sharepoint', 'powerautomate', 'forms', 'costeador', 'buk', id]);
     expect(result.splitService).toBe('librechat');
   });
   it('Teams es una app global: se puede fijar y recordar', () => {

@@ -3,14 +3,14 @@ import { CATEGORIES, GLOBAL_APP_IDS } from '../../src/shared/contracts';
 import { SERVICES, validAdmin, accessRequestUrl, isAppId, allowedNavigation, allowedDownload, isPdfUrl, partitionFor, contentBounds, remotePreferences, customService, catalogOf, sameServiceOrigin, groupMembers, windowTarget } from '../../src/main/policy';
 
 describe('registro y aislamiento', () => {
-  it('registra las doce direcciones reales', () => {
+  it('registra las direcciones reales', () => {
     expect(SERVICES.map(s => s.url)).toEqual([
       'http://172.16.8.73:8087/', 'http://172.16.8.73:5678/',
       'https://172.16.8.73/', 'https://app.amatime.com/',
       'https://email-category-ai.vercel.app/', 'http://172.16.8.73:8080/',
       'https://teams.microsoft.com/v2/',
       'https://m365.cloud.microsoft/', 'https://outlook.office.com/mail/', 'https://amatime.sharepoint.com/',
-      'https://make.powerautomate.com/', 'https://forms.office.com/', 'https://julio-sepulveda-costeo-bulk-copacki.vercel.app/',
+      'https://make.powerautomate.com/', 'https://forms.office.com/', 'https://julio-sepulveda-costeo-bulk-copacki.vercel.app/', 'https://amatime.buk.cl/users/sign_in'
     ]);
   });
   it('cada servicio pertenece a una categoría válida y cada categoría tiene servicios', () => {
@@ -96,7 +96,7 @@ describe('catálogo de Microsoft 365', () => {
     const order = (category: string) => SERVICES.filter(s => s.category === category).map(s => s.id);
     expect(order('control')).toEqual(['librechat', 'copilot']);
     expect(order('comunicacion')).toEqual(['teams', 'outlook']);
-    expect(order('operacion')).toEqual(['huly', 'sharepoint']);
+    expect(order('operacion')).toEqual(['huly', 'sharepoint', 'buk']);
     expect(order('amatime')).toEqual(['portal', 'costeador']);
   });
   it('GLOBAL_APP_IDS coincide con el catálogo', () => { expect([...GLOBAL_APP_IDS]).toEqual(SERVICES.map(s => s.id)); });
@@ -194,6 +194,13 @@ describe('páginas del usuario', () => {
     expect(partitionFor(app.id, true)).toBe('persist:amatime-custom-0a1b2c3d-aaaa');
     expect(partitionFor(app.id, false)).toBe('amatime-custom-0a1b2c3d-aaaa');
     expect(partitionFor(app.id, true)).not.toBe(partitionFor('custom-0a1b2c3d-bbbb', true));
+  });
+});
+
+describe('Buk (RRHH)', () => {
+  it('es una app web de Operación con su login de Amatime, sin grupo ni administrador', () => {
+    expect(SERVICES.find(service => service.id === 'buk')).toEqual({ id: 'buk', name: 'Buk', shortName: 'Buk', category: 'operacion', url: 'https://amatime.buk.cl/users/sign_in' });
+    expect(GLOBAL_APP_IDS).toContain('buk');
   });
 });
 

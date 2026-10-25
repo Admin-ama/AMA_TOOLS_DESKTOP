@@ -22,6 +22,7 @@ export const SERVICES: Service[] = [
   { id: 'powerautomate', name: 'Power Automate', shortName: 'Power Automate', category: 'automatizacion', url: 'https://make.powerautomate.com/', group: 'microsoft' },
   { id: 'forms', name: 'Microsoft Forms', shortName: 'Forms', category: 'automatizacion', url: 'https://forms.office.com/', group: 'microsoft' },
   { id: 'costeador', name: 'Costeador', shortName: 'Costeador', category: 'amatime', url: 'https://julio-sepulveda-costeo-bulk-copacki.vercel.app/', admin: { name: 'Julio Sepúlveda', email: 'jsepulveda@amatime.com' } },
+  { id: 'buk', name: 'Buk', shortName: 'Buk', category: 'operacion', url: 'https://amatime.buk.cl/users/sign_in' },
 ];
 /** Una página del usuario es una app más del catálogo: solo su origen, sin login externo. */
 export function customService(app: CustomApp): Service {
