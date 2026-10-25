@@ -23,6 +23,7 @@ const api: PortalApi = {
   snoozeUpdate: () => command('snooze-update'),
   panel: panel => command('panel', panel),
   finishSplash: () => command('finish-splash'),
+  requestAccess: id => command('request-access', id),
   theme: theme => command('theme', theme),
   remember: (id, enabled) => command('remember', id, enabled),
   pin: (id, pinned) => command('pin', id, pinned),

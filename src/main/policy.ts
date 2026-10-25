@@ -1,4 +1,4 @@
-import { type AppId, type CustomApp, type Service } from '../shared/contracts';
+import { type AppAdmin, type AppId, type CustomApp, type Service } from '../shared/contracts';
 
 /** Navegación del grupo Microsoft (login, Teams, Office, SharePoint del tenant, Power Platform, Forms): una lista para todas las apps del grupo. */
 const MICROSOFT_HOSTS: readonly string[] = ['login.microsoftonline.com', 'login.live.com', 'outlook.office365.com', 'amatime.sharepoint.com', 'amatime-my.sharepoint.com'];
@@ -9,7 +9,7 @@ export const SERVICES: Service[] = [
   { id: 'huly', name: 'Huly Workspace', shortName: 'Huly', category: 'operacion', url: 'http://172.16.8.73:8087/' },
   { id: 'n8n', name: 'n8n Automations', shortName: 'n8n', category: 'automatizacion', url: 'http://172.16.8.73:5678/' },
   { id: 'librechat', name: 'LibreChat AI', shortName: 'LibreChat', category: 'control', url: 'https://172.16.8.73/' },
-  { id: 'portal', name: 'Portal de Operaciones', shortName: 'Portal Ops', category: 'amatime', url: 'https://app.amatime.com/', certified: true },
+  { id: 'portal', name: 'Portal de Operaciones', shortName: 'Portal Ops', category: 'amatime', url: 'https://app.amatime.com/' },
   { id: 'emailai', name: 'Email Category AI', shortName: 'Email AI', category: 'automatizacion', url: 'https://email-category-ai.vercel.app/', authOrigins: ['https://login.microsoftonline.com', 'https://login.live.com', 'https://mysignins.microsoft.com'] },
   { id: 'stirling', name: 'Stirling PDF', shortName: 'Stirling PDF', category: 'automatizacion', url: 'http://172.16.8.73:8080/' },
   {
@@ -21,7 +21,7 @@ export const SERVICES: Service[] = [
   { id: 'sharepoint', name: 'SharePoint', shortName: 'SharePoint', category: 'operacion', url: 'https://amatime.sharepoint.com/', group: 'microsoft' },
   { id: 'powerautomate', name: 'Power Automate', shortName: 'Power Automate', category: 'automatizacion', url: 'https://make.powerautomate.com/', group: 'microsoft' },
   { id: 'forms', name: 'Microsoft Forms', shortName: 'Forms', category: 'automatizacion', url: 'https://forms.office.com/', group: 'microsoft' },
-  { id: 'costeador', name: 'Costeador', shortName: 'Costeador', category: 'amatime', url: 'https://julio-sepulveda-costeo-bulk-copacki.vercel.app/', certified: true },
+  { id: 'costeador', name: 'Costeador', shortName: 'Costeador', category: 'amatime', url: 'https://julio-sepulveda-costeo-bulk-copacki.vercel.app/' },
 ];
 /** Una página del usuario es una app más del catálogo: solo su origen, sin login externo. */
 export function customService(app: CustomApp): Service {
@@ -101,3 +101,19 @@ export function remotePreferences(id: AppId, persistent: boolean, group?: Servic
 }
 export { contentBounds } from '../shared/layout';
 export { splitBounds, SPLIT } from '../shared/split';
+
+/** Correo simple: sin espacios ni caracteres que permitan colar parámetros en el enlace de Teams. */
+const EMAIL = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+export function validAdmin(admin: unknown): admin is AppAdmin {
+  if (!admin || typeof admin !== 'object') return false;
+  const { name, email } = admin as Record<string, unknown>;
+  return typeof name === 'string' && name.trim().length > 0 && name.length <= 60 && typeof email === 'string' && email.length <= 254 && EMAIL.test(email);
+}
+/** Chat de Teams con el administrador y el mensaje de solicitud ya escrito. */
+export function accessRequestUrl(admin: AppAdmin, appName: string, teamsOrigin = 'https://teams.microsoft.com'): string {
+  if (!validAdmin(admin)) throw new Error('Administrador inválido');
+  const url = new URL('/l/chat/0/0', teamsOrigin);
+  url.searchParams.set('users', admin.email);
+  url.searchParams.set('message', `Hola ${admin.name.trim().split(/\s+/)[0]}, quiero solicitar acceso a ${appName}.`);
+  return url.toString();
+}

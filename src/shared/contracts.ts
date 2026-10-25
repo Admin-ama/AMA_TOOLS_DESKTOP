@@ -17,6 +17,7 @@ export type CategoryId = typeof CATEGORIES[number]['id'] | 'mine';
 export const MINE_CATEGORY = { id: 'mine', label: 'Mis páginas' } as const;
 /** Apps fijadas por defecto: LibreChat es el centro de mando; después operación y herramientas. */
 export const DEFAULT_PINNED: readonly AppId[] = ['librechat', 'copilot', 'portal', 'huly', 'n8n', 'emailai', 'stirling'];
+export interface AppAdmin { name: string; email: string }
 export interface Service {
   id: AppId; name: string; shortName: string; category: CategoryId; url: string;
   /** Orígenes https exactos de login externo (SSO). */
@@ -25,8 +26,8 @@ export interface Service {
   group?: 'microsoft';
   /** Se fija en la barra lateral una vez (usuarios nuevos y existentes); después manda el usuario. */
   pinByDefault?: boolean;
-  /** App interna homologada por TI (distintivo en el launcher). */
-  certified?: boolean;
+  /** Apps Amatime: a quién pedir credenciales (chat de Teams desde la tarjeta). */
+  admin?: AppAdmin;
   /** Solo páginas del usuario. */
   custom?: boolean; icon?: string;
 }
@@ -99,6 +100,7 @@ export interface PortalApi {
   snoozeUpdate(): Promise<void>;
   panel(panel: Snapshot['panel']): Promise<void>;
   finishSplash(): Promise<void>;
+  requestAccess(id: AppId): Promise<void>;
   theme(theme: Theme): Promise<void>;
   remember(id: AppId, enabled: boolean): Promise<void>;
   pin(id: AppId, pinned: boolean): Promise<void>;

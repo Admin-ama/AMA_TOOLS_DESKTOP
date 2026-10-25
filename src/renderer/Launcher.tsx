@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from 'react';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
-import { IconPin, IconPinFilled, IconSearch, IconX, IconLayoutSidebarRight, IconPlus, IconPencil, IconShieldCheck } from '@tabler/icons-react';
+import { IconPin, IconPinFilled, IconSearch, IconX, IconLayoutSidebarRight, IconPlus, IconPencil, IconUserShield, IconBrandTeams } from '@tabler/icons-react';
 import { CATEGORIES, MINE_CATEGORY, type Service, type AppId } from '../shared/contracts';
 import { checkCustomName, checkCustomUrl, MAX_CUSTOM_APPS } from '../shared/custom-apps';
 import { ServiceLogo } from './service-visuals';
@@ -17,6 +17,8 @@ interface Props {
   pinned: AppId[];
   onOpen(id: AppId): void;
   onSplit(id: AppId): void;
+  /** Apps Amatime: chat de Teams con el administrador para pedir credenciales. */
+  onRequestAccess(id: AppId): void;
   onPin(id: AppId, pinned: boolean): void;
   onClose(): void;
   /** Devuelven la promesa cruda: el formulario muestra el motivo del rechazo del proceso principal. */
@@ -60,7 +62,7 @@ function PageForm({ mode, initial, onSubmit, onCancel }: { mode: FormMode; initi
   </form>;
 }
 
-export function Launcher({ services, pinned, onOpen, onSplit, onPin, onClose, onAdd, onEdit, onMenu, editRequest }: Props) {
+export function Launcher({ services, pinned, onOpen, onSplit, onRequestAccess, onPin, onClose, onAdd, onEdit, onMenu, editRequest }: Props) {
   const [query, setQuery] = useState('');
   const [form, setForm] = useState<FormMode | null>(null);
   const search = useRef<HTMLInputElement>(null);
@@ -99,8 +101,9 @@ export function Launcher({ services, pinned, onOpen, onSplit, onPin, onClose, on
     const isPinned = pinned.includes(service.id);
     return <div className={`launcher-card ${service.custom ? 'custom' : ''}`} key={service.id} onContextMenu={event => { event.preventDefault(); onMenu(service.id, event.currentTarget); }}>
       <button className="launcher-open" aria-label={`Abrir ${service.name}`} aria-haspopup="menu" onClick={() => onOpen(service.id)} onKeyDown={event => { if (isMenuKey(event)) { event.preventDefault(); onMenu(service.id, event.currentTarget); } }}>
-        <span className="launcher-logo"><ServiceLogo id={service.id} icon={service.icon} /></span><span className="launcher-text"><span className="launcher-name">{service.name}</span>{service.certified && <span className="launcher-badge"><IconShieldCheck size={12} stroke={2.2} aria-hidden="true" />Homologada</span>}</span>
+        <span className="launcher-logo"><ServiceLogo id={service.id} icon={service.icon} /></span><span className="launcher-text"><span className="launcher-name">{service.name}</span>{service.admin && <span className="launcher-admin" title={service.admin.email}><IconUserShield size={13} stroke={2} aria-hidden="true" />Admin: {service.admin.name}</span>}</span>
       </button>
+      {service.admin && <button className="launcher-access" aria-label={`Pedir acceso a ${service.name}`} onClick={() => onRequestAccess(service.id)}><IconBrandTeams size={14} stroke={1.9} aria-hidden="true" />Pedir acceso</button>}
       {service.custom && <button className="pin-button edit-button" aria-label={`Editar ${service.name}`} title="Editar página" onClick={() => setForm({ kind: 'edit', id: service.id })}><IconPencil size={16} /></button>}
       <button className="pin-button split-button" aria-label={`Abrir ${service.name} a la derecha`} title="Abrir a la derecha" onClick={() => onSplit(service.id)}><IconLayoutSidebarRight size={16} /></button>
       <button className={`pin-button ${isPinned ? 'pinned' : ''}`} aria-pressed={isPinned} aria-label={isPinned ? `Quitar ${service.name} de la barra lateral` : `Fijar ${service.name} en la barra lateral`} title={isPinned ? 'Quitar de la barra lateral' : 'Fijar en la barra lateral'} onClick={event => pin(event, service.id, !isPinned)}>

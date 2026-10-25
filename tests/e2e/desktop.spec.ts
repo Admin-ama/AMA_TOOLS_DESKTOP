@@ -47,7 +47,7 @@ test.beforeEach(async ({}, testInfo) => {
   const config = Object.fromEntries(['huly', 'n8n', 'librechat', 'portal', 'emailai', 'stirling', 'teams', 'copilot', 'outlook', 'sharepoint', 'powerautomate', 'forms', 'costeador'].map(id => [id, `http://127.0.0.1:${address.port}/${id}`]));
   await writeFile(path.join(directory, 'services.json'), JSON.stringify(config));
   await writeFile(path.join(directory, 'installed.json'), '[]');
-  app = await electron.launch({ args: ['.'], env: { ...process.env, AMA_E2E: '1', AMA_TEST_UPDATES: testInfo.title.includes('[updates]') ? '1' : '0', AMA_TEST_SPLASH_MS: testInfo.title.includes('[arranque]') ? '4000' : '', AMA_TEST_CONFIG: path.join(directory, 'services.json'), AMA_TEST_INSTALLED_APPS: path.join(directory, 'installed.json'), AMA_TEST_USER_DATA: path.join(directory, 'data') } });
+  app = await electron.launch({ args: ['.'], env: { ...process.env, AMA_E2E: '1', AMA_TEST_UPDATES: testInfo.title.includes('[updates]') ? '1' : '0', AMA_TEST_SPLASH_MS: testInfo.title.includes('[arranque]') ? '4000' : '', AMA_TEST_ADMINS: testInfo.title.includes('[admins]') ? JSON.stringify({ costeador: { name: 'Julio Prueba', email: 'julio.prueba@amatime.com' } }) : '', AMA_TEST_CONFIG: path.join(directory, 'services.json'), AMA_TEST_INSTALLED_APPS: path.join(directory, 'installed.json'), AMA_TEST_USER_DATA: path.join(directory, 'data') } });
   page = await app.firstWindow();
   if (testInfo.title.includes('[arranque]')) return;
   await expect(page.getByRole('status', { name: 'Iniciando Amatime OS' })).toHaveCount(0);
@@ -1292,17 +1292,20 @@ test('las barras de scroll del shell son finas, sin flechas y con pulgar sutil',
   expect(global('::-webkit-scrollbar-thumb')).toMatch(/border-radius/);
 });
 
-test('Apps Amatime: categoría propia con las apps internas homologadas y su distintivo', async () => {
+test('[admins] Apps Amatime: la tarjeta muestra al administrador y "Pedir acceso" abre su chat de Teams', async () => {
   await page.getByRole('button', { name: 'Ver todas las aplicaciones', exact: true }).click();
   const launcher = page.getByRole('region', { name: 'Todas las aplicaciones' });
   const section = launcher.locator('.launcher-category', { has: page.getByRole('heading', { name: 'Apps Amatime' }) });
-  await expect(section).toBeVisible();
-  for (const name of ['Portal de Operaciones', 'Costeador']) {
-    const card = section.locator('.launcher-card', { has: page.getByRole('button', { name: `Abrir ${name}`, exact: true }) });
-    await expect(card.getByText('Homologada')).toBeVisible();
-  }
-  // Las apps de terceros no llevan distintivo.
-  await expect(launcher.locator('.launcher-card', { has: page.getByRole('button', { name: 'Abrir n8n Automations', exact: true }) }).getByText('Homologada')).toHaveCount(0);
-  await section.getByRole('button', { name: 'Abrir Costeador', exact: true }).click();
-  await expect(page.getByTestId('costeador-tab-1')).toHaveAttribute('aria-selected', 'true');
+  const card = section.locator('.launcher-card', { has: page.getByRole('button', { name: 'Abrir Costeador', exact: true }) });
+  await expect(card.getByText('Admin: Julio Prueba')).toBeVisible();
+  await expect(card.getByText('Homologada')).toHaveCount(0);
+  // El Portal no tiene admin en esta prueba: no muestra nada.
+  await expect(section.locator('.launcher-card', { has: page.getByRole('button', { name: 'Abrir Portal de Operaciones', exact: true }) }).getByRole('button', { name: /Pedir acceso/ })).toHaveCount(0);
+  await card.getByRole('button', { name: 'Pedir acceso a Costeador' }).click();
+  await expect(launcher).toHaveCount(0);
+  await expect(page.getByTestId('teams-tab-1')).toHaveAttribute('aria-selected', 'true');
+  await expect.poll(() => app.evaluate(({ webContents }) => webContents.getAllWebContents().map(w => w.getURL()).find(u => u.includes('/l/chat/0/0')) ?? '')).toContain('users=julio.prueba%40amatime.com');
+  // IPC: solo apps con administrador.
+  const rejected = await page.evaluate(async () => { const out = []; for (const id of ['huly', 'evil', 42]) { try { await window.portal.requestAccess(id as never); out.push(false); } catch { out.push(true); } } return out; });
+  expect(rejected).toEqual([true, true, true]);
 });

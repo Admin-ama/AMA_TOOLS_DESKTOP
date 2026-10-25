@@ -266,7 +266,10 @@ input[type=checkbox] { accent-color:var(--accent); width:1rem; height:1rem; }
 :root[data-theme='light'] ::-webkit-scrollbar-thumb { background-color: #0f172a26; }
 :root[data-theme='light'] ::-webkit-scrollbar-thumb:hover { background-color: #0ea5a099; }
 
-/* Apps Amatime: distintivo de app interna homologada y azulejo de marca para apps sin logo. */
+/* Apps Amatime: administrador de la app (a quién pedir credenciales) y azulejo de marca para apps sin logo. */
 .launcher-text { display:flex; flex-direction:column; align-items:flex-start; gap:.3rem; min-width:0; }
-.launcher-badge { display:inline-flex; align-items:center; gap:.25rem; padding:.12rem .45rem; border-radius:999px; background:#1da77422; border:1px solid #1da77455; color:var(--accent); font-size:.6rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
 .service-logo-tile { display:grid; place-items:center; width:30px; height:30px; border-radius:9px; color:#fff; background:linear-gradient(135deg, var(--teal), var(--primary)); box-shadow:0 4px 10px #0ea5a033; }
+.launcher-admin { display:inline-flex; align-items:center; gap:.3rem; color:var(--muted); font-size:.68rem; font-weight:600; }
+.launcher-access { display:inline-flex; align-items:center; gap:.35rem; margin:0 .8rem .75rem 4.4rem; padding:.3rem .65rem; border-radius:999px; border:1px solid #5b5fc755; background:#5b5fc71f; color:#a5a8f5; font-size:.68rem; font-weight:700; }
+.launcher-access:hover { background:#5b5fc733; border-color:#7b7fe8; color:#c7c9ff; }
+:root[data-theme='light'] .launcher-access { color:#4b4fc0; }

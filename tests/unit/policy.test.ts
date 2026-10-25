@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CATEGORIES, GLOBAL_APP_IDS } from '../../src/shared/contracts';
-import { SERVICES, isAppId, allowedNavigation, allowedDownload, isPdfUrl, partitionFor, contentBounds, remotePreferences, customService, catalogOf, sameServiceOrigin, groupMembers, windowTarget } from '../../src/main/policy';
+import { SERVICES, validAdmin, accessRequestUrl, isAppId, allowedNavigation, allowedDownload, isPdfUrl, partitionFor, contentBounds, remotePreferences, customService, catalogOf, sameServiceOrigin, groupMembers, windowTarget } from '../../src/main/policy';
 
 describe('registro y aislamiento', () => {
   it('registra las doce direcciones reales', () => {
@@ -197,15 +197,29 @@ describe('páginas del usuario', () => {
   });
 });
 
-describe('Apps Amatime (homologadas)', () => {
-  it('tienen su categoría justo después de Control y Costeador está homologado en ella', () => {
+describe('Apps Amatime (internas, con administrador)', () => {
+  it('tienen su categoría justo después de Control con el Portal y el Costeador', () => {
     expect(CATEGORIES.map(category => category.id).slice(0, 2)).toEqual(['control', 'amatime']);
     expect(CATEGORIES.find(category => category.id === 'amatime')!.label).toBe('Apps Amatime');
-    const costeador = SERVICES.find(service => service.id === 'costeador')!;
-    expect(costeador).toMatchObject({ name: 'Costeador', category: 'amatime', certified: true, url: 'https://julio-sepulveda-costeo-bulk-copacki.vercel.app/' });
+    expect(SERVICES.find(service => service.id === 'costeador')).toMatchObject({ name: 'Costeador', category: 'amatime', url: 'https://julio-sepulveda-costeo-bulk-copacki.vercel.app/' });
+    expect(SERVICES.find(service => service.id === 'portal')).toMatchObject({ category: 'amatime' });
     expect(GLOBAL_APP_IDS).toContain('costeador');
-    expect(SERVICES.find(service => service.id === 'portal')).toMatchObject({ category: 'amatime', certified: true });
-    // Solo las apps internas homologadas llevan el distintivo.
-    expect(SERVICES.filter(service => service.certified).every(service => service.category === 'amatime')).toBe(true);
+  });
+  it('solo las Apps Amatime declaran administrador, siempre con nombre y correo válidos', () => {
+    for (const service of SERVICES.filter(service => service.admin)) {
+      expect(service.category).toBe('amatime');
+      expect(validAdmin(service.admin)).toBe(true);
+    }
+  });
+  it('valida el administrador: nombre corto y correo simple, sin parámetros escondidos', () => {
+    expect(validAdmin({ name: 'Julio Sepúlveda', email: 'jsepulveda@amatime.com' })).toBe(true);
+    for (const admin of [{ name: '', email: 'a@b.cl' }, { name: 'X', email: 'no-es-correo' }, { name: 'X', email: 'a@b.cl?cc=evil@x.com' }, { name: 'X', email: 'a b@c.cl' }, { name: 'x'.repeat(61), email: 'a@b.cl' }, null, 'a@b.cl']) expect(validAdmin(admin as never)).toBe(false);
+  });
+  it('arma el chat de Teams con el administrador y un mensaje ya escrito', () => {
+    const url = new URL(accessRequestUrl({ name: 'Julio Sepúlveda', email: 'jsepulveda@amatime.com' }, 'Costeador'));
+    expect(url.origin + url.pathname).toBe('https://teams.microsoft.com/l/chat/0/0');
+    expect(url.searchParams.get('users')).toBe('jsepulveda@amatime.com');
+    expect(url.searchParams.get('message')).toBe('Hola Julio, quiero solicitar acceso a Costeador.');
+    expect(() => accessRequestUrl({ name: 'X', email: 'a@b.cl?x=1' }, 'Costeador')).toThrow();
   });
 });

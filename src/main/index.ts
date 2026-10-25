@@ -4,9 +4,9 @@ import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { SERVICES, isAppId, groupMembers } from './policy';
+import { SERVICES, isAppId, groupMembers, validAdmin, accessRequestUrl } from './policy';
 import { SHELL_LAYOUT } from '../shared/layout';
-import { STARTUP_SERVICE, DEFAULT_SPLIT_SERVICE, type SplashPhase } from '../shared/contracts';
+import { STARTUP_SERVICE, DEFAULT_SPLIT_SERVICE, type SplashPhase, type AppAdmin } from '../shared/contracts';
 import { checkCustomName, checkCustomUrl, isCustomId, MAX_CUSTOM_APPS } from '../shared/custom-apps';
 import { fetchFavicon } from './favicon';
 import { isZoomPercent } from '../shared/zoom';
@@ -46,6 +46,11 @@ async function createWindow() {
       if (url.hostname !== '127.0.0.1' || url.protocol !== 'http:') throw new Error('Test configuration must use loopback');
       return { ...service, url: url.href };
     });
+  }
+  // Solo e2e: administradores de prueba (los reales viven en el catálogo).
+  if (testing && process.env.AMA_TEST_ADMINS) {
+    const admins = JSON.parse(process.env.AMA_TEST_ADMINS) as Record<string, unknown>;
+    services = services.map(service => validAdmin(admins[service.id]) ? { ...service, admin: admins[service.id] as AppAdmin } : service);
   }
   const window = new BrowserWindow({
     icon: path.join(__dirname, '../assets/amatime.ico'),
@@ -232,6 +237,14 @@ async function createWindow() {
           // La sesión del grupo Microsoft es una sola: la preferencia vale para todas sus apps.
           for (const member of groupMembers(serviceId, manager.services)) preferences.remember[member.id] = args[1];
           await savePreferences(preferencesFile, preferences);
+          break;
+        }
+        case 'request-access': {
+          // Pedir credenciales: chat de Teams con el administrador de la app, dentro de Amatime OS.
+          const service = manager.services.find(item => item.id === id());
+          const teams = manager.services.find(item => item.id === 'teams');
+          if (!service?.admin || !teams) throw new Error('Esta aplicación no tiene administrador');
+          manager.openTab('teams', accessRequestUrl(service.admin, service.name, new URL(teams.url).origin));
           break;
         }
         case 'pin': {
