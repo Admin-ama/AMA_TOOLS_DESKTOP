@@ -1,9 +1,10 @@
-import { useEffect, useState, type KeyboardEvent, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type CSSProperties } from 'react';
 import { IconSettings, IconHelpHexagon, IconMoon, IconSun, IconRefresh, IconShieldCheck, IconAlertTriangle, IconChevronLeft, IconTrash, IconActivity, IconPlus, IconMinus, IconX, IconLayoutGrid, IconLayoutSidebarRight } from '@tabler/icons-react';
 import { CATEGORIES, MINE_CATEGORY, type AppId, type Snapshot } from '../shared/contracts';
 import { SHELL_LAYOUT } from '../shared/layout';
 import { PAGE_ZOOM } from '../shared/zoom';
 import { Launcher } from './Launcher';
+import { AppContextMenu, anchorOf, isMenuKey, type MenuAction, type MenuAnchor } from './AppContextMenu';
 import { NetworkBlock } from './NetworkBlock';
 import { DesktopDock } from './DesktopDock';
 import { StatusBar } from './StatusBar';
@@ -19,6 +20,10 @@ export function App() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [size, setSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+  const [menu, setMenu] = useState<{ id: AppId; anchor: MenuAnchor } | null>(null);
+  // "Editar…" desde el menú abre el launcher con el formulario de esa página; cada petición es un objeto nuevo.
+  const [editRequest, setEditRequest] = useState<{ id: AppId } | null>(null);
+  const trigger = useRef<HTMLElement | null>(null);
   useEffect(() => {
     const unsubscribe = window.portal.onChange(setState);
     void window.portal.snapshot().then(setState).catch(() => setError('No se pudo conectar con el contenedor. Reinicia la aplicación.'));
@@ -30,6 +35,9 @@ export function App() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
   useEffect(() => { if (state) document.documentElement.dataset.theme = state.preferences.theme; }, [state?.preferences.theme]);
+  useEffect(() => { if (state && state.panel !== 'launcher') setEditRequest(null); }, [state?.panel]);
+  // Sin red las vistas ya están ocultas y los botones deshabilitados: el menú no debe quedar flotando.
+  useEffect(() => { if (menu && state && state.network.status !== 'connected') { setMenu(null); void window.portal.overlay(false).catch(() => undefined); } }, [menu, state?.network.status]);
   useEffect(() => { if (state?.activeTabId) document.getElementById(`tab-${state.activeTabId}`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }, [state?.activeTabId]);
 
   async function action(task: () => Promise<void>, success = '') {
@@ -54,6 +62,30 @@ export function App() {
   const selectTab = (id: string) => void action(() => window.portal.selectTab(id));
   const panel = (value: Snapshot['panel']) => void action(() => window.portal.panel(value));
   const toggleTheme = () => void action(() => window.portal.theme(light ? 'dark' : 'light'));
+
+  // Las vistas nativas pintan por encima del DOM: mientras el menú está abierto el proceso principal las oculta.
+  function openMenu(id: AppId, source: HTMLElement) {
+    trigger.current = source;
+    setMenu({ id, anchor: anchorOf(source) });
+    void window.portal.overlay(true).catch(() => undefined);
+  }
+  function closeMenu(restoreFocus: boolean) {
+    setMenu(null);
+    void window.portal.overlay(false).catch(() => undefined);
+    if (restoreFocus) trigger.current?.focus();
+  }
+  function runMenu(choice: MenuAction) {
+    if (!menu) return;
+    const { id } = menu;
+    closeMenu(false);
+    if (choice === 'open') activate(id);
+    // Una app aún sin abrir ya recibe su primera pestaña al activarse: abrir otra daría dos.
+    else if (choice === 'tab') { const opened = state!.tabs.some(tab => tab.serviceId === id); void action(async () => { await window.portal.activate(id); if (opened) await window.portal.openTab(); }); }
+    else if (choice === 'split') void action(() => window.portal.splitOpen(id));
+    else if (choice === 'unpin') void action(() => window.portal.pin(id, false));
+    else if (choice === 'edit') { setEditRequest({ id }); panel('launcher'); }
+    else void action(() => window.portal.customRemove(id));
+  }
 
   function tabKey(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     let next = index;
@@ -80,7 +112,7 @@ export function App() {
       <nav className="service-nav" aria-label="Servicios">
         {sidebarGroups.map(group => <div className="nav-group" role="group" aria-label={group.label} key={group.label}>
         {group.ids.map(item => {
-          return <button key={item.id} className={`nav-item ${state.active === item.id && state.panel === 'service' ? 'active' : ''}`} disabled={blocked} aria-label={`Abrir ${item.name}`} aria-current={state.active === item.id && state.panel === 'service' ? 'page' : undefined} onClick={() => activate(item.id)}>
+          return <button key={item.id} className={`nav-item ${state.active === item.id && state.panel === 'service' ? 'active' : ''}`} disabled={blocked} aria-label={`Abrir ${item.name}`} aria-current={state.active === item.id && state.panel === 'service' ? 'page' : undefined} aria-haspopup="menu" onClick={() => activate(item.id)} onContextMenu={event => { event.preventDefault(); openMenu(item.id, event.currentTarget); }} onKeyDown={event => { if (isMenuKey(event)) { event.preventDefault(); openMenu(item.id, event.currentTarget); } }}>
             <ServiceLogo id={item.id} icon={item.icon} /><span className="nav-tooltip">{item.name}</span>
             {state.states[item.id].status === 'ready' && <span className="nav-dot" />}
           </button>;
@@ -125,7 +157,7 @@ export function App() {
 
     <main id="service-content" className="content" role="tabpanel" aria-labelledby={state.activeTabId ? `tab-${state.activeTabId}` : undefined}>
       {blocked && (state.panel === 'service' || state.panel === 'launcher') && <NetworkBlock network={state.network} onRetry={() => action(() => window.portal.reload())} onForticlient={() => action(() => window.portal.openForticlient())} />}
-      {!blocked && state.panel === 'launcher' && <Launcher services={state.services} pinned={state.preferences.pinned} onOpen={activate} onSplit={id => void action(() => window.portal.splitOpen(id))} onPin={(id, pinned) => void action(() => window.portal.pin(id, pinned))} onClose={() => panel('service')} onAdd={input => window.portal.customAdd(input)} onEdit={(id, input) => window.portal.customEdit(id, input)} />}
+      {!blocked && state.panel === 'launcher' && <Launcher services={state.services} pinned={state.preferences.pinned} onOpen={activate} onSplit={id => void action(() => window.portal.splitOpen(id))} onPin={(id, pinned) => void action(() => window.portal.pin(id, pinned))} onClose={() => panel('service')} onAdd={input => window.portal.customAdd(input)} onEdit={(id, input) => window.portal.customEdit(id, input)} onMenu={openMenu} editRequest={editRequest} />}
       {state.panel === 'settings' && <section className="settings-page">
         <button className="back-button" onClick={() => panel('service')}><IconChevronLeft size={17} />Volver al servicio</button>
         <div className="page-heading"><span className="eyebrow">PERSONALIZA TU ESPACIO</span><h1>Preferencias del portal</h1><p>Tu interfaz y tus sesiones. Cada aplicación conserva su propio inicio de sesión.</p></div>
@@ -162,7 +194,7 @@ export function App() {
     {!blocked && state.panel === 'service' && state.split && <SplitView services={state.services} split={state.split} width={size.width} height={size.height} onSet={id => void action(() => window.portal.splitSet(id))} onToTab={() => void action(() => window.portal.splitToTab())} onClose={() => void action(() => window.portal.splitClose())} onResize={(ratio, persist) => window.portal.splitResize(ratio, persist)} onCapture={() => window.portal.splitCapture()} onDrag={active => window.portal.splitDrag(active)} />}
 
     <StatusBar network={state.network.status} version={state.updates.currentVersion} />
-  </div>{state.splash !== 'done' && <Splash key="splash" state={state} />}</>;
+  </div>{menu && state.services.some(item => item.id === menu.id) && <AppContextMenu service={state.services.find(item => item.id === menu.id)!} pinned={state.preferences.pinned.includes(menu.id)} anchor={menu.anchor} onAction={runMenu} onClose={closeMenu} />}{state.splash !== 'done' && <Splash key="splash" state={state} />}</>;
 }
 
 

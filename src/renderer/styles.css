@@ -145,6 +145,15 @@ input[type=checkbox] { accent-color:var(--accent); width:1rem; height:1rem; }
 .page-form label.form-check { flex-direction:row; align-items:center; gap:.5rem; font-weight:400; }
 .form-error { margin:0; color:var(--danger); font-size:.68rem; }
 .page-form-actions { display:flex; gap:.6rem; margin-top:.3rem; }
+/* Menú contextual: sobre todo el DOM (las vistas nativas se ocultan mientras está abierto). */
+.menu-backdrop { position:fixed; inset:0; z-index:60; }
+.app-menu { position:fixed; z-index:61; min-width:13.5rem; display:flex; flex-direction:column; padding:.3rem; background:var(--surface); border:1px solid var(--line); border-radius:.7rem; box-shadow:0 12px 36px #00000066; }
+.app-menu-item { text-align:left; padding:.55rem .7rem; border-radius:.45rem; background:transparent; color:var(--text); font-size:.72rem; font-weight:600; white-space:nowrap; }
+.app-menu-item:hover, .app-menu-item:focus-visible { background:#0ea5a016; outline:0; }
+.app-menu-item.danger { color:var(--danger); }
+.app-menu-item.danger:hover, .app-menu-item.danger:focus-visible { background:#ef444414; }
+.app-menu-separator { height:1px; margin:.3rem .4rem; background:var(--line); }
+.app-menu-confirm { margin:0; padding:.45rem .7rem .35rem; font-size:.72rem; font-weight:700; color:var(--text); }
 .launcher-empty { color:var(--muted); font-size:.75rem; margin:1.5rem 0 0; }
 .nav-item:disabled, .app-tab:disabled, .icon-button:disabled { cursor:default; }
 .nav-item:disabled { opacity:.35; }

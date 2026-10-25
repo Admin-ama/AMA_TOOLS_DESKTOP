@@ -936,3 +936,132 @@ test('páginas propias: el límite de 30 se aplica en el proceso principal', asy
   }, customUrl());
   expect(outcome).toEqual({ created: 30, failed: 1 });
 });
+
+// ── Menú contextual de la sidebar ──────────────────────────────────────────────
+const sideButton = (name: string) => page.getByRole('navigation', { name: 'Servicios' }).getByRole('button', { name: `Abrir ${name}`, exact: true });
+const menuFor = (name: string) => page.getByRole('menu', { name: `Acciones de ${name}` });
+async function rightClick(name: string) {
+  await sideButton(name).click({ button: 'right' });
+  await expect(menuFor(name)).toBeVisible();
+  return menuFor(name);
+}
+
+test('menú contextual: ofrece las acciones de una app global y oculta las vistas nativas mientras está abierto', async () => {
+  await waitForPage();
+  expect(await visibleViews()).toHaveLength(1);
+  const menu = await rightClick('n8n Automations');
+  await expect(menu.getByRole('menuitem')).toHaveText(['Abrir', 'Abrir en pestaña nueva', 'Abrir a la derecha', 'Quitar de la barra']);
+  // Anclado al icono: a su derecha y alineado verticalmente con él.
+  const [icon, box] = [(await sideButton('n8n Automations').boundingBox())!, (await menu.boundingBox())!];
+  expect(box.x).toBeGreaterThanOrEqual(icon.x + icon.width);
+  expect(Math.abs(box.y - icon.y)).toBeLessThan(40);
+  await expect.poll(async () => (await visibleViews()).length).toBe(0);
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect.poll(async () => (await visibleViews()).length).toBe(1);
+});
+
+test('menú contextual: clic fuera lo cierra y devuelve las vistas', async () => {
+  const menu = await rightClick('Huly Workspace');
+  await expect.poll(async () => (await visibleViews()).length).toBe(0);
+  await page.mouse.click(700, 420);
+  await expect(menu).toHaveCount(0);
+  await expect.poll(async () => (await visibleViews()).length).toBe(1);
+  expect(await page.evaluate(async () => (await window.portal.snapshot()).active)).toBe('huly');
+});
+
+test('menú contextual: "Abrir" activa la app y "Abrir en pestaña nueva" añade una pestaña (solo si ya tenía)', async () => {
+  await (await rightClick('Portal de Operaciones')).getByRole('menuitem', { name: 'Abrir', exact: true }).click();
+  await expect(page.getByTestId('portal-tab-1')).toHaveAttribute('aria-selected', 'true');
+  await (await rightClick('Portal de Operaciones')).getByRole('menuitem', { name: 'Abrir en pestaña nueva' }).click();
+  await expect(page.getByTestId('portal-tab-2')).toHaveAttribute('aria-selected', 'true');
+  // Una app aún sin abrir recibe una sola pestaña, no dos.
+  await (await rightClick('n8n Automations')).getByRole('menuitem', { name: 'Abrir en pestaña nueva' }).click();
+  await expect(page.getByTestId('n8n-tab-1')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('n8n-tab-2')).toHaveCount(0);
+  await expect.poll(visibleApps).toEqual(['n8n']);
+});
+
+test('menú contextual: "Abrir a la derecha" abre el panel lateral con esa app', async () => {
+  await (await rightClick('n8n Automations')).getByRole('menuitem', { name: 'Abrir a la derecha' }).click();
+  await expect.poll(async () => (await splitState()).split?.serviceId).toBe('n8n');
+  await expect.poll(visibleApps).toEqual(['huly', 'n8n']);
+});
+
+test('menú contextual: "Quitar de la barra" solo aparece en apps fijadas y las desfija', async () => {
+  await (await rightClick('n8n Automations')).getByRole('menuitem', { name: 'Quitar de la barra' }).click();
+  await expect(sideButton('n8n Automations')).toHaveCount(0);
+  expect((await splitState()).preferences.pinned).not.toContain('n8n');
+  // Huly sigue visible aunque se desfije mientras está abierta, pero entonces ya no ofrece "Quitar".
+  await (await rightClick('Huly Workspace')).getByRole('menuitem', { name: 'Quitar de la barra' }).click();
+  const menu = await rightClick('Huly Workspace');
+  await expect(menu.getByRole('menuitem', { name: 'Quitar de la barra' })).toHaveCount(0);
+  await expect(menu.getByRole('menuitem')).toHaveText(['Abrir', 'Abrir en pestaña nueva', 'Abrir a la derecha']);
+});
+
+test('menú contextual: se abre con Shift+F10, se recorre con flechas y Esc devuelve el foco al icono', async () => {
+  await sideButton('n8n Automations').focus();
+  await page.keyboard.press('Shift+F10');
+  const menu = menuFor('n8n Automations');
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: 'Abrir', exact: true })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(menu.getByRole('menuitem', { name: 'Abrir en pestaña nueva' })).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(menu.getByRole('menuitem', { name: 'Quitar de la barra' })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(menu.getByRole('menuitem', { name: 'Abrir', exact: true })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(sideButton('n8n Automations')).toBeFocused();
+  await page.keyboard.press('ContextMenu');
+  await expect(menu).toBeVisible();
+});
+
+test('menú contextual: una página propia puede editarse y eliminarse (con confirmación)', async () => {
+  const { saved } = await addCustomPage('Mi wiki', customUrl());
+  await page.keyboard.press('Escape');
+  const menu = await rightClick('Mi wiki');
+  await expect(menu.getByRole('menuitem')).toHaveText(['Abrir', 'Abrir en pestaña nueva', 'Abrir a la derecha', 'Quitar de la barra', 'Editar…', 'Eliminar']);
+  await menu.getByRole('menuitem', { name: 'Editar…' }).click();
+  const launcher = page.getByRole('region', { name: 'Todas las aplicaciones' });
+  const form = launcher.getByRole('form', { name: 'Editar página' });
+  await expect(form.getByLabel('Nombre')).toHaveValue('Mi wiki');
+  await form.getByLabel('Nombre').fill('Wiki 2');
+  await form.getByRole('button', { name: 'Guardar' }).click();
+  await expect(sideButton('Wiki 2')).toBeVisible();
+  await page.keyboard.press('Escape');
+  // Eliminar pide confirmación dentro del propio menú; cancelar no borra nada.
+  let confirm = await rightClick('Wiki 2');
+  await confirm.getByRole('menuitem', { name: 'Eliminar' }).click();
+  await expect(confirm.getByText('¿Eliminar Wiki 2?')).toBeVisible();
+  await confirm.getByRole('menuitem', { name: 'Cancelar' }).click();
+  await expect(confirm.getByRole('menuitem', { name: 'Abrir', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(menuFor('Wiki 2')).toHaveCount(0);
+  expect((await customApps()).map(item => item.id)).toEqual([saved.id]);
+  confirm = await rightClick('Wiki 2');
+  await confirm.getByRole('menuitem', { name: 'Eliminar' }).click();
+  await confirm.getByRole('menuitem', { name: 'Eliminar', exact: true }).click();
+  await expect(sideButton('Wiki 2')).toHaveCount(0);
+  expect(await customApps()).toEqual([]);
+  await expect.poll(async () => (await visibleViews()).length).toBe(1);
+});
+
+test('menú contextual: también funciona sobre las tarjetas del launcher', async () => {
+  await page.getByRole('button', { name: 'Ver todas las aplicaciones', exact: true }).click();
+  const launcher = page.getByRole('region', { name: 'Todas las aplicaciones' });
+  await launcher.getByRole('button', { name: 'Abrir Microsoft Teams', exact: true }).click({ button: 'right' });
+  const menu = menuFor('Microsoft Teams');
+  await expect(menu.getByRole('menuitem')).toHaveText(['Abrir', 'Abrir en pestaña nueva', 'Abrir a la derecha']);
+  await menu.getByRole('menuitem', { name: 'Abrir a la derecha' }).click();
+  await expect.poll(async () => (await splitState()).split?.serviceId).toBe('teams');
+});
+
+test('menú contextual: overlay libera las vistas aunque el menú siga abierto y valida su argumento', async () => {
+  await rightClick('n8n Automations');
+  await page.evaluate(() => window.portal.overlay(false));
+  await expect.poll(async () => (await visibleViews()).length).toBe(1);
+  const rejected = await page.evaluate(async () => { try { await (window.portal as any).overlay('yes'); return false; } catch { return true; } });
+  expect(rejected).toBe(true);
+});

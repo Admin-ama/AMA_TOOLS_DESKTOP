@@ -5,6 +5,7 @@ import { IconPin, IconPinFilled, IconSearch, IconX, IconLayoutSidebarRight, Icon
 import { CATEGORIES, MINE_CATEGORY, type Service, type AppId } from '../shared/contracts';
 import { checkCustomName, checkCustomUrl, MAX_CUSTOM_APPS } from '../shared/custom-apps';
 import { ServiceLogo } from './service-visuals';
+import { isMenuKey } from './AppContextMenu';
 
 gsap.registerPlugin(useGSAP);
 
@@ -21,6 +22,10 @@ interface Props {
   /** Devuelven la promesa cruda: el formulario muestra el motivo del rechazo del proceso principal. */
   onAdd(input: { name: string; url: string; pin: boolean }): Promise<string>;
   onEdit(id: AppId, input: { name: string; url: string }): Promise<void>;
+  /** Clic derecho o tecla de menú sobre una tarjeta. */
+  onMenu(id: AppId, source: HTMLElement): void;
+  /** Petición externa (menú contextual) de editar una página: abre el formulario. */
+  editRequest?: { id: AppId } | null;
 }
 type FormMode = { kind: 'add' } | { kind: 'edit'; id: AppId };
 interface FormValues { name: string; url: string; pin: boolean }
@@ -55,13 +60,14 @@ function PageForm({ mode, initial, onSubmit, onCancel }: { mode: FormMode; initi
   </form>;
 }
 
-export function Launcher({ services, pinned, onOpen, onSplit, onPin, onClose, onAdd, onEdit }: Props) {
+export function Launcher({ services, pinned, onOpen, onSplit, onPin, onClose, onAdd, onEdit, onMenu, editRequest }: Props) {
   const [query, setQuery] = useState('');
   const [form, setForm] = useState<FormMode | null>(null);
   const search = useRef<HTMLInputElement>(null);
   const root = useRef<HTMLElement>(null);
   const closing = useRef(false);
   useEffect(() => { search.current?.focus(); }, []);
+  useEffect(() => { if (editRequest) setForm({ kind: 'edit', id: editRequest.id }); }, [editRequest]);
   useGSAP(() => {
     gsap.matchMedia().add(MOTION, () => {
       gsap.timeline({ defaults: { ease: 'power3.out' } })
@@ -91,8 +97,8 @@ export function Launcher({ services, pinned, onOpen, onSplit, onPin, onClose, on
   const editing = form?.kind === 'edit' ? services.find(item => item.id === form.id) : undefined;
   const card = (service: Service) => {
     const isPinned = pinned.includes(service.id);
-    return <div className={`launcher-card ${service.custom ? 'custom' : ''}`} key={service.id}>
-      <button className="launcher-open" aria-label={`Abrir ${service.name}`} onClick={() => onOpen(service.id)}>
+    return <div className={`launcher-card ${service.custom ? 'custom' : ''}`} key={service.id} onContextMenu={event => { event.preventDefault(); onMenu(service.id, event.currentTarget); }}>
+      <button className="launcher-open" aria-label={`Abrir ${service.name}`} aria-haspopup="menu" onClick={() => onOpen(service.id)} onKeyDown={event => { if (isMenuKey(event)) { event.preventDefault(); onMenu(service.id, event.currentTarget); } }}>
         <span className="launcher-logo"><ServiceLogo id={service.id} icon={service.icon} /></span><span className="launcher-name">{service.name}</span>
       </button>
       {service.custom && <button className="pin-button edit-button" aria-label={`Editar ${service.name}`} title="Editar página" onClick={() => setForm({ kind: 'edit', id: service.id })}><IconPencil size={16} /></button>}
