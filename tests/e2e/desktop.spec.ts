@@ -1152,9 +1152,28 @@ test('Microsoft 365: el launcher agrupa las apps nuevas por categoría y Copilot
   expect(await names('Operación')).toEqual(['Huly Workspace', 'SharePoint']);
   expect(await names('Comunicación')).toEqual(['Microsoft Teams', 'Outlook']);
   expect(await names('Automatización y herramientas')).toEqual(['n8n Automations', 'Email Category AI', 'Stirling PDF', 'Power Automate', 'Microsoft Forms']);
-  await launcher.getByRole('button', { name: 'Quitar Copilot M365 de la barra lateral' }).click();
-  await expect.poll(async () => (await splitState()).preferences.pinned).not.toContain('copilot');
-  expect((await splitState()).preferences.seenCatalog).toEqual(['copilot', 'buk']);
+});
+
+test('LibreChat, Copilot y Buk son fijas: primero en la barra y no se pueden quitar', async () => {
+  const nav = page.getByRole('navigation', { name: 'Servicios' });
+  const tips = await nav.getByRole('button').evaluateAll(buttons => buttons.map(button => button.getAttribute('data-tooltip')));
+  expect(tips.slice(0, 3)).toEqual(['LibreChat AI', 'Copilot M365', 'Buk']);
+  // El proceso principal rechaza desfijarlas aunque el renderer lo pida.
+  const rejected = await page.evaluate(async () => Promise.all(['librechat', 'copilot', 'buk'].map(id => window.portal.pin(id, false).then(() => false, () => true))));
+  expect(rejected).toEqual([true, true, true]);
+  expect((await page.evaluate(async () => (await window.portal.snapshot()).preferences.pinned)).slice(0, 3)).toEqual(['librechat', 'copilot', 'buk']);
+  // Launcher: candado en vez de chincheta; el resto sigue configurable.
+  await page.getByRole('button', { name: 'Ver todas las aplicaciones', exact: true }).click();
+  const launcher = page.getByRole('region', { name: 'Todas las aplicaciones' });
+  for (const name of ['LibreChat AI', 'Copilot M365', 'Buk']) {
+    await expect(launcher.getByRole('button', { name: `Quitar ${name} de la barra lateral` })).toHaveCount(0);
+    await expect(launcher.getByLabel(`${name} siempre está fijada`)).toBeVisible();
+  }
+  await expect(launcher.getByRole('button', { name: 'Quitar Huly Workspace de la barra lateral' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  // Menú contextual: sin "Quitar de la barra" en las fijas.
+  const menu = await rightClick('Buk');
+  await expect(menu.getByRole('menuitem', { name: 'Quitar de la barra' })).toHaveCount(0);
 });
 
 test('Microsoft 365: las apps del grupo comparten sesión y borrarla cierra las vistas de todo el grupo', async () => {

@@ -6,7 +6,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { SERVICES, isAppId, groupMembers, validAdmin, accessRequestUrl } from './policy';
 import { SHELL_LAYOUT } from '../shared/layout';
-import { STARTUP_SERVICE, DEFAULT_SPLIT_SERVICE, type SplashPhase, type AppAdmin } from '../shared/contracts';
+import { STARTUP_SERVICE, DEFAULT_SPLIT_SERVICE, FIXED_APPS, type SplashPhase, type AppAdmin } from '../shared/contracts';
 import { checkCustomName, checkCustomUrl, isCustomId, MAX_CUSTOM_APPS } from '../shared/custom-apps';
 import { fetchFavicon } from './favicon';
 import { isZoomPercent } from '../shared/zoom';
@@ -250,6 +250,7 @@ async function createWindow() {
         case 'pin': {
           const serviceId = id();
           if (typeof args[1] !== 'boolean') throw new Error('Preferencia inválida');
+          if (!args[1] && FIXED_APPS.includes(serviceId)) throw new Error('Esta app siempre está fijada');
           preferences.pinned = args[1] ? (preferences.pinned.includes(serviceId) ? preferences.pinned : [...preferences.pinned, serviceId]) : preferences.pinned.filter(item => item !== serviceId);
           await savePreferences(preferencesFile, preferences);
           break;

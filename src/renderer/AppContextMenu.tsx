@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
-import type { Service } from '../shared/contracts';
+import { FIXED_APPS, type Service } from '../shared/contracts';
 
 gsap.registerPlugin(useGSAP);
 
@@ -34,6 +34,7 @@ interface Props {
 export function AppContextMenu({ service, pinned, anchor, onAction, onClose }: Props) {
   const root = useRef<HTMLDivElement>(null);
   const [confirming, setConfirming] = useState(false);
+  const unpinnable = pinned && !FIXED_APPS.includes(service.id); // las fijas no se quitan
   const items = () => [...(root.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])];
   useGSAP(() => {
     gsap.matchMedia().add(MOTION, () => { gsap.from(root.current, { opacity: 0, y: -4, scale: 0.97, duration: 0.12, ease: 'power2.out', clearProps: 'opacity,transform' }); });
@@ -72,8 +73,8 @@ export function AppContextMenu({ service, pinned, anchor, onAction, onClose }: P
         {item('open', 'Abrir')}
         {item('tab', 'Abrir en pestaña nueva')}
         {item('split', 'Abrir a la derecha')}
-        {(pinned || service.custom) && <div className="app-menu-separator" role="separator" />}
-        {pinned && item('unpin', 'Quitar de la barra')}
+        {(unpinnable || service.custom) && <div className="app-menu-separator" role="separator" />}
+        {unpinnable && item('unpin', 'Quitar de la barra')}
         {service.custom && item('edit', 'Editar…')}
         {service.custom && <button role="menuitem" className="app-menu-item danger" onClick={() => setConfirming(true)}>Eliminar</button>}
       </>}

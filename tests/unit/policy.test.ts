@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CATEGORIES, GLOBAL_APP_IDS } from '../../src/shared/contracts';
+import { CATEGORIES, FIXED_APPS, GLOBAL_APP_IDS } from '../../src/shared/contracts';
 import { SERVICES, validAdmin, accessRequestUrl, isAppId, allowedNavigation, allowedDownload, isPdfUrl, partitionFor, contentBounds, remotePreferences, customService, catalogOf, sameServiceOrigin, groupMembers, windowTarget } from '../../src/main/policy';
 
 describe('registro y aislamiento', () => {
@@ -100,10 +100,10 @@ describe('catálogo de Microsoft 365', () => {
     expect(order('amatime')).toEqual(['portal', 'costeador']);
   });
   it('GLOBAL_APP_IDS coincide con el catálogo', () => { expect([...GLOBAL_APP_IDS]).toEqual(SERVICES.map(s => s.id)); });
-  it('el grupo Microsoft son exactamente Teams y las apps nuevas; Copilot y Buk se fijan por defecto', () => {
+  it('el grupo Microsoft son exactamente Teams y las apps nuevas; LibreChat, Copilot y Buk son fijas', () => {
     expect(groupMembers('outlook', SERVICES).map(s => s.id).sort()).toEqual(['copilot', 'forms', 'outlook', 'powerautomate', 'sharepoint', 'teams']);
     expect(groupMembers('huly', SERVICES)).toEqual([SERVICES.find(s => s.id === 'huly')]);
-    expect(SERVICES.filter(s => s.pinByDefault).map(s => s.id)).toEqual(['copilot', 'buk']);
+    expect(FIXED_APPS).toEqual(['librechat', 'copilot', 'buk']);
   });
   it('comparten una única partición persistente; el resto, la suya', () => {
     for (const s of SERVICES.filter(x => x.group)) expect(partitionFor(s.id, true, s.group)).toBe('persist:amatime-microsoft');
@@ -198,8 +198,8 @@ describe('páginas del usuario', () => {
 });
 
 describe('Buk (RRHH)', () => {
-  it('es una app web de Control (pegada bajo Copilot) con su login de Amatime, sin grupo ni administrador, fijada por defecto', () => {
-    expect(SERVICES.find(service => service.id === 'buk')).toEqual({ id: 'buk', name: 'Buk', shortName: 'Buk', category: 'control', url: 'https://amatime.buk.cl/users/sign_in', pinByDefault: true });
+  it('es una app web de Control (pegada bajo Copilot) con su login de Amatime, sin grupo ni administrador', () => {
+    expect(SERVICES.find(service => service.id === 'buk')).toEqual({ id: 'buk', name: 'Buk', shortName: 'Buk', category: 'control', url: 'https://amatime.buk.cl/users/sign_in' });
     expect(GLOBAL_APP_IDS).toContain('buk');
   });
 });

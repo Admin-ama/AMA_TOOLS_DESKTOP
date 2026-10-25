@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from 'react';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
-import { IconPin, IconPinFilled, IconSearch, IconX, IconLayoutSidebarRight, IconPlus, IconPencil, IconUserShield, IconBrandTeams } from '@tabler/icons-react';
-import { CATEGORIES, MINE_CATEGORY, type Service, type AppId } from '../shared/contracts';
+import { IconPin, IconPinFilled, IconLock, IconSearch, IconX, IconLayoutSidebarRight, IconPlus, IconPencil, IconUserShield, IconBrandTeams } from '@tabler/icons-react';
+import { CATEGORIES, FIXED_APPS, MINE_CATEGORY, type Service, type AppId } from '../shared/contracts';
 import { checkCustomName, checkCustomUrl, MAX_CUSTOM_APPS } from '../shared/custom-apps';
 import { ServiceLogo } from './service-visuals';
 import { isMenuKey } from './AppContextMenu';
@@ -106,9 +106,11 @@ export function Launcher({ services, pinned, onOpen, onSplit, onRequestAccess, o
       {service.admin && <button className="launcher-access" aria-label={`Pedir acceso a ${service.name}`} onClick={() => onRequestAccess(service.id)}><IconBrandTeams size={14} stroke={1.9} aria-hidden="true" />Pedir acceso</button>}
       {service.custom && <button className="pin-button edit-button" aria-label={`Editar ${service.name}`} title="Editar página" onClick={() => setForm({ kind: 'edit', id: service.id })}><IconPencil size={16} /></button>}
       <button className="pin-button split-button" aria-label={`Abrir ${service.name} a la derecha`} title="Abrir a la derecha" onClick={() => onSplit(service.id)}><IconLayoutSidebarRight size={16} /></button>
-      <button className={`pin-button ${isPinned ? 'pinned' : ''}`} aria-pressed={isPinned} aria-label={isPinned ? `Quitar ${service.name} de la barra lateral` : `Fijar ${service.name} en la barra lateral`} title={isPinned ? 'Quitar de la barra lateral' : 'Fijar en la barra lateral'} onClick={event => pin(event, service.id, !isPinned)}>
-        {isPinned ? <IconPinFilled size={16} /> : <IconPin size={16} />}
-      </button>
+      {FIXED_APPS.includes(service.id)
+        ? <span className="pin-button pin-fixed" role="img" aria-label={`${service.name} siempre está fijada`} title="Siempre fijada"><IconLock size={15} /></span>
+        : <button className={`pin-button ${isPinned ? 'pinned' : ''}`} aria-pressed={isPinned} aria-label={isPinned ? `Quitar ${service.name} de la barra lateral` : `Fijar ${service.name} en la barra lateral`} title={isPinned ? 'Quitar de la barra lateral' : 'Fijar en la barra lateral'} onClick={event => pin(event, service.id, !isPinned)}>
+          {isPinned ? <IconPinFilled size={16} /> : <IconPin size={16} />}
+        </button>}
     </div>;
   };
   const mine = services.filter(service => service.category === MINE_CATEGORY.id);

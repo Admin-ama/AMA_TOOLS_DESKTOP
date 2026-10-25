@@ -1,14 +1,14 @@
 import { readFile, writeFile, rename, mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import { GLOBAL_APP_IDS, DEFAULT_PINNED, type DesktopApp, type Preferences, type AppId, DEFAULT_SPLIT_RATIO, DEFAULT_SPLIT_SERVICE } from '../shared/contracts';
+import { GLOBAL_APP_IDS, DEFAULT_PINNED, FIXED_APPS, type DesktopApp, type Preferences, type AppId, DEFAULT_SPLIT_RATIO, DEFAULT_SPLIT_SERVICE } from '../shared/contracts';
 import { normalizeCustomApps } from '../shared/custom-apps';
 import { SERVICES } from './policy';
 import { MAX_DESKTOP_APPS, MAX_DESKTOP_APP_NAME, validAumid } from './desktop-apps';
 
-/** `ids`: catálogo vigente (globales + páginas propias); lo desconocido se descarta. */
+/** `ids`: catálogo vigente (globales + páginas propias); lo desconocido se descarta. Las fijas van siempre primero; el resto, en el orden del usuario. */
 export function normalizePinned(input: unknown, ids: readonly AppId[] = GLOBAL_APP_IDS): AppId[] {
-  if (!Array.isArray(input)) return DEFAULT_PINNED.filter(id => ids.includes(id));
-  return [...new Set(input)].filter((id): id is AppId => ids.some(known => known === id));
+  const chosen = Array.isArray(input) ? [...new Set(input)].filter((id): id is AppId => ids.some(known => known === id)) : DEFAULT_PINNED.filter(id => ids.includes(id));
+  return [...FIXED_APPS.filter(id => ids.includes(id)), ...chosen.filter(id => !FIXED_APPS.includes(id))];
 }
 /** Solo la forma: que la ruta exista se comprueba al vincular y al abrir. */
 export function normalizeDesktopApps(input: unknown): DesktopApp[] {
@@ -33,23 +33,6 @@ export function normalizeSplitRatio(input: unknown): number {
 export function normalizeSplitService(input: unknown, ids: readonly AppId[] = GLOBAL_APP_IDS): AppId {
   return ids.find(id => id === input) ?? DEFAULT_SPLIT_SERVICE;
 }
-/** Apps globales que se fijan una vez en la barra, en orden de catálogo (Copilot, Buk). */
-const PIN_BY_DEFAULT: readonly AppId[] = SERVICES.filter(service => service.pinByDefault).map(service => service.id);
-/** Cadena de anclaje: cada app por defecto va bajo la anterior que esté fijada (LibreChat → Copilot → Buk). */
-const PIN_CHAIN: readonly AppId[] = ['librechat', ...PIN_BY_DEFAULT];
-/** Migra las apps nuevas con pinByDefault: las no vistas se fijan (bajo la anterior de la cadena, o al frente) y se marcan vistas; lo ya visto lo decide el usuario. */
-export function migratePinned(pinned: readonly AppId[], seenInput: unknown): { pinned: AppId[]; seenCatalog: AppId[] } {
-  const seen = new Set(Array.isArray(seenInput) ? seenInput.filter((id): id is AppId => PIN_BY_DEFAULT.includes(id)) : []);
-  const result = [...pinned];
-  for (const id of PIN_BY_DEFAULT) {
-    if (seen.has(id)) continue;
-    seen.add(id);
-    if (result.includes(id)) continue;
-    const anchor = PIN_CHAIN.slice(0, PIN_CHAIN.indexOf(id)).reverse().find(previous => result.includes(previous));
-    result.splice(anchor ? result.indexOf(anchor) + 1 : 0, 0, id);
-  }
-  return { pinned: result, seenCatalog: PIN_BY_DEFAULT.filter(id => seen.has(id)) };
-}
 /** Las apps de un grupo comparten sesión: se recuerda solo si todas lo piden. */
 function syncGroupRemember(remember: Record<AppId, boolean>): Record<AppId, boolean> {
   for (const group of new Set(SERVICES.map(service => service.group).filter(Boolean))) {
@@ -67,7 +50,7 @@ export function normalizePreferences(input: unknown): Preferences {
   return {
     theme: source.theme === 'light' ? 'light' : 'dark',
     remember: syncGroupRemember(Object.fromEntries(ids.map(id => [id, Object.hasOwn(remember, id) && typeof remember[id] === 'boolean' ? remember[id] : true]))),
-    ...migratePinned(normalizePinned(source.pinned, ids), source.seenCatalog),
+    pinned: normalizePinned(source.pinned, ids),
     desktopApps: normalizeDesktopApps(source.desktopApps),
     customApps,
     splitRatio: normalizeSplitRatio(source.splitRatio),

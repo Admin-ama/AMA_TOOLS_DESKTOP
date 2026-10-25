@@ -133,6 +133,7 @@ input[type=checkbox] { accent-color:var(--accent); width:1rem; height:1rem; }
 .pin-button { position:absolute; top:.5rem; right:.5rem; display:grid; place-items:center; width:1.8rem; height:1.8rem; border-radius:.5rem; background:transparent; color:var(--soft); }
 .pin-button:hover { color:var(--teal); background:#0ea5a010; }
 .pin-button.pinned { color:var(--accent); }
+.pin-button.pin-fixed, .pin-button.pin-fixed:hover { color:var(--soft); background:transparent; opacity:.7; cursor:default; }
 .launcher-card.custom .launcher-open { padding-right:6.6rem; }
 .pin-button.edit-button { right:4.5rem; }
 .launcher-add { display:flex; align-items:center; gap:.5rem; margin-top:.6rem; padding:.7rem 1rem; border-radius:.8rem; border:1px dashed var(--line); background:transparent; color:var(--teal); font-size:.72rem; font-weight:700; }
