@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from 'react';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
-import { IconPin, IconPinFilled, IconSearch, IconX, IconLayoutSidebarRight, IconPlus, IconPencil } from '@tabler/icons-react';
+import { IconPin, IconPinFilled, IconSearch, IconX, IconLayoutSidebarRight, IconPlus, IconPencil, IconShieldCheck } from '@tabler/icons-react';
 import { CATEGORIES, MINE_CATEGORY, type Service, type AppId } from '../shared/contracts';
 import { checkCustomName, checkCustomUrl, MAX_CUSTOM_APPS } from '../shared/custom-apps';
 import { ServiceLogo } from './service-visuals';
@@ -99,7 +99,7 @@ export function Launcher({ services, pinned, onOpen, onSplit, onPin, onClose, on
     const isPinned = pinned.includes(service.id);
     return <div className={`launcher-card ${service.custom ? 'custom' : ''}`} key={service.id} onContextMenu={event => { event.preventDefault(); onMenu(service.id, event.currentTarget); }}>
       <button className="launcher-open" aria-label={`Abrir ${service.name}`} aria-haspopup="menu" onClick={() => onOpen(service.id)} onKeyDown={event => { if (isMenuKey(event)) { event.preventDefault(); onMenu(service.id, event.currentTarget); } }}>
-        <span className="launcher-logo"><ServiceLogo id={service.id} icon={service.icon} /></span><span className="launcher-name">{service.name}</span>
+        <span className="launcher-logo"><ServiceLogo id={service.id} icon={service.icon} /></span><span className="launcher-text"><span className="launcher-name">{service.name}</span>{service.certified && <span className="launcher-badge"><IconShieldCheck size={12} stroke={2.2} aria-hidden="true" />Homologada</span>}</span>
       </button>
       {service.custom && <button className="pin-button edit-button" aria-label={`Editar ${service.name}`} title="Editar página" onClick={() => setForm({ kind: 'edit', id: service.id })}><IconPencil size={16} /></button>}
       <button className="pin-button split-button" aria-label={`Abrir ${service.name} a la derecha`} title="Abrir a la derecha" onClick={() => onSplit(service.id)}><IconLayoutSidebarRight size={16} /></button>

@@ -9,7 +9,7 @@ export const SERVICES: Service[] = [
   { id: 'huly', name: 'Huly Workspace', shortName: 'Huly', category: 'operacion', url: 'http://172.16.8.73:8087/' },
   { id: 'n8n', name: 'n8n Automations', shortName: 'n8n', category: 'automatizacion', url: 'http://172.16.8.73:5678/' },
   { id: 'librechat', name: 'LibreChat AI', shortName: 'LibreChat', category: 'control', url: 'https://172.16.8.73/' },
-  { id: 'portal', name: 'Portal de Operaciones', shortName: 'Portal Ops', category: 'operacion', url: 'https://app.amatime.com/' },
+  { id: 'portal', name: 'Portal de Operaciones', shortName: 'Portal Ops', category: 'amatime', url: 'https://app.amatime.com/', certified: true },
   { id: 'emailai', name: 'Email Category AI', shortName: 'Email AI', category: 'automatizacion', url: 'https://email-category-ai.vercel.app/', authOrigins: ['https://login.microsoftonline.com', 'https://login.live.com', 'https://mysignins.microsoft.com'] },
   { id: 'stirling', name: 'Stirling PDF', shortName: 'Stirling PDF', category: 'automatizacion', url: 'http://172.16.8.73:8080/' },
   {
@@ -21,6 +21,7 @@ export const SERVICES: Service[] = [
   { id: 'sharepoint', name: 'SharePoint', shortName: 'SharePoint', category: 'operacion', url: 'https://amatime.sharepoint.com/', group: 'microsoft' },
   { id: 'powerautomate', name: 'Power Automate', shortName: 'Power Automate', category: 'automatizacion', url: 'https://make.powerautomate.com/', group: 'microsoft' },
   { id: 'forms', name: 'Microsoft Forms', shortName: 'Forms', category: 'automatizacion', url: 'https://forms.office.com/', group: 'microsoft' },
+  { id: 'costeador', name: 'Costeador', shortName: 'Costeador', category: 'amatime', url: 'https://julio-sepulveda-costeo-bulk-copacki.vercel.app/', certified: true },
 ];
 /** Una página del usuario es una app más del catálogo: solo su origen, sin login externo. */
 export function customService(app: CustomApp): Service {

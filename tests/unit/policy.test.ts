@@ -10,7 +10,7 @@ describe('registro y aislamiento', () => {
       'https://email-category-ai.vercel.app/', 'http://172.16.8.73:8080/',
       'https://teams.microsoft.com/v2/',
       'https://m365.cloud.microsoft/', 'https://outlook.office.com/mail/', 'https://amatime.sharepoint.com/',
-      'https://make.powerautomate.com/', 'https://forms.office.com/',
+      'https://make.powerautomate.com/', 'https://forms.office.com/', 'https://julio-sepulveda-costeo-bulk-copacki.vercel.app/',
     ]);
   });
   it('cada servicio pertenece a una categoría válida y cada categoría tiene servicios', () => {
@@ -96,7 +96,8 @@ describe('catálogo de Microsoft 365', () => {
     const order = (category: string) => SERVICES.filter(s => s.category === category).map(s => s.id);
     expect(order('control')).toEqual(['librechat', 'copilot']);
     expect(order('comunicacion')).toEqual(['teams', 'outlook']);
-    expect(order('operacion')).toEqual(['huly', 'portal', 'sharepoint']);
+    expect(order('operacion')).toEqual(['huly', 'sharepoint']);
+    expect(order('amatime')).toEqual(['portal', 'costeador']);
   });
   it('GLOBAL_APP_IDS coincide con el catálogo', () => { expect([...GLOBAL_APP_IDS]).toEqual(SERVICES.map(s => s.id)); });
   it('el grupo Microsoft son exactamente Teams y las apps nuevas; Copilot se fija por defecto', () => {
@@ -193,5 +194,18 @@ describe('páginas del usuario', () => {
     expect(partitionFor(app.id, true)).toBe('persist:amatime-custom-0a1b2c3d-aaaa');
     expect(partitionFor(app.id, false)).toBe('amatime-custom-0a1b2c3d-aaaa');
     expect(partitionFor(app.id, true)).not.toBe(partitionFor('custom-0a1b2c3d-bbbb', true));
+  });
+});
+
+describe('Apps Amatime (homologadas)', () => {
+  it('tienen su categoría justo después de Control y Costeador está homologado en ella', () => {
+    expect(CATEGORIES.map(category => category.id).slice(0, 2)).toEqual(['control', 'amatime']);
+    expect(CATEGORIES.find(category => category.id === 'amatime')!.label).toBe('Apps Amatime');
+    const costeador = SERVICES.find(service => service.id === 'costeador')!;
+    expect(costeador).toMatchObject({ name: 'Costeador', category: 'amatime', certified: true, url: 'https://julio-sepulveda-costeo-bulk-copacki.vercel.app/' });
+    expect(GLOBAL_APP_IDS).toContain('costeador');
+    expect(SERVICES.find(service => service.id === 'portal')).toMatchObject({ category: 'amatime', certified: true });
+    // Solo las apps internas homologadas llevan el distintivo.
+    expect(SERVICES.filter(service => service.certified).every(service => service.category === 'amatime')).toBe(true);
   });
 });

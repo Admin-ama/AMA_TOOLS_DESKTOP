@@ -1,11 +1,13 @@
 /** Apps globales del catálogo (código); las páginas del usuario tienen ids `custom-<uuid>`. */
-export const GLOBAL_APP_IDS = ['huly', 'n8n', 'librechat', 'portal', 'emailai', 'stirling', 'teams', 'copilot', 'outlook', 'sharepoint', 'powerautomate', 'forms'] as const;
+export const GLOBAL_APP_IDS = ['huly', 'n8n', 'librechat', 'portal', 'emailai', 'stirling', 'teams', 'copilot', 'outlook', 'sharepoint', 'powerautomate', 'forms', 'costeador'] as const;
 export type AppId = string;
 export const STARTUP_SERVICE: AppId = 'librechat';
 export type Theme = 'dark' | 'light';
 export type PageStatus = 'idle' | 'loading' | 'ready' | 'error';
 export const CATEGORIES = [
   { id: 'control', label: 'Control' },
+  /** Apps internas de la empresa, con sus propias bases de datos, homologadas por TI. */
+  { id: 'amatime', label: 'Apps Amatime' },
   { id: 'operacion', label: 'Operación' },
   { id: 'comunicacion', label: 'Comunicación' },
   { id: 'automatizacion', label: 'Automatización y herramientas' },
@@ -23,6 +25,8 @@ export interface Service {
   group?: 'microsoft';
   /** Se fija en la barra lateral una vez (usuarios nuevos y existentes); después manda el usuario. */
   pinByDefault?: boolean;
+  /** App interna homologada por TI (distintivo en el launcher). */
+  certified?: boolean;
   /** Solo páginas del usuario. */
   custom?: boolean; icon?: string;
 }

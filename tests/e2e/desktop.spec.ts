@@ -44,7 +44,7 @@ test.beforeEach(async ({}, testInfo) => {
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('Missing server port');
-  const config = Object.fromEntries(['huly', 'n8n', 'librechat', 'portal', 'emailai', 'stirling', 'teams', 'copilot', 'outlook', 'sharepoint', 'powerautomate', 'forms'].map(id => [id, `http://127.0.0.1:${address.port}/${id}`]));
+  const config = Object.fromEntries(['huly', 'n8n', 'librechat', 'portal', 'emailai', 'stirling', 'teams', 'copilot', 'outlook', 'sharepoint', 'powerautomate', 'forms', 'costeador'].map(id => [id, `http://127.0.0.1:${address.port}/${id}`]));
   await writeFile(path.join(directory, 'services.json'), JSON.stringify(config));
   await writeFile(path.join(directory, 'installed.json'), '[]');
   app = await electron.launch({ args: ['.'], env: { ...process.env, AMA_E2E: '1', AMA_TEST_UPDATES: testInfo.title.includes('[updates]') ? '1' : '0', AMA_TEST_SPLASH_MS: testInfo.title.includes('[arranque]') ? '4000' : '', AMA_TEST_CONFIG: path.join(directory, 'services.json'), AMA_TEST_INSTALLED_APPS: path.join(directory, 'installed.json'), AMA_TEST_USER_DATA: path.join(directory, 'data') } });
@@ -209,9 +209,9 @@ test('launcher agrupa por categorías, fija y desfija apps y abre apps no fijada
   await page.getByRole('button', { name: 'Ver todas las aplicaciones', exact: true }).click();
   const launcher = page.getByRole('region', { name: 'Todas las aplicaciones' });
   await expect(launcher).toBeVisible();
-  for (const name of ['Control', 'Operación', 'Comunicación', 'Automatización y herramientas']) await expect(launcher.getByRole('heading', { name })).toBeVisible();
-  await expect(launcher.getByRole('button', { name: /^Abrir (?!.*a la derecha)/ })).toHaveCount(12);
-  await expect(launcher.getByRole('button', { name: /^Abrir .* a la derecha$/ })).toHaveCount(12);
+  for (const name of ['Control', 'Apps Amatime', 'Operación', 'Comunicación', 'Automatización y herramientas']) await expect(launcher.getByRole('heading', { name })).toBeVisible();
+  await expect(launcher.getByRole('button', { name: /^Abrir (?!.*a la derecha)/ })).toHaveCount(13);
+  await expect(launcher.getByRole('button', { name: /^Abrir .* a la derecha$/ })).toHaveCount(13);
   // Teams es global pero no está fijado por defecto: solo vive en Comunicación.
   await expect(launcher.getByRole('button', { name: 'Fijar Microsoft Teams en la barra lateral' })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Servicios' }).getByRole('button', { name: 'Abrir Microsoft Teams' })).toHaveCount(0);
@@ -971,7 +971,7 @@ test('páginas propias: cambiar de origen cierra sus pestañas y reabre en el nu
   await expect(page.getByTestId(`${saved.id}-tab-1`)).toHaveCount(0);
   await expect.poll(async () => (await nativeViews()).length).toBe(before - 1);
   const state = await page.evaluate(async () => { const s = await window.portal.snapshot(); return { apps: s.preferences.customApps, pinned: s.preferences.pinned, remember: Object.keys(s.preferences.remember), services: s.services.length, active: s.active }; });
-  expect(state).toMatchObject({ apps: [], services: 12, active: 'librechat' });
+  expect(state).toMatchObject({ apps: [], services: 13, active: 'librechat' });
   expect(state.pinned.some(id => id.startsWith('custom-'))).toBe(false);
   expect(state.remember.some(id => id.startsWith('custom-'))).toBe(false);
 });
@@ -990,7 +990,7 @@ test('páginas propias: los comandos validan sus argumentos en el proceso princi
   });
   expect(Object.entries(outcome).filter(([, rejected]) => !rejected)).toEqual([]);
   expect(await customApps()).toEqual([]);
-  expect(await page.evaluate(async () => (await window.portal.snapshot()).services.length)).toBe(12);
+  expect(await page.evaluate(async () => (await window.portal.snapshot()).services.length)).toBe(13);
 });
 
 test('páginas propias: el límite de 30 se aplica en el proceso principal', async () => {
@@ -1147,7 +1147,7 @@ test('Microsoft 365: el launcher agrupa las apps nuevas por categoría y Copilot
   const launcher = page.getByRole('region', { name: 'Todas las aplicaciones' });
   const names = (heading: string) => launcher.locator('.launcher-category').filter({ has: page.getByRole('heading', { name: heading, exact: true }) }).locator('.launcher-name').allTextContents();
   expect(await names('Control')).toEqual(['LibreChat AI', 'Copilot M365']);
-  expect(await names('Operación')).toEqual(['Huly Workspace', 'Portal de Operaciones', 'SharePoint']);
+  expect(await names('Operación')).toEqual(['Huly Workspace', 'SharePoint']);
   expect(await names('Comunicación')).toEqual(['Microsoft Teams', 'Outlook']);
   expect(await names('Automatización y herramientas')).toEqual(['n8n Automations', 'Email Category AI', 'Stirling PDF', 'Power Automate', 'Microsoft Forms']);
   await launcher.getByRole('button', { name: 'Quitar Copilot M365 de la barra lateral' }).click();
@@ -1290,4 +1290,19 @@ test('las barras de scroll del shell son finas, sin flechas y con pulgar sutil',
   expect(global('::-webkit-scrollbar-button')).toMatch(/display: none/);
   expect(global('::-webkit-scrollbar-track')).toMatch(/background-color: (transparent|rgba\(0, 0, 0, 0\))/);
   expect(global('::-webkit-scrollbar-thumb')).toMatch(/border-radius/);
+});
+
+test('Apps Amatime: categoría propia con las apps internas homologadas y su distintivo', async () => {
+  await page.getByRole('button', { name: 'Ver todas las aplicaciones', exact: true }).click();
+  const launcher = page.getByRole('region', { name: 'Todas las aplicaciones' });
+  const section = launcher.locator('.launcher-category', { has: page.getByRole('heading', { name: 'Apps Amatime' }) });
+  await expect(section).toBeVisible();
+  for (const name of ['Portal de Operaciones', 'Costeador']) {
+    const card = section.locator('.launcher-card', { has: page.getByRole('button', { name: `Abrir ${name}`, exact: true }) });
+    await expect(card.getByText('Homologada')).toBeVisible();
+  }
+  // Las apps de terceros no llevan distintivo.
+  await expect(launcher.locator('.launcher-card', { has: page.getByRole('button', { name: 'Abrir n8n Automations', exact: true }) }).getByText('Homologada')).toHaveCount(0);
+  await section.getByRole('button', { name: 'Abrir Costeador', exact: true }).click();
+  await expect(page.getByTestId('costeador-tab-1')).toHaveAttribute('aria-selected', 'true');
 });

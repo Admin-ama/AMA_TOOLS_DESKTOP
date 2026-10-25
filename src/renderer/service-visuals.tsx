@@ -1,4 +1,4 @@
-import { IconCalendarEvent, IconGitBranch, IconMessageCircle2, IconServerCog, IconMailAi, IconFileTypePdf, IconBrandTeams, IconWorld } from '@tabler/icons-react';
+import { IconCalendarEvent, IconGitBranch, IconMessageCircle2, IconServerCog, IconMailAi, IconFileTypePdf, IconBrandTeams, IconWorld, IconCalculator } from '@tabler/icons-react';
 import type { AppId } from '../shared/contracts';
 import hulyLogo from '../../images/Huly-logo.svg';
 import n8nLogo from '../../images/n8n-logo.svg';
@@ -8,7 +8,7 @@ import stirlingLogo from '../../images/stirling.png';
 import { AmaBot } from './AmaBot';
 import { MicrosoftLogo, isMicrosoftLogo } from './microsoft-logos';
 
-const icons = { huly: IconCalendarEvent, n8n: IconGitBranch, librechat: IconMessageCircle2, portal: IconServerCog, emailai: IconMailAi, stirling: IconFileTypePdf, teams: IconBrandTeams } as const;
+const icons = { huly: IconCalendarEvent, n8n: IconGitBranch, librechat: IconMessageCircle2, portal: IconServerCog, emailai: IconMailAi, stirling: IconFileTypePdf, teams: IconBrandTeams, costeador: IconCalculator } as const;
 const sidebarLogos: Record<string, string> = { huly: hulyLogo, n8n: n8nLogo, librechat: amaBotLogo, portal: amaAppLogo, stirling: stirlingLogo };
 const known = (id: AppId): id is keyof typeof icons => Object.hasOwn(icons, id);
 
@@ -24,6 +24,8 @@ export function ServiceLogo({ id, icon }: { id: AppId; icon?: string }) {
   if (id === 'librechat') return <AmaBot className="service-logo service-logo-librechat" />;
   if (id === 'emailai') return <IconMailAi className="service-logo service-logo-emailai" size={26} stroke={1.65} />;
   if (id === 'teams') return <IconBrandTeams className="service-logo service-logo-teams" size={28} stroke={1.5} />;
+  // Apps Amatime sin logo propio: azulejo con los colores de la marca.
+  if (id === 'costeador') return <span className="service-logo service-logo-tile" aria-hidden="true"><IconCalculator size={20} stroke={1.8} /></span>;
   if (isMicrosoftLogo(id)) return <MicrosoftLogo id={id} size={28} className={`service-logo service-logo-${id}`} />;
   if (Object.hasOwn(sidebarLogos, id)) return <img className={`service-logo service-logo-${id}`} src={sidebarLogos[id]} alt="" draggable={false} />;
   // Página propia: su favicon, o un mundo genérico si no se pudo obtener.
