@@ -37,6 +37,7 @@ test.beforeEach(async ({}, testInfo) => {
   server = createServer((req, res) => {
     if (slowDocument && req.url === '/n8n') return;
     if (req.url === '/never-load') return;
+    if (req.url === '/favicon.ico') { res.setHeader('Content-Type', 'image/png'); res.end(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')); return; }
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.end(`<html lang="es"><head><title>Página ${req.url}</title></head><body><h1>Login nativo ${req.url}</h1><input aria-label="Email del servicio">${slowResource ? '<img src="/never-load" alt="Recurso secundario">' : ''}<script>localStorage.setItem('visited','yes')</script></body></html>`);
   });
@@ -803,4 +804,135 @@ test('los comandos del panel validan sus argumentos en el proceso principal', as
   expect(outcome.okRatio).toBe(true);
   // Sin persist el ratio solo se aplica: no se guarda.
   expect((await splitState()).preferences.splitRatio).toBe(0.38);
+});
+
+// ── Páginas propias ────────────────────────────────────────────────────────────
+const customUrl = (host = '127.0.0.1') => `http://${host}:${(server.address() as AddressInfo).port}/custom`;
+const customApps = () => page.evaluate(async () => (await window.portal.snapshot()).preferences.customApps);
+async function openCustomForm(name: string, url: string, pin = true) {
+  await page.getByRole('button', { name: 'Ver todas las aplicaciones', exact: true }).click();
+  const launcher = page.getByRole('region', { name: 'Todas las aplicaciones' });
+  await launcher.getByRole('button', { name: 'Agregar página' }).click();
+  const form = launcher.getByRole('form', { name: 'Agregar página' });
+  await form.getByLabel('Nombre').fill(name);
+  await form.getByLabel('Dirección (URL)').fill(url);
+  const pinBox = form.getByRole('checkbox', { name: 'Fijar en la barra lateral' });
+  if (pin !== await pinBox.isChecked()) await pinBox.click();
+  return { launcher, form };
+}
+async function addCustomPage(name: string, url: string, pin = true) {
+  const { launcher, form } = await openCustomForm(name, url, pin);
+  await form.getByRole('button', { name: 'Guardar' }).click();
+  await expect(launcher.getByRole('button', { name: `Abrir ${name.trim()}`, exact: true })).toBeVisible();
+  const apps = await customApps();
+  return { launcher, saved: apps[apps.length - 1] };
+}
+
+test('páginas propias: se agregan fijadas, aparecen en Mis páginas y abren con su propia partición', async () => {
+  await waitForPage();
+  const url = customUrl();
+  const { launcher, saved } = await addCustomPage('  Mi wiki ', url);
+  await expect(launcher.getByRole('heading', { name: 'Mis páginas' })).toBeVisible();
+  await expect(launcher.getByRole('form')).toHaveCount(0);
+  expect(saved).toMatchObject({ name: 'Mi wiki', url });
+  expect(saved.id).toMatch(/^custom-/);
+  // La favicon del servidor se guarda como data URL y se pinta en la sidebar.
+  expect(saved.icon).toMatch(/^data:image\/png;base64,/);
+  expect(await page.evaluate(async () => (await window.portal.snapshot()).preferences.pinned)).toContain(saved.id);
+  await page.keyboard.press('Escape');
+  const nav = page.getByRole('navigation', { name: 'Servicios' });
+  await expect(nav.getByRole('group', { name: 'Mis páginas' }).getByRole('button', { name: 'Abrir Mi wiki', exact: true })).toBeVisible();
+  await expect(nav.getByRole('button', { name: 'Abrir Mi wiki', exact: true }).locator('img.service-logo-custom')).toBeVisible();
+  await nav.getByRole('button', { name: 'Abrir Mi wiki', exact: true }).click();
+  await expect(page.getByTestId(`${saved.id}-tab-1`)).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId(`${saved.id}-tab-1`)).toContainText('Página /custom');
+  await waitForPage();
+  const sessions = await app.evaluate(({ webContents }) => {
+    const all = webContents.getAllWebContents();
+    const custom = all.find(w => w.getURL().endsWith('/custom'))!;
+    const huly = all.find(w => w.getURL().endsWith('/huly'))!;
+    return { storage: custom.session.storagePath ?? '', shared: custom.session === huly.session };
+  });
+  expect(sessions.shared).toBe(false);
+  expect(sessions.storage).toContain(`amatime-${saved.id}`);
+});
+
+test('páginas propias: el formulario explica los errores y no guarda nada', async () => {
+  const { form } = await openCustomForm('Mala', 'javascript:alert(1)');
+  const save = () => form.getByRole('button', { name: 'Guardar' }).click();
+  await save();
+  await expect(form.getByRole('alert')).toContainText('http o https');
+  for (const [url, message] of [['http://example.com/', 'HTTP solo se permite'], ['https://u:p@example.com/', 'usuario'], ['example.com', 'https://']] as const) {
+    await form.getByLabel('Dirección (URL)').fill(url);
+    await save();
+    await expect(form.getByRole('alert')).toContainText(message);
+  }
+  await form.getByLabel('Dirección (URL)').fill('https://ok.example.com/');
+  await form.getByLabel('Nombre').fill('   ');
+  await save();
+  await expect(form.getByRole('alert')).toContainText('nombre');
+  expect(await customApps()).toEqual([]);
+  await form.getByRole('button', { name: 'Cancelar' }).click();
+  await expect(form).toHaveCount(0);
+});
+
+test('páginas propias: se editan desde su tarjeta y el cambio se guarda', async () => {
+  const { launcher, saved } = await addCustomPage('Mi wiki', customUrl(), false);
+  await expect(page.getByRole('navigation', { name: 'Servicios' }).getByRole('button', { name: 'Abrir Mi wiki' })).toHaveCount(0);
+  await launcher.getByRole('button', { name: 'Editar Mi wiki', exact: true }).click();
+  const form = launcher.getByRole('form', { name: 'Editar página' });
+  await expect(form.getByLabel('Nombre')).toHaveValue('Mi wiki');
+  await expect(form.getByLabel('Dirección (URL)')).toHaveValue(customUrl());
+  await expect(form.getByRole('checkbox', { name: 'Fijar en la barra lateral' })).toHaveCount(0);
+  await form.getByLabel('Nombre').fill('Wiki RRHH');
+  await form.getByRole('button', { name: 'Guardar' }).click();
+  await expect(launcher.getByRole('button', { name: 'Abrir Wiki RRHH', exact: true })).toBeVisible();
+  expect(await customApps()).toEqual([{ ...saved, name: 'Wiki RRHH' }]);
+});
+
+test('páginas propias: cambiar de origen cierra sus pestañas y reabre en el nuevo; eliminar la quita de todo', async () => {
+  const { saved } = await addCustomPage('Mi wiki', customUrl());
+  await page.keyboard.press('Escape');
+  await page.getByRole('navigation', { name: 'Servicios' }).getByRole('button', { name: 'Abrir Mi wiki', exact: true }).click();
+  await expect(page.getByTestId(`${saved.id}-tab-1`)).toHaveAttribute('aria-selected', 'true');
+  await waitForPage();
+  const before = (await nativeViews()).length;
+  await page.evaluate(([id, url]) => window.portal.customEdit(id, { name: 'Mi wiki', url }), [saved.id, customUrl('localhost')]);
+  await expect.poll(async () => (await nativeViews()).some(v => v.url.startsWith('http://localhost:'))).toBe(true);
+  expect((await nativeViews()).length).toBe(before);
+  await expect(page.getByTestId(`${saved.id}-tab-1`)).toHaveAttribute('aria-selected', 'true');
+  await page.evaluate(id => window.portal.customRemove(id), saved.id);
+  await expect(page.getByRole('navigation', { name: 'Servicios' }).getByRole('button', { name: 'Abrir Mi wiki' })).toHaveCount(0);
+  await expect(page.getByTestId(`${saved.id}-tab-1`)).toHaveCount(0);
+  await expect.poll(async () => (await nativeViews()).length).toBe(before - 1);
+  const state = await page.evaluate(async () => { const s = await window.portal.snapshot(); return { apps: s.preferences.customApps, pinned: s.preferences.pinned, remember: Object.keys(s.preferences.remember), services: s.services.length, active: s.active }; });
+  expect(state).toMatchObject({ apps: [], services: 7, active: 'librechat' });
+  expect(state.pinned.some(id => id.startsWith('custom-'))).toBe(false);
+  expect(state.remember.some(id => id.startsWith('custom-'))).toBe(false);
+});
+
+test('páginas propias: los comandos validan sus argumentos en el proceso principal', async () => {
+  const outcome = await page.evaluate(async () => {
+    const portal = window.portal as any;
+    const rejects = async (task: () => Promise<unknown>) => { try { await task(); return false; } catch { return true; } };
+    const result: Record<string, boolean> = {};
+    const good = { name: 'x', url: 'https://a.example.com/', pin: true };
+    const bads: [string, unknown][] = [['null', null], ['string', 'x'], ['array', []], ['sin nombre', { ...good, name: '' }], ['nombre largo', { ...good, name: 'x'.repeat(41) }], ['nombre no texto', { ...good, name: 3 }], ['javascript', { ...good, url: 'javascript:alert(1)' }], ['file', { ...good, url: 'file:///C:/x' }], ['credenciales', { ...good, url: 'https://u:p@a.example.com/' }], ['http público', { ...good, url: 'http://example.com/' }], ['pin no booleano', { ...good, pin: 'yes' }]];
+    for (const [label, value] of bads) result['add:' + label] = await rejects(() => portal.customAdd(value));
+    for (const id of ['huly', 'custom-noexiste0', '__proto__', 3, null]) { result['edit:' + String(id)] = await rejects(() => portal.customEdit(id, { name: 'x', url: 'https://a.example.com/' })); result['remove:' + String(id)] = await rejects(() => portal.customRemove(id)); }
+    result.overlay = await rejects(() => portal.overlay('yes'));
+    return result;
+  });
+  expect(Object.entries(outcome).filter(([, rejected]) => !rejected)).toEqual([]);
+  expect(await customApps()).toEqual([]);
+  expect(await page.evaluate(async () => (await window.portal.snapshot()).services.length)).toBe(7);
+});
+
+test('páginas propias: el límite de 30 se aplica en el proceso principal', async () => {
+  const outcome = await page.evaluate(async (url) => {
+    let created = 0, failed = 0;
+    for (let i = 0; i < 31; i++) { try { await window.portal.customAdd({ name: `p${i}`, url, pin: false }); created++; } catch { failed++; } }
+    return { created, failed };
+  }, customUrl());
+  expect(outcome).toEqual({ created: 30, failed: 1 });
 });
