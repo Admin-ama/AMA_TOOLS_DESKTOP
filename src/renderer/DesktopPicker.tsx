@@ -1,11 +1,23 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import gsap from 'gsap';
-import { IconApps, IconCheck, IconRefresh, IconSearch, IconX } from '@tabler/icons-react';
+import { useGSAP } from '@gsap/react';
+import { IconApps, IconBuildingStore, IconCheck, IconDeviceDesktop, IconFolderSearch, IconLayoutGrid, IconRefresh, IconSearch, IconX } from '@tabler/icons-react';
 import type { DesktopCandidate } from '../shared/contracts';
+
+gsap.registerPlugin(useGSAP);
 
 const MOTION = '(prefers-reduced-motion: no-preference)';
 const ICON_BATCH = 8;
+// La cascada solo anima lo que cabe en pantalla; el resto aparece sin esperar.
+const STAGGER_LIMIT = 36;
 const plain = (value: string) => value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+type Source = 'all' | 'path' | 'aumid';
+const SOURCES: { id: Source; label: string; icon: typeof IconApps }[] = [
+  { id: 'all', label: 'Todas', icon: IconLayoutGrid },
+  { id: 'path', label: 'Programas', icon: IconDeviceDesktop },
+  { id: 'aumid', label: 'Microsoft Store', icon: IconBuildingStore },
+];
 
 interface Props {
   onClose(): void;
@@ -26,6 +38,7 @@ export function DesktopPicker({ onClose, onLink, onBrowse }: Props) {
   const [items, setItems] = useState<DesktopCandidate[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [query, setQuery] = useState('');
+  const [source, setSource] = useState<Source>('all');
   const [icons, setIcons] = useState<Record<string, string>>({});
   const [tick, setTick] = useState(0);
 
@@ -37,16 +50,30 @@ export function DesktopPicker({ onClose, onLink, onBrowse }: Props) {
   }
   useEffect(() => { mounted.current = true; load(false); return () => { mounted.current = false; }; }, []);
   useEffect(() => { search.current?.focus(); }, []);
-  useEffect(() => {
-    const mm = gsap.matchMedia();
-    mm.add(MOTION, () => { gsap.from(root.current, { opacity: 0, y: 8, scale: 0.98, duration: 0.16, ease: 'power2.out', clearProps: 'opacity,transform' }); });
-    return () => mm.revert();
-  }, []);
+
+  const { contextSafe } = useGSAP(() => {
+    gsap.matchMedia().add(MOTION, () => {
+      gsap.timeline({ defaults: { ease: 'power3.out' } })
+        .from('.picker-backdrop', { opacity: 0, duration: 0.2 })
+        .from('.picker', { opacity: 0, y: 18, scale: 0.96, filter: 'blur(6px)', duration: 0.32, clearProps: 'filter' }, '<')
+        .from('.picker-hero > *, .picker-search, .picker-tabs', { opacity: 0, y: 8, duration: 0.25, stagger: 0.05 }, '-=0.18');
+    });
+  }, { scope: root });
 
   const filtered = useMemo(() => {
     const needle = plain(query.trim());
-    return (items ?? []).filter(item => !needle || plain(item.name).includes(needle));
-  }, [items, query]);
+    return (items ?? []).filter(item => (source === 'all' || item.kind === source) && (!needle || plain(item.name).includes(needle)));
+  }, [items, query, source]);
+  const counts = useMemo(() => ({ all: items?.length ?? 0, path: items?.filter(item => item.kind === 'path').length ?? 0, aumid: items?.filter(item => item.kind === 'aumid').length ?? 0 }), [items]);
+
+  // Cascada de tarjetas cuando llega la lista o cambia el filtro (no en cada tecla).
+  useGSAP(() => {
+    if (!items?.length) return;
+    gsap.matchMedia().add(MOTION, () => {
+      const cards = gsap.utils.toArray<HTMLElement>('.picker-card').slice(0, STAGGER_LIMIT);
+      gsap.from(cards, { opacity: 0, y: 14, scale: 0.94, duration: 0.32, ease: 'power3.out', stagger: 0.014, clearProps: 'opacity,transform' });
+    });
+  }, { scope: root, dependencies: [items, source], revertOnUpdate: true });
 
   // Iconos perezosos: lotes pequeños empezando por lo que se ve (resultados de la búsqueda).
   useEffect(() => {
@@ -62,38 +89,56 @@ export function DesktopPicker({ onClose, onLink, onBrowse }: Props) {
   function key(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onClose(); return; }
     if (event.key !== 'Tab') return;
-    const focusable = [...(root.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input') ?? [])];
+    const focusable = [...(root.current?.querySelectorAll<HTMLElement>('.picker button:not(:disabled), .picker input') ?? [])];
     if (!focusable.length) return;
     const first = focusable[0], last = focusable[focusable.length - 1];
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
   }
-  const choose = (item: DesktopCandidate) => { if (!item.linked) onLink(item.id); };
+  // Pequeña confirmación visual antes de cerrar: la tarjeta "salta" hacia la barra.
+  const choose = contextSafe((item: DesktopCandidate, target?: HTMLElement) => {
+    if (item.linked) return;
+    if (!target || !window.matchMedia(MOTION).matches) return onLink(item.id);
+    gsap.timeline({ onComplete: () => onLink(item.id) })
+      .to(target, { scale: 1.06, duration: 0.12, ease: 'power2.out' })
+      .to(target, { scale: 0.9, opacity: 0, x: 40, duration: 0.18, ease: 'power2.in' });
+  });
 
-  return <div className="picker-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
-    <div ref={root} className="picker" role="dialog" aria-modal="true" aria-label="Vincular aplicación de escritorio" onKeyDown={key}>
-      <div className="picker-head">
-        <h2>Vincular aplicación de escritorio</h2>
-        <button className="secondary-button picker-refresh" disabled={items === null} onClick={() => load(true)}><IconRefresh size={16} />Actualizar</button>
-        <button className="icon-button" aria-label="Cerrar" title="Cerrar" onClick={onClose}><IconX size={18} /></button>
-      </div>
-      <label className="launcher-search"><IconSearch size={17} aria-hidden="true" /><input ref={search} type="text" aria-label="Buscar aplicación instalada" placeholder="Buscar aplicación…" value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { const first = filtered.find(item => !item.linked); if (first) choose(first); } }} /></label>
-      <div className="picker-body">
-        {items === null ? <p className="picker-empty" role="status">Buscando aplicaciones instaladas…</p>
-          : filtered.length === 0 ? <p className="picker-empty" role="status">{failed ? 'No se pudieron leer las aplicaciones instaladas.' : query.trim() ? `Sin resultados para «${query.trim()}».` : 'No se encontraron aplicaciones instaladas.'}</p>
-          : <ul className="picker-grid" aria-label="Aplicaciones instaladas">
-            {filtered.map(item => <li key={item.id}>
-              <button className="picker-card" disabled={item.linked} aria-label={item.linked ? `${item.name} (ya vinculada)` : item.name} title={item.name} onClick={() => choose(item)}>
-                {icons[item.id] ? <img src={icons[item.id]} alt="" draggable={false} /> : <IconApps className="picker-glyph" size={28} stroke={1.5} />}
-                <span>{item.name}</span>
-                {item.linked && <IconCheck className="picker-check" size={17} aria-hidden="true" />}
-              </button>
-            </li>)}
-          </ul>}
-      </div>
-      <div className="picker-foot">
-        <span>{items ? `${filtered.length} de ${items.length}` : ''}</span>
-        <button className="picker-browse" onClick={onBrowse}>¿No la encuentras? Examinar…</button>
+  return <div ref={root} className="picker-root" onKeyDown={key}>
+    <div className="picker-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
+      <div className="picker" role="dialog" aria-modal="true" aria-label="Vincular aplicación de escritorio">
+        <header className="picker-hero">
+          <span className="picker-badge" aria-hidden="true"><IconDeviceDesktop size={26} stroke={1.6} /></span>
+          <div className="picker-titles">
+            <h2>Vincular aplicación de escritorio</h2>
+            <p>Elige una app de tu equipo para tenerla a un clic en la barra derecha.</p>
+          </div>
+          <button className="picker-ghost" disabled={items === null} onClick={() => load(true)}><IconRefresh size={17} />Actualizar</button>
+          <button className="picker-close" aria-label="Cerrar" title="Cerrar (Esc)" onClick={onClose}><IconX size={20} /></button>
+        </header>
+        <label className="picker-search"><IconSearch size={20} aria-hidden="true" /><input ref={search} type="text" aria-label="Buscar aplicación instalada" placeholder="Buscar en tus aplicaciones…" value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { const first = filtered.find(item => !item.linked); if (first) choose(first); } }} /></label>
+        <div className="picker-tabs" role="tablist" aria-label="Origen de las aplicaciones">
+          {SOURCES.map(({ id, label, icon: Icon }) => <button key={id} role="tab" aria-selected={source === id} className={source === id ? 'active' : ''} onClick={() => setSource(id)}>
+            <Icon size={16} aria-hidden="true" />{label}{items && <span className="picker-count">{counts[id]}</span>}
+          </button>)}
+        </div>
+        <div className="picker-body">
+          {items === null ? <div className="picker-grid" role="status" aria-label="Buscando aplicaciones instaladas…">{Array.from({ length: 12 }, (_, index) => <span key={index} className="picker-skeleton" />)}</div>
+            : filtered.length === 0 ? <p className="picker-empty" role="status">{failed ? 'No se pudieron leer las aplicaciones instaladas.' : query.trim() ? `Sin resultados para «${query.trim()}».` : 'No se encontraron aplicaciones en esta sección.'}</p>
+            : <ul className="picker-grid" aria-label="Aplicaciones instaladas">
+              {filtered.map(item => <li key={item.id}>
+                <button className="picker-card" disabled={item.linked} aria-label={item.linked ? `${item.name} (ya vinculada)` : item.name} title={item.name} onClick={event => choose(item, event.currentTarget)}>
+                  <span className="picker-icon">{icons[item.id] ? <img src={icons[item.id]} alt="" draggable={false} /> : item.kind === 'aumid' ? <IconBuildingStore size={30} stroke={1.5} /> : <IconApps size={30} stroke={1.5} />}</span>
+                  <span className="picker-name">{item.name}</span>
+                  {item.linked && <span className="picker-check" aria-hidden="true"><IconCheck size={14} stroke={2.6} /></span>}
+                </button>
+              </li>)}
+            </ul>}
+        </div>
+        <footer className="picker-foot">
+          <span>{items ? `${filtered.length} de ${items.length} aplicaciones` : 'Buscando aplicaciones instaladas…'}</span>
+          <button className="picker-browse" onClick={onBrowse}><IconFolderSearch size={17} />¿No la encuentras? Examinar…</button>
+        </footer>
       </div>
     </div>
   </div>;

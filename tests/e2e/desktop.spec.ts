@@ -1189,3 +1189,28 @@ test('Microsoft 365: una ventana nueva de una app del grupo abre pestaña de la 
   await app.evaluate(({ webContents }) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/outlook'))!.executeJavaScript("window.open(location.origin + '/outlook/adjunto')", true));
   await expect(page.getByTestId('outlook-tab-2')).toBeVisible();
 });
+
+test('apps de escritorio: con muchas apps el selector queda dentro de la ventana, con buscador legible y filtros por origen', async () => {
+  const entries = [];
+  for (let index = 0; index < 160; index++) {
+    const file = path.join(directory, `App ${String(index).padStart(3, '0')}.exe`);
+    await writeFile(file, 'MZ');
+    entries.push({ name: `App ${String(index).padStart(3, '0')}`, kind: 'path', path: file });
+  }
+  entries.push({ name: 'Tienda Falsa', kind: 'aumid', aumid: 'Fake.Store_8wekyb3d8bbwe!App' });
+  await writeFile(path.join(directory, 'installed.json'), JSON.stringify(entries));
+  await page.getByRole('complementary', { name: 'Aplicaciones de escritorio' }).getByRole('button', { name: 'Vincular aplicación de escritorio' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Vincular aplicación de escritorio' });
+  await expect(dialog.getByRole('button', { name: 'App 000' })).toBeVisible();
+  const viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+  const box = (await dialog.boundingBox())!;
+  expect(box.y).toBeGreaterThanOrEqual(0);
+  expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+  expect((await dialog.getByRole('textbox', { name: 'Buscar aplicación instalada' }).boundingBox())!.height).toBeGreaterThanOrEqual(40);
+  // Filtros: programas del menú Inicio vs. Microsoft Store.
+  await dialog.getByRole('tab', { name: /Microsoft Store/ }).click();
+  await expect(dialog.getByRole('button', { name: 'Tienda Falsa' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'App 000' })).toHaveCount(0);
+  await dialog.getByRole('tab', { name: /Todas/ }).click();
+  await expect(dialog.getByRole('button', { name: 'App 000' })).toBeVisible();
+});
