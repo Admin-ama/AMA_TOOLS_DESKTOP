@@ -28,6 +28,8 @@ interface Props {
   onMenu(id: AppId, source: HTMLElement): void;
   /** Petición externa (menú contextual) de editar una página: abre el formulario. */
   editRequest?: { id: AppId } | null;
+  /** El formulario ya se abrió con editRequest: App puede olvidarla. */
+  onEditHandled?(): void;
 }
 type FormMode = { kind: 'add' } | { kind: 'edit'; id: AppId };
 interface FormValues { name: string; url: string; pin: boolean }
@@ -62,14 +64,14 @@ function PageForm({ mode, initial, onSubmit, onCancel }: { mode: FormMode; initi
   </form>;
 }
 
-export function Launcher({ services, pinned, onOpen, onSplit, onRequestAccess, onPin, onClose, onAdd, onEdit, onMenu, editRequest }: Props) {
+export function Launcher({ services, pinned, onOpen, onSplit, onRequestAccess, onPin, onClose, onAdd, onEdit, onMenu, editRequest, onEditHandled }: Props) {
   const [query, setQuery] = useState('');
   const [form, setForm] = useState<FormMode | null>(null);
   const search = useRef<HTMLInputElement>(null);
   const root = useRef<HTMLElement>(null);
   const closing = useRef(false);
   useEffect(() => { search.current?.focus(); }, []);
-  useEffect(() => { if (editRequest) setForm({ kind: 'edit', id: editRequest.id }); }, [editRequest]);
+  useEffect(() => { if (!editRequest) return; setForm({ kind: 'edit', id: editRequest.id }); onEditHandled?.(); }, [editRequest]);
   useGSAP(() => {
     gsap.matchMedia().add(MOTION, () => {
       gsap.timeline({ defaults: { ease: 'power3.out' } })

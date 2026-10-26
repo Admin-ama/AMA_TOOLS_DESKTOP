@@ -39,7 +39,6 @@ export function App() {
   }, []);
   useTooltips(!!menu || picker || (!!state && state.panel !== 'service'));
   useEffect(() => { if (state) document.documentElement.dataset.theme = state.preferences.theme; }, [state?.preferences.theme]);
-  useEffect(() => { if (state && state.panel !== 'launcher') setEditRequest(null); }, [state?.panel]);
   // Sin red las vistas ya están ocultas y los botones deshabilitados: el menú no debe quedar flotando.
   useEffect(() => { if (menu && state && state.network.status !== 'connected') { setMenu(null); void window.portal.overlay(false).catch(() => undefined); } }, [menu, state?.network.status]);
   useEffect(() => { if (picker && state && state.network.status !== 'connected') { setPicker(false); void window.portal.overlay(false).catch(() => undefined); } }, [picker, state?.network.status]);
@@ -98,7 +97,11 @@ export function App() {
     else if (choice === 'tab') { const opened = state!.tabs.some(tab => tab.serviceId === id); void action(async () => { await window.portal.activate(id); if (opened) await window.portal.openTab(); }); }
     else if (choice === 'split') void action(() => window.portal.splitOpen(id));
     else if (choice === 'unpin') void action(() => window.portal.pin(id, false));
-    else if (choice === 'edit') { setEditRequest({ id }); panel('launcher'); }
+    else if (choice === 'edit') {
+      // La consume el launcher al montarse; no se borra por cambios de panel (un snapshot de cierre tardío la perdía).
+      setEditRequest({ id });
+      void action(() => window.portal.panel('launcher').catch(error => { setEditRequest(null); throw error; }));
+    }
     else void action(() => window.portal.customRemove(id));
   }
 
@@ -172,7 +175,7 @@ export function App() {
 
     <main id="service-content" className="content" role="tabpanel" aria-labelledby={state.activeTabId ? `tab-${state.activeTabId}` : undefined}>
       {blocked && (state.panel === 'service' || state.panel === 'launcher') && <NetworkBlock network={state.network} onRetry={() => action(() => window.portal.reload())} onForticlient={() => action(() => window.portal.openForticlient())} />}
-      {!blocked && state.panel === 'launcher' && <Launcher services={state.services} pinned={state.preferences.pinned} onOpen={activate} onSplit={id => void action(() => window.portal.splitOpen(id))} onRequestAccess={id => void action(() => window.portal.requestAccess(id))} onPin={(id, pinned) => void action(() => window.portal.pin(id, pinned))} onClose={() => panel('service')} onAdd={input => window.portal.customAdd(input)} onEdit={(id, input) => window.portal.customEdit(id, input)} onMenu={openMenu} editRequest={editRequest} />}
+      {!blocked && state.panel === 'launcher' && <Launcher services={state.services} pinned={state.preferences.pinned} onOpen={activate} onSplit={id => void action(() => window.portal.splitOpen(id))} onRequestAccess={id => void action(() => window.portal.requestAccess(id))} onPin={(id, pinned) => void action(() => window.portal.pin(id, pinned))} onClose={() => panel('service')} onAdd={input => window.portal.customAdd(input)} onEdit={(id, input) => window.portal.customEdit(id, input)} onMenu={openMenu} editRequest={editRequest} onEditHandled={() => setEditRequest(null)} />}
       {state.panel === 'settings' && <section className="settings-page">
         <button className="back-button" onClick={() => panel('service')}><IconChevronLeft size={17} />Volver al servicio</button>
         <div className="page-heading"><span className="eyebrow">PERSONALIZA TU ESPACIO</span><h1>Preferencias del portal</h1><p>Tu interfaz y tus sesiones. Cada aplicación conserva su propio inicio de sesión.</p></div>
