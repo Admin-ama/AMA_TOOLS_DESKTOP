@@ -11,7 +11,7 @@ import { checkCustomName, checkCustomUrl, isCustomId, MAX_CUSTOM_APPS } from '..
 import { fetchFavicon } from './favicon';
 import { isZoomPercent } from '../shared/zoom';
 import { assetPath } from './assets';
-import { readPreferences, savePreferences } from './preferences';
+import { readPreferences, reorderPinned, savePreferences } from './preferences';
 import { ServiceViewManager } from './service-view-manager';
 import { CursorTracker } from './cursor-tracker';
 import { autoUpdater } from 'electron-updater';
@@ -255,6 +255,12 @@ async function createWindow() {
         }
         case 'pin': {
           const serviceId = id();
+        case 'pin-order': {
+          if (args.length !== 1) throw new Error('Orden inválido');
+          preferences.pinned = reorderPinned(preferences.pinned, args[0]);
+          await savePreferences(preferencesFile, preferences);
+          break;
+        }
           if (typeof args[1] !== 'boolean') throw new Error('Preferencia inválida');
           if (!args[1] && FIXED_APPS.includes(serviceId)) throw new Error('Esta app siempre está fijada');
           preferences.pinned = args[1] ? (preferences.pinned.includes(serviceId) ? preferences.pinned : [...preferences.pinned, serviceId]) : preferences.pinned.filter(item => item !== serviceId);

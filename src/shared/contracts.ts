@@ -108,6 +108,8 @@ export interface PortalApi {
   theme(theme: Theme): Promise<void>;
   remember(id: AppId, enabled: boolean): Promise<void>;
   pin(id: AppId, pinned: boolean): Promise<void>;
+  /** Nuevo orden de las fijadas (misma lista, otro orden). */
+  reorderPinned(ids: AppId[]): Promise<void>;
   clearSession(id: AppId): Promise<void>;
   splitOpen(id?: AppId): Promise<void>;
   splitSet(id: AppId): Promise<void>;

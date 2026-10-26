@@ -33,6 +33,12 @@ export function normalizeSplitRatio(input: unknown): number {
 export function normalizeSplitService(input: unknown, ids: readonly AppId[] = GLOBAL_APP_IDS): AppId {
   return ids.find(id => id === input) ?? DEFAULT_SPLIT_SERVICE;
 }
+/** Nuevo orden pedido por el renderer: solo una permutación de las fijadas actuales (las fijas siguen primero). */
+export function reorderPinned(current: readonly AppId[], requested: unknown): AppId[] {
+  const valid = Array.isArray(requested) && requested.length === current.length && new Set(requested).size === current.length && requested.every(id => current.includes(id));
+  if (!valid) throw new Error('Orden inválido');
+  return normalizePinned(requested, current);
+}
 /** Las apps de un grupo comparten sesión: se recuerda solo si todas lo piden. */
 function syncGroupRemember(remember: Record<AppId, boolean>): Record<AppId, boolean> {
   for (const group of new Set(SERVICES.map(service => service.group).filter(Boolean))) {

@@ -37,6 +37,11 @@ button { transition:background .18s, color .18s, border-color .18s; }
 .nav-item:hover { color:var(--text); background:#1da77408; }
 .nav-item.active { color:var(--accent); background:linear-gradient(90deg,#1da77416,transparent); }
 .nav-item.active::before { content:''; position:absolute; inset:0 auto 0 0; width:3px; background:var(--accent); box-shadow:0 0 10px #1da77440; }
+.nav-item[draggable='true'] { cursor:grab; }
+.nav-item.dragging { opacity:.35; }
+.nav-item.drop-before::after, .nav-item.drop-after::after { content:''; position:absolute; left:.6rem; right:.6rem; height:2px; border-radius:2px; background:var(--accent); box-shadow:0 0 8px #1da77480; pointer-events:none; }
+.nav-item.drop-before::after { top:0; }
+.nav-item.drop-after::after { bottom:0; }
 .nav-dot { position:absolute; top:.65rem; right:.8rem; width:4px; height:4px; border-radius:50%; background:var(--accent); }
 .service-logo { display:block; object-fit:contain; flex-shrink:0; pointer-events:none; }
 .service-logo-huly { width:38px; height:24px; }

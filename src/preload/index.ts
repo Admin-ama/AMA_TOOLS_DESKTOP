@@ -28,6 +28,7 @@ const api: PortalApi = {
   theme: theme => command('theme', theme),
   remember: (id, enabled) => command('remember', id, enabled),
   pin: (id, pinned) => command('pin', id, pinned),
+  reorderPinned: ids => command('pin-order', ids),
   clearSession: id => command('clear-session', id),
   splitOpen: id => command('split-open', id),
   splitSet: id => command('split-set', id),

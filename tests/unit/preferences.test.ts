@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizePreferences } from '../../src/main/preferences';
+import { normalizePreferences, reorderPinned } from '../../src/main/preferences';
 import { assetPath } from '../../src/main/assets';
 import path from 'node:path';
 
@@ -125,6 +125,19 @@ describe('apps fijas (LibreChat, Copilot, Buk)', () => {
   });
   it('ya no guarda seenCatalog (preferencias antiguas lo descartan)', () => {
     expect(normalizePreferences({ seenCatalog: ['copilot'] })).not.toHaveProperty('seenCatalog');
+  });
+});
+
+describe('reordenar apps fijadas', () => {
+  const current = ['librechat', 'copilot', 'buk', 'portal', 'huly', 'n8n'];
+  it('acepta otro orden de las mismas apps; las fijas siguen primero y en su orden', () => {
+    expect(reorderPinned(current, ['librechat', 'copilot', 'buk', 'n8n', 'portal', 'huly'])).toEqual(['librechat', 'copilot', 'buk', 'n8n', 'portal', 'huly']);
+    expect(reorderPinned(current, ['huly', 'buk', 'librechat', 'portal', 'copilot', 'n8n'])).toEqual(['librechat', 'copilot', 'buk', 'huly', 'portal', 'n8n']);
+  });
+  it('rechaza listas que no son una permutación de las fijadas actuales', () => {
+    for (const bad of [null, 'huly', {}, [...current, 'stirling'], current.slice(1), [...current.slice(0, -1), 'portal'], [...current, 3], current.map((id, i) => i === 5 ? 'evil' : id)]) {
+      expect(() => reorderPinned(current, bad), JSON.stringify(bad)).toThrow('Orden inválido');
+    }
   });
 });
 

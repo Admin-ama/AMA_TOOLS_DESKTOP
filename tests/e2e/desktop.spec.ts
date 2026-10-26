@@ -408,7 +408,7 @@ test('barra de estado inferior muestra red, versión y reloj alineada con la vis
 });
 
 test('ojos del bot siguen el cursor aunque esté sobre la vista remota', async () => {
-  const eyes = page.getByRole('button', { name: 'Abrir LibreChat AI', exact: true }).locator('.bot-eyes');
+  const eyes = page.getByRole('button', { name: 'Abrir AMA IA', exact: true }).locator('.bot-eyes');
   // El cursor real no llega al shell sobre la vista remota; main reenvía la posición global.
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!.webContents.send('portal:cursor', { x: 1200, y: 120 }));
   await expect.poll(() => eyes.evaluate(el => (el as SVGGElement).style.transform)).toMatch(/^translate\(\d+(\.\d+)?px, /);
@@ -417,8 +417,8 @@ test('ojos del bot siguen el cursor aunque esté sobre la vista remota', async (
 });
 
 test('sidebar carga los logos locales de las aplicaciones', async ({}, testInfo) => {
-  expect(await page.getByRole('navigation', { name: 'Servicios' }).getByRole('button').evaluateAll(buttons => buttons.map(button => button.getAttribute('data-tooltip')))).toEqual(['LibreChat AI', 'Copilot M365', 'Buk', 'Portal de Operaciones', 'Huly Workspace', 'n8n Automations', 'Email Category AI', 'Stirling PDF']);
-  await expect(page.getByRole('button', { name: 'Abrir LibreChat AI', exact: true }).locator('svg .bot-eye')).toHaveCount(2);
+  expect(await page.getByRole('navigation', { name: 'Servicios' }).getByRole('button').evaluateAll(buttons => buttons.map(button => button.getAttribute('data-tooltip')))).toEqual(['AMA IA', 'Copilot M365', 'Buk', 'Portal de Operaciones', 'Huly Workspace', 'n8n Automations', 'Email Category AI', 'Stirling PDF']);
+  await expect(page.getByRole('button', { name: 'Abrir AMA IA', exact: true }).locator('svg .bot-eye')).toHaveCount(2);
   // Email AI: azulejo propio (sobre + destellos), no el icono de línea genérico.
   await expect(page.getByRole('button', { name: 'Abrir Email Category AI', exact: true }).locator('svg.service-logo-emailai .mail-spark')).toHaveCount(2);
   for (const name of ['Huly Workspace', 'n8n Automations', 'Portal de Operaciones', 'Stirling PDF', 'Buk']) {
@@ -1153,7 +1153,7 @@ test('Microsoft 365: el launcher agrupa las apps nuevas por categoría y Copilot
   await page.getByRole('button', { name: 'Ver todas las aplicaciones', exact: true }).click();
   const launcher = page.getByRole('region', { name: 'Todas las aplicaciones' });
   const names = (heading: string) => launcher.locator('.launcher-category').filter({ has: page.getByRole('heading', { name: heading, exact: true }) }).locator('.launcher-name').allTextContents();
-  expect(await names('Control')).toEqual(['LibreChat AI', 'Copilot M365', 'Buk']);
+  expect(await names('Control')).toEqual(['AMA IA', 'Copilot M365', 'Buk']);
   expect(await names('Operación')).toEqual(['Huly Workspace', 'SharePoint']);
   expect(await names('Comunicación')).toEqual(['Microsoft Teams', 'Outlook']);
   expect(await names('Automatización y herramientas')).toEqual(['n8n Automations', 'Email Category AI', 'Stirling PDF', 'Power Automate', 'Microsoft Forms']);
@@ -1162,7 +1162,7 @@ test('Microsoft 365: el launcher agrupa las apps nuevas por categoría y Copilot
 test('LibreChat, Copilot y Buk son fijas: primero en la barra y no se pueden quitar', async () => {
   const nav = page.getByRole('navigation', { name: 'Servicios' });
   const tips = await nav.getByRole('button').evaluateAll(buttons => buttons.map(button => button.getAttribute('data-tooltip')));
-  expect(tips.slice(0, 3)).toEqual(['LibreChat AI', 'Copilot M365', 'Buk']);
+  expect(tips.slice(0, 3)).toEqual(['AMA IA', 'Copilot M365', 'Buk']);
   // El proceso principal rechaza desfijarlas aunque el renderer lo pida.
   const rejected = await page.evaluate(async () => Promise.all(['librechat', 'copilot', 'buk'].map(id => window.portal.pin(id, false).then(() => false, () => true))));
   expect(rejected).toEqual([true, true, true]);
@@ -1170,7 +1170,7 @@ test('LibreChat, Copilot y Buk son fijas: primero en la barra y no se pueden qui
   // Launcher: candado en vez de chincheta; el resto sigue configurable.
   await page.getByRole('button', { name: 'Ver todas las aplicaciones', exact: true }).click();
   const launcher = page.getByRole('region', { name: 'Todas las aplicaciones' });
-  for (const name of ['LibreChat AI', 'Copilot M365', 'Buk']) {
+  for (const name of ['AMA IA', 'Copilot M365', 'Buk']) {
     await expect(launcher.getByRole('button', { name: `Quitar ${name} de la barra lateral` })).toHaveCount(0);
     await expect(launcher.getByLabel(`${name} siempre está fijada`)).toBeVisible();
   }
@@ -1259,8 +1259,8 @@ test('tooltip nativo de la barra lateral aparece sobre la vista nativa, se desli
   expect(first.parented).toBe(true);
   expect(first.focusable).toBe(false);
   expect(first.focused).toBe(false);
-  await page.getByRole('button', { name: 'Abrir LibreChat AI', exact: true }).hover();
-  await expect.poll(async () => (await tooltipState())?.text).toBe('LibreChat AI');
+  await page.getByRole('button', { name: 'Abrir AMA IA', exact: true }).hover();
+  await expect.poll(async () => (await tooltipState())?.text).toBe('AMA IA');
   await page.mouse.move(600, 400);
   await expect.poll(() => tooltipState()).toBeNull();
 });
@@ -1357,3 +1357,22 @@ test('sin Office instalado el dock no muestra accesos de Office', async () => {
   await expect(page.locator('.dock-office button')).toHaveCount(0);
 });
 
+
+test('las apps fijadas configurables se reordenan arrastrando o con Alt+flechas dentro de su grupo; las fijas no se mueven', async () => {
+  const nav = page.getByRole('navigation', { name: 'Servicios' });
+  const order = () => nav.getByRole('group', { name: 'Automatización y herramientas' }).getByRole('button').evaluateAll(buttons => buttons.map(button => button.getAttribute('data-tooltip')));
+  expect(await order()).toEqual(['n8n Automations', 'Email Category AI', 'Stirling PDF']);
+  await nav.getByRole('button', { name: 'Abrir Stirling PDF' }).dragTo(nav.getByRole('button', { name: 'Abrir n8n Automations' }), { targetPosition: { x: 20, y: 4 } });
+  await expect.poll(order).toEqual(['Stirling PDF', 'n8n Automations', 'Email Category AI']);
+  expect((await page.evaluate(async () => (await window.portal.snapshot()).preferences.pinned))).toEqual(['librechat', 'copilot', 'buk', 'portal', 'huly', 'stirling', 'n8n', 'emailai']);
+  // Teclado: Alt+↓ baja un puesto.
+  await nav.getByRole('button', { name: 'Abrir Stirling PDF' }).focus();
+  await page.keyboard.press('Alt+ArrowDown');
+  await expect.poll(order).toEqual(['n8n Automations', 'Stirling PDF', 'Email Category AI']);
+  // Las fijas no se pueden arrastrar.
+  expect(await nav.getByRole('button', { name: 'Abrir AMA IA' }).getAttribute('draggable')).not.toBe('true');
+  expect(await nav.getByRole('button', { name: 'Abrir n8n Automations' }).getAttribute('draggable')).toBe('true');
+  // Sobrevive al reinicio de preferencias (main valida y guarda).
+  const rejects = await page.evaluate(async () => (window.portal.reorderPinned as (ids: unknown) => Promise<void>)(['huly']).then(() => false, () => true));
+  expect(rejects).toBe(true);
+});

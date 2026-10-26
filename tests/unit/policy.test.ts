@@ -197,6 +197,12 @@ describe('páginas del usuario', () => {
   });
 });
 
+describe('AMA IA (LibreChat)', () => {
+  it('se muestra como AMA IA sin cambiar su id ni su dirección', () => {
+    expect(SERVICES.find(service => service.id === 'librechat')).toMatchObject({ name: 'AMA IA', shortName: 'AMA IA', url: 'https://172.16.8.73/' });
+  });
+});
+
 describe('Buk (RRHH)', () => {
   it('es una app web de Control (pegada bajo Copilot) con su login de Amatime, sin grupo ni administrador', () => {
     expect(SERVICES.find(service => service.id === 'buk')).toEqual({ id: 'buk', name: 'Buk', shortName: 'Buk', category: 'control', url: 'https://amatime.buk.cl/users/sign_in' });

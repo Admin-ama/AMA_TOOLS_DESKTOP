@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type CSSProperties } from 'react';
 import { IconSettings, IconHelpHexagon, IconMoon, IconSun, IconRefresh, IconShieldCheck, IconAlertTriangle, IconChevronLeft, IconTrash, IconActivity, IconPlus, IconMinus, IconX, IconLayoutGrid, IconLayoutSidebarRight } from '@tabler/icons-react';
-import { CATEGORIES, MINE_CATEGORY, type AppId, type Snapshot } from '../shared/contracts';
+import { CATEGORIES, FIXED_APPS, MINE_CATEGORY, type AppId, type Snapshot } from '../shared/contracts';
+import { movePinned, stepPinned } from '../shared/pin-order';
 import { SHELL_LAYOUT } from '../shared/layout';
 import { PAGE_ZOOM } from '../shared/zoom';
 import { Launcher } from './Launcher';
@@ -25,6 +26,9 @@ export function App() {
   const [menu, setMenu] = useState<{ id: AppId; anchor: MenuAnchor } | null>(null);
   // "Editar…" desde el menú abre el launcher con el formulario de esa página; cada petición es un objeto nuevo.
   const [editRequest, setEditRequest] = useState<{ id: AppId } | null>(null);
+  // Arrastre de una app fijada dentro de su grupo de la sidebar.
+  const [drag, setDrag] = useState<{ id: AppId; group: string } | null>(null);
+  const [drop, setDrop] = useState<{ id: AppId; place: 'before' | 'after' } | null>(null);
   const trigger = useRef<HTMLElement | null>(null);
   const [picker, setPicker] = useState(false);
   useEffect(() => {
@@ -130,7 +134,23 @@ export function App() {
       <nav className="service-nav" aria-label="Servicios">
         {sidebarGroups.map(group => <div className="nav-group" role="group" aria-label={group.label} key={group.label}>
         {group.ids.map(item => {
-          return <button key={item.id} className={`nav-item ${state.active === item.id && state.panel === 'service' ? 'active' : ''}`} disabled={blocked} aria-label={`Abrir ${item.name}`} data-tooltip={item.name} data-tooltip-side="right" aria-current={state.active === item.id && state.panel === 'service' ? 'page' : undefined} aria-haspopup="menu" onClick={() => activate(item.id)} onContextMenu={event => { event.preventDefault(); openMenu(item.id, event.currentTarget); }} onKeyDown={event => { if (isMenuKey(event)) { event.preventDefault(); openMenu(item.id, event.currentTarget); } }}>
+          const pinned = state.preferences.pinned;
+          // Solo las fijadas que el usuario controla se reordenan; las fijas (AMA IA, Copilot, Buk) van siempre arriba.
+          const movable = (id: AppId) => pinned.includes(id) && !FIXED_APPS.includes(id);
+          const reorder = (next: readonly AppId[]) => { if (next !== pinned) void action(() => window.portal.reorderPinned([...next])); };
+          const place = (event: { clientY: number; currentTarget: HTMLElement }) => { const box = event.currentTarget.getBoundingClientRect(); return event.clientY < box.top + box.height / 2 ? 'before' as const : 'after' as const; };
+          const target = !!drag && drag.group === group.label && drag.id !== item.id && movable(item.id);
+          return <button key={item.id} className={`nav-item ${state.active === item.id && state.panel === 'service' ? 'active' : ''} ${drag?.id === item.id ? 'dragging' : ''} ${drop?.id === item.id ? `drop-${drop.place}` : ''}`}
+            draggable={movable(item.id) && !blocked}
+            onDragStart={event => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', item.id); setDrag({ id: item.id, group: group.label }); }}
+            onDragOver={event => { if (!target) return; event.preventDefault(); event.dataTransfer.dropEffect = 'move'; const where = place(event); if (drop?.id !== item.id || drop.place !== where) setDrop({ id: item.id, place: where }); }}
+            onDragLeave={() => { if (drop?.id === item.id) setDrop(null); }}
+            onDrop={event => { if (!target || !drag) return; event.preventDefault(); reorder(movePinned(pinned, drag.id, item.id, place(event))); setDrag(null); setDrop(null); }}
+            onDragEnd={() => { setDrag(null); setDrop(null); }} disabled={blocked} aria-label={`Abrir ${item.name}`} data-tooltip={item.name} data-tooltip-side="right" aria-current={state.active === item.id && state.panel === 'service' ? 'page' : undefined} aria-haspopup="menu" onClick={() => activate(item.id)} onContextMenu={event => { event.preventDefault(); openMenu(item.id, event.currentTarget); }} onKeyDown={event => {
+              if (isMenuKey(event)) { event.preventDefault(); openMenu(item.id, event.currentTarget); return; }
+              // Alt+↑/↓: mueve la app un puesto dentro de su grupo (alternativa al arrastre).
+              if (event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown') && movable(item.id)) { event.preventDefault(); reorder(stepPinned(pinned, group.ids.map(other => other.id).filter(movable), item.id, event.key === 'ArrowUp' ? -1 : 1)); }
+            }}>
             <ServiceLogo id={item.id} icon={item.icon} />
             {state.states[item.id].status === 'ready' && <span className="nav-dot" />}
           </button>;
@@ -204,7 +224,7 @@ export function App() {
         <div className="page-heading"><span className="eyebrow">AMATIME OS · {state.updates.currentVersion}</span><h1>Tus herramientas, conectadas</h1><p>Un contenedor de escritorio. Cinco aplicaciones independientes.</p></div>
         <div className="settings-card"><IconActivity className="help-icon" /><h2>Navegación sin perder contexto</h2><p>La barra lateral cambia de aplicación. La barra superior muestra solo sus pestañas: usa + para abrir otra y × para cerrarla. Cada pestaña conserva su página y comparte la sesión de su aplicación. Las flechas del teclado recorren las pestañas; al volver a una aplicación se restaura la última seleccionada.</p></div>
         <div className="settings-card"><IconShieldCheck className="help-icon" /><h2>Cada aplicación gestiona su acceso</h2><p>El portal no tiene formulario de login, no comprueba credenciales y no asegura que una página cargada sea una sesión autenticada. Usa el login y logout propios del servicio.</p></div>
-        <div className="settings-card"><IconAlertTriangle className="help-icon" /><h2>Red, permisos y seguridad</h2><p>Huly, n8n y LibreChat necesitan acceso a la red interna o VPN. Huly y n8n todavía usan HTTP: configura HTTPS antes de un despliegue de producción. LibreChat usa HTTPS. LibreChat admite una excepción de autoridad no confiable únicamente en https://172.16.8.73/; úsala solo en red interna de confianza. Los demás destinos y errores TLS siguen validándose.</p><p>La navegación a otros orígenes, ventanas externas, descargas y permisos del dispositivo están bloqueados. Si un SSO requiere otro dominio, su integración debe revisarse antes de habilitarlo.</p></div>
+        <div className="settings-card"><IconAlertTriangle className="help-icon" /><h2>Red, permisos y seguridad</h2><p>Huly, n8n y AMA IA necesitan acceso a la red interna o VPN. Huly y n8n todavía usan HTTP: configura HTTPS antes de un despliegue de producción. AMA IA usa HTTPS y admite una excepción de autoridad no confiable únicamente en https://172.16.8.73/; úsala solo en red interna de confianza. Los demás destinos y errores TLS siguen validándose.</p><p>La navegación a otros orígenes, ventanas externas, descargas y permisos del dispositivo están bloqueados. Si un SSO requiere otro dominio, su integración debe revisarse antes de habilitarlo.</p></div>
       </section>}
       {error && <p className="action-error" role="alert">{error}</p>}
     </main>
