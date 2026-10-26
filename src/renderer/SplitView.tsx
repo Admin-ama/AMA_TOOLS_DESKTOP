@@ -24,7 +24,9 @@ interface Props {
   onCapture(): Promise<SplitCapture>;
   onDrag(active: boolean): Promise<void>;
 }
-interface Session { pointerId: number; startX: number; startPanel: number; area: number; ratio: number; moved: boolean; frame: number; start: SplitBounds; ready: Promise<void> }
+interface Session { pointerId: number; startX: number; startPanel: number; area: number; ratio: number; moved: boolean; frame: number; start: SplitBounds; ready: Promise<void>; release(): void }
+/** Lo que el arrastre necesita de un evento de puntero (React o nativo de window). */
+type PointerPoint = Pick<globalThis.PointerEvent, 'pointerId' | 'clientX'>;
 interface Ghost { capture: SplitCapture; main: Rect; panel: Rect }
 
 const box = ({ x, y, width, height }: Rect): CSSProperties => ({ left: x, top: y, width, height });
@@ -56,9 +58,23 @@ export function SplitView({ services, split, width, height, onSet, onToTab, onCl
     if (event.button !== 0 || session.current || !layout) return;
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
-    session.current = { pointerId: event.pointerId, startX: event.clientX, startPanel: layout.panel.width, area: layout.main.width + layout.divider.width + layout.panel.width, ratio: layout.ratio, moved: false, frame: 0, start: layout, ready: Promise.resolve() };
+    // Al ocultar las vistas nativas (split-drag) Chromium mueve el foco y el divisor pierde la captura:
+    // el arrastre se sigue en window, que con las vistas ocultas cubre toda la ventana.
+    const onMove = (next: globalThis.PointerEvent) => move(next);
+    const onUp = (next: globalThis.PointerEvent) => void end(next, false);
+    const onCancel = (next: globalThis.PointerEvent) => void end(next, true);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onCancel);
+    const release = () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); window.removeEventListener('pointercancel', onCancel); };
+    session.current = { pointerId: event.pointerId, startX: event.clientX, startPanel: layout.panel.width, area: layout.main.width + layout.divider.width + layout.panel.width, ratio: layout.ratio, moved: false, frame: 0, start: layout, ready: Promise.resolve(), release };
   }
-  function move(event: PointerEvent<HTMLDivElement>) {
+  /** Si el foco salta al ocultar las vistas, se recupera la captura: así se sigue el puntero aunque salga de la ventana. */
+  function recapture(event: PointerEvent<HTMLDivElement>) {
+    if (session.current?.pointerId !== event.pointerId) return;
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* el puntero ya se soltó: window recibe el pointerup */ }
+  }
+  function move(event: PointerPoint) {
     const s = session.current;
     if (!s || event.pointerId !== s.pointerId) return;
     const delta = s.startX - event.clientX; // Hacia la izquierda el panel crece.
@@ -73,12 +89,15 @@ export function SplitView({ services, split, width, height, onSet, onToTab, onCl
     cancelAnimationFrame(s.frame);
     s.frame = requestAnimationFrame(() => setLive(s.ratio));
   }
-  async function end(event: PointerEvent<HTMLDivElement>, cancelled: boolean) {
+  async function end(event: PointerPoint, cancelled: boolean) {
     const s = session.current;
     if (!s || event.pointerId !== s.pointerId) return;
     session.current = null;
+    s.release();
     cancelAnimationFrame(s.frame);
     if (!s.moved) return;
+    // El punto de suelta manda: el último pointermove puede no haber llegado si la captura saltó.
+    if (!cancelled) s.ratio = splitBounds(width, height, (s.startPanel + s.startX - event.clientX) / s.area)?.ratio ?? s.ratio;
     await s.ready;
     // Primero el ratio (con las vistas ocultas) y después se vuelven a mostrar en su nuevo sitio.
     if (!cancelled) await onResize(s.ratio, true).catch(() => undefined);
@@ -108,7 +127,7 @@ export function SplitView({ services, split, width, height, onSet, onToTab, onCl
       <button className="icon-button" aria-label="Cerrar panel" title="Cerrar panel" onClick={onClose}><IconX size={17} /></button>
     </div>
     <div className={`split-divider ${ghost ? 'dragging' : ''}`} role="separator" aria-orientation="vertical" aria-label="Redimensionar panel lateral" aria-valuemin={10} aria-valuemax={90} aria-valuenow={Math.round(layout.ratio * 100)} tabIndex={0} style={box(layout.divider)}
-      onPointerDown={down} onPointerMove={move} onPointerUp={event => void end(event, false)} onPointerCancel={event => void end(event, true)}
+      onPointerDown={down} onLostPointerCapture={recapture}
       onDoubleClick={() => void onResize(0.5, true).catch(() => undefined)} onKeyDown={key} />
     {ghost && <>
       <div className="split-ghost" data-testid="split-ghost-main" style={box(layout.main)}>{ghost.capture.main && <img src={ghost.capture.main} alt="" draggable={false} style={{ width: ghost.main.width, height: ghost.main.height }} />}</div>
