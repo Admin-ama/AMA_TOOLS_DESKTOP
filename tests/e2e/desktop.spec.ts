@@ -1398,16 +1398,29 @@ test('descargas generadas por la página (blob: y data:) se permiten; las de otr
   await expect.poll(() => app.evaluate(() => (globalThis as any).downloads)).toEqual([{ url: 'blob:', blocked: false }, { url: 'data:', blocked: false }, { url: 'https', blocked: true }]);
 });
 
-test('con "recordar sesión" las cookies de sesión (login sin "recordarme", como Buk) sobreviven al reiniciar la app', async () => {
-  await page.getByRole('button', { name: 'Abrir Buk', exact: true }).click();
-  await expect(page.getByTestId('buk-tab-1')).toHaveAttribute('aria-selected', 'true');
-  await waitForPage();
-  // La página fija una cookie de sesión (sin caducidad), como un login de Rails.
-  await app.evaluate(({ webContents }) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/buk'))!.executeJavaScript("document.cookie = 'sid=logged-in; path=/'"));
+test('con "recordar sesión" las cookies de sesión de TODAS las apps (login sin "recordarme", como Buk) sobreviven al reiniciar', async () => {
+  test.setTimeout(120_000);
+  const ids = await page.evaluate(async () => (await window.portal.snapshot()).services.map(service => service.id));
+  expect(ids).toHaveLength(14);
+  // Cada app abre su vista y su página fija una cookie de sesión propia (sin caducidad), como un login de Rails.
+  for (const id of ids) {
+    await page.evaluate(appId => window.portal.activate(appId), id);
+    await expect.poll(() => app.evaluate(({ webContents }, appId) => webContents.getAllWebContents().some(w => w.getURL().endsWith('/' + appId) && !w.isLoading()), id)).toBe(true);
+    await app.evaluate(({ webContents }, appId) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/' + appId))!.executeJavaScript(`document.cookie = 'sid_${appId}=logged-in; path=/'`), id);
+  }
+  const partitions = await app.evaluate(({ webContents }, list) => Object.fromEntries(list.map(appId => [appId, (webContents.getAllWebContents().find(w => w.getURL().endsWith('/' + appId))!.session as any).storagePath as string])), ids);
   const env = await app.evaluate(() => ({ ...process.env }));
   await app.close();
   app = await electron.launch({ args: ['.'], env: env as Record<string, string> });
   page = await app.firstWindow();
-  const cookies = await app.evaluate(async ({ session }) => (await session.fromPartition('persist:amatime-buk').cookies.get({ name: 'sid' })).map(c => ({ value: c.value, session: c.session })));
-  expect(cookies).toEqual([{ value: 'logged-in', session: false }]);
+  const survived = await app.evaluate(async ({ session }, list) => {
+    const result: Record<string, boolean> = {};
+    for (const appId of list) {
+      const partition = 'persist:amatime-' + (['teams', 'copilot', 'outlook', 'sharepoint', 'powerautomate', 'forms'].includes(appId) ? 'microsoft' : appId);
+      result[appId] = (await session.fromPartition(partition).cookies.get({ name: 'sid_' + appId })).some(cookie => cookie.value === 'logged-in' && !cookie.session);
+    }
+    return result;
+  }, ids);
+  expect(survived).toEqual(Object.fromEntries(ids.map(appId => [appId, true])));
+  expect(Object.values(partitions).every(Boolean)).toBe(true);
 });
