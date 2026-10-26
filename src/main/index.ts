@@ -340,6 +340,10 @@ async function createWindow() {
         case 'split-close': manager.closeSplit(); break;
         case 'split-to-tab': manager.splitToTab(); break;
         case 'split-capture': return manager.capture();
+        case 'freeze-views': {
+          if (args.length) throw new Error('Acción inválida');
+          return manager.freeze();
+        }
         case 'split-drag': {
           if (typeof args[0] !== 'boolean') throw new Error('Estado inválido');
           manager.setDragging(args[0]);

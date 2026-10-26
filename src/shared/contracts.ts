@@ -48,6 +48,8 @@ export const DEFAULT_SPLIT_SERVICE: AppId = 'librechat';
 export interface SplitState { serviceId: AppId; ratio: number }
 /** Capturas (data URL) de ambas vistas para pintarlas mientras se arrastra el divisor. */
 export interface SplitCapture { main: string | null; panel: string | null }
+/** Captura de una vista nativa visible y dónde está (coordenadas del contenido de la ventana = CSS del shell). */
+export interface FrozenView { image: string; bounds: { x: number; y: number; width: number; height: number } }
 export interface Preferences { theme: Theme; remember: Record<AppId, boolean>; pinned: AppId[]; desktopApps: DesktopApp[]; customApps: CustomApp[]; splitRatio: number; splitService: AppId }
 export type PublicPreferences = Omit<Preferences, 'desktopApps'>;
 export interface UpdateState {
@@ -118,6 +120,8 @@ export interface PortalApi {
   splitClose(): Promise<void>;
   splitToTab(): Promise<void>;
   splitCapture(): Promise<SplitCapture>;
+  /** Capturas de las vistas visibles, para dejarlas a la vista mientras un menú las oculta. */
+  freezeViews(): Promise<FrozenView[]>;
   /** Devuelve el id de la página creada. */
   customAdd(input: { name: string; url: string; pin: boolean }): Promise<string>;
   customEdit(id: AppId, input: { name: string; url: string }): Promise<void>;

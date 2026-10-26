@@ -1434,3 +1434,20 @@ test('con "recordar sesión" las cookies de sesión de TODAS las apps (login sin
   expect(survived).toEqual(Object.fromEntries(ids.map(appId => [appId, true])));
   expect(Object.values(partitions).every(Boolean)).toBe(true);
 });
+
+test('al abrir el menú contextual la app de atrás sigue viéndose (captura congelada en su sitio) y vuelve al cerrarlo', async () => {
+  const before = (await visibleViews()).map(view => view.bounds);
+  expect(before).toHaveLength(1);
+  const menu = await rightClick('n8n Automations');
+  await expect.poll(async () => (await visibleViews()).length).toBe(0);
+  const frozen = page.locator('.frozen-views img');
+  await expect(frozen).toHaveCount(1);
+  await expect(frozen).toHaveAttribute('src', /^data:image\/jpeg;base64,/);
+  const box = (await frozen.boundingBox())!;
+  for (const key of ['x', 'y', 'width', 'height'] as const) expect(Math.abs(box[key] - before[0][key]), key).toBeLessThanOrEqual(1);
+  // El menú queda por encima de la captura.
+  await expect(menu).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect.poll(async () => (await visibleViews()).length).toBe(1);
+  await expect(frozen).toHaveCount(0);
+});

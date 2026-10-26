@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type CSSProperties } from 'react';
 import { IconSettings, IconHelpHexagon, IconMoon, IconSun, IconRefresh, IconShieldCheck, IconAlertTriangle, IconChevronLeft, IconTrash, IconActivity, IconPlus, IconMinus, IconX, IconLayoutGrid, IconLayoutSidebarRight } from '@tabler/icons-react';
-import { CATEGORIES, FIXED_APPS, MINE_CATEGORY, type AppId, type Snapshot } from '../shared/contracts';
+import { CATEGORIES, FIXED_APPS, MINE_CATEGORY, type AppId, type FrozenView, type Snapshot } from '../shared/contracts';
 import { movePinned, stepPinned } from '../shared/pin-order';
 import { SHELL_LAYOUT } from '../shared/layout';
 import { PAGE_ZOOM } from '../shared/zoom';
@@ -26,6 +26,9 @@ export function App() {
   const [menu, setMenu] = useState<{ id: AppId; anchor: MenuAnchor } | null>(null);
   // "Editar…" desde el menú abre el launcher con el formulario de esa página; cada petición es un objeto nuevo.
   const [editRequest, setEditRequest] = useState<{ id: AppId } | null>(null);
+  // Capturas de las vistas nativas mientras un menú o diálogo DOM las oculta: la app de atrás sigue viéndose.
+  const [frozen, setFrozen] = useState<FrozenView[] | null>(null);
+  const hold = useRef(0);
   // Arrastre de una app fijada dentro de su grupo de la sidebar.
   const [drag, setDrag] = useState<{ id: AppId; group: string } | null>(null);
   const [drop, setDrop] = useState<{ id: AppId; place: 'before' | 'after' } | null>(null);
@@ -44,8 +47,8 @@ export function App() {
   useTooltips(!!menu || picker || (!!state && state.panel !== 'service'));
   useEffect(() => { if (state) document.documentElement.dataset.theme = state.preferences.theme; }, [state?.preferences.theme]);
   // Sin red las vistas ya están ocultas y los botones deshabilitados: el menú no debe quedar flotando.
-  useEffect(() => { if (menu && state && state.network.status !== 'connected') { setMenu(null); void window.portal.overlay(false).catch(() => undefined); } }, [menu, state?.network.status]);
-  useEffect(() => { if (picker && state && state.network.status !== 'connected') { setPicker(false); void window.portal.overlay(false).catch(() => undefined); } }, [picker, state?.network.status]);
+  useEffect(() => { if (menu && state && state.network.status !== 'connected') { setMenu(null); showViews(); } }, [menu, state?.network.status]);
+  useEffect(() => { if (picker && state && state.network.status !== 'connected') { setPicker(false); showViews(); } }, [picker, state?.network.status]);
   useEffect(() => { if (state?.activeTabId) document.getElementById(`tab-${state.activeTabId}`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }, [state?.activeTabId]);
 
   async function action(task: () => Promise<void>, success = '') {
@@ -73,25 +76,40 @@ export function App() {
   const panel = (value: Snapshot['panel']) => void action(() => window.portal.panel(value));
   const toggleTheme = () => void action(() => window.portal.theme(light ? 'dark' : 'light'));
 
-  // Las vistas nativas pintan por encima del DOM: mientras el menú está abierto el proceso principal las oculta.
+  // Las vistas nativas pintan por encima del DOM: mientras un menú o diálogo está abierto el proceso principal las oculta.
+  // Antes se captura lo que muestran y se deja congelado en su sitio, para que la app de atrás no desaparezca.
+  function hideViews() {
+    const ticket = ++hold.current;
+    void (async () => {
+      const shots = await window.portal.freezeViews().catch((): FrozenView[] => []);
+      if (ticket !== hold.current) return;
+      setFrozen(shots);
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      if (ticket === hold.current) await window.portal.overlay(true).catch(() => undefined);
+    })();
+  }
+  function showViews() {
+    ++hold.current; // un hideViews en curso ya no oculta nada
+    void window.portal.overlay(false).catch(() => undefined).finally(() => setFrozen(null));
+  }
   function openMenu(id: AppId, source: HTMLElement) {
     trigger.current = source;
     setMenu({ id, anchor: anchorOf(source) });
-    void window.portal.overlay(true).catch(() => undefined);
+    hideViews();
   }
   function closeMenu(restoreFocus: boolean) {
     setMenu(null);
-    void window.portal.overlay(false).catch(() => undefined);
+    showViews();
     if (restoreFocus) trigger.current?.focus();
   }
   // Selector de apps instaladas: mismo mecanismo que el menú, las vistas nativas se ocultan mientras está abierto.
   function openPicker() {
     setPicker(true);
-    void window.portal.overlay(true).catch(() => undefined);
+    hideViews();
   }
   function closePicker() {
     setPicker(false);
-    void window.portal.overlay(false).catch(() => undefined);
+    showViews();
     document.querySelector<HTMLElement>('.dock-add')?.focus();
   }
   function runMenu(choice: MenuAction) {
@@ -239,7 +257,7 @@ export function App() {
     {!blocked && state.panel === 'service' && state.split && <SplitView services={state.services} split={state.split} width={size.width} height={size.height} onSet={id => void action(() => window.portal.splitSet(id))} onToTab={() => void action(() => window.portal.splitToTab())} onClose={() => void action(() => window.portal.splitClose())} onResize={(ratio, persist) => window.portal.splitResize(ratio, persist)} onCapture={() => window.portal.splitCapture()} onDrag={active => window.portal.splitDrag(active)} />}
 
     <StatusBar network={state.network.status} version={state.updates.currentVersion} />
-  </div>{picker && <DesktopPicker onClose={closePicker} onLink={id => { closePicker(); void action(() => window.portal.desktopLink(id)); }} onBrowse={() => { closePicker(); void action(() => window.portal.addDesktopApp()); }} />}{menu && state.services.some(item => item.id === menu.id) && <AppContextMenu service={state.services.find(item => item.id === menu.id)!} pinned={state.preferences.pinned.includes(menu.id)} anchor={menu.anchor} onAction={runMenu} onClose={closeMenu} />}{state.splash !== 'done' && <Splash key="splash" state={state} />}</>;
+  </div>{picker && <DesktopPicker onClose={closePicker} onLink={id => { closePicker(); void action(() => window.portal.desktopLink(id)); }} onBrowse={() => { closePicker(); void action(() => window.portal.addDesktopApp()); }} />}{menu && state.services.some(item => item.id === menu.id) && <AppContextMenu service={state.services.find(item => item.id === menu.id)!} pinned={state.preferences.pinned.includes(menu.id)} anchor={menu.anchor} onAction={runMenu} onClose={closeMenu} />}{frozen && frozen.length > 0 && <div className="frozen-views" aria-hidden="true">{frozen.map((shot, index) => <img key={index} src={shot.image} alt="" draggable={false} style={{ left: shot.bounds.x, top: shot.bounds.y, width: shot.bounds.width, height: shot.bounds.height }} />)}</div>}{state.splash !== 'done' && <Splash key="splash" state={state} />}</>;
 }
 
 

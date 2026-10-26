@@ -212,6 +212,9 @@ input[type=checkbox] { accent-color:var(--accent); width:1rem; height:1rem; }
 .icon-button.toggled { color:var(--accent); background:#1da7741a; }
 /* Panel lateral: el DOM solo dibuja divisor, cabecera y capturas; la página es una vista nativa en el hueco .split-slot. */
 .split-layer { position:fixed; inset:0; pointer-events:none; z-index:2; }
+/* Vistas nativas congeladas mientras un menú o diálogo DOM las oculta (por encima del contenido, por debajo de menús y diálogos). */
+.frozen-views { position:fixed; inset:0; pointer-events:none; z-index:2; }
+.frozen-views img { position:absolute; display:block; object-fit:fill; user-select:none; }
 .split-layer > * { position:fixed; pointer-events:auto; }
 .split-slot { pointer-events:none; background:var(--bg); }
 .split-header { display:flex; align-items:center; gap:.4rem; padding:0 .45rem 0 .65rem; background:var(--surface); border-bottom:1px solid var(--line); min-width:0; }

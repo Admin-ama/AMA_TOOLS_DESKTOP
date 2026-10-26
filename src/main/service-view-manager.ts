@@ -1,5 +1,5 @@
 import { WebContentsView, app, session, type BrowserWindow } from 'electron';
-import { type ApplicationTab, type Service, type AppId, type ServiceState, type Snapshot, type Preferences, type SplitCapture } from '../shared/contracts';
+import { type ApplicationTab, type Service, type AppId, type ServiceState, type Snapshot, type Preferences, type SplitCapture, type FrozenView } from '../shared/contracts';
 import { permissionAllowed, sanitizeUserAgent } from './permissions';
 import { allowedNavigation, allowedDownload, isPdfUrl, sameServiceOrigin, contentBounds, splitBounds, partitionFor, remotePreferences, catalogOf, groupMembers, windowTarget } from './policy';
 import { ApplicationTabs } from './application-tabs';
@@ -193,6 +193,18 @@ export class ServiceViewManager {
     const current = this.panelEntry?.view.webContents.getURL();
     this.closeSplit();
     this.openTab(serviceId, current && allowedNavigation(current, service) ? current : undefined);
+  }
+
+  /** Lo que se ve ahora (vista activa y panel): el renderer lo muestra congelado mientras un menú DOM obliga a ocultarlas. */
+  async freeze(): Promise<FrozenView[]> {
+    const shown = [...this.views.values(), this.panelEntry].filter((entry): entry is Entry => !!entry && !entry.disposed && !entry.view.webContents.isDestroyed() && entry.view.getVisible());
+    const shots = await Promise.all(shown.map(async entry => {
+      try {
+        const image = await entry.view.webContents.capturePage();
+        return image.isEmpty() ? null : { image: 'data:image/jpeg;base64,' + image.toJPEG(75).toString('base64'), bounds: entry.view.getBounds() };
+      } catch { return null; }
+    }));
+    return shots.filter((shot): shot is FrozenView => !!shot);
   }
 
   async capture(): Promise<SplitCapture> {

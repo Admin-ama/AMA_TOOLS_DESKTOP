@@ -36,6 +36,7 @@ const api: PortalApi = {
   splitClose: () => command('split-close'),
   splitToTab: () => command('split-to-tab'),
   splitCapture: () => command('split-capture'),
+  freezeViews: () => command('freeze-views'),
   splitDrag: active => command('split-drag', active),
   customAdd: input => command('custom-add', input),
   customEdit: (id, input) => command('custom-edit', id, input),
