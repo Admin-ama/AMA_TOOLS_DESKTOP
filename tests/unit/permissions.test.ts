@@ -6,6 +6,7 @@ const svc = (id: string) => SERVICES.find(s => s.id === id)!;
 const teams = svc('teams');
 const origins = ['https://teams.microsoft.com/v2/', 'https://teams.cloud.microsoft/', 'https://eu.teams.microsoft.com/', 'https://outlook.office.com/mail/', 'https://m365.cloud.microsoft/', 'https://amatime.sharepoint.com/', 'https://forms.office.com/'];
 const TEAMS = ['clipboard-sanitized-write', 'fullscreen', 'media', 'notifications'];
+const INTERNAL = ['huly', 'n8n', 'librechat', 'stirling'];
 
 describe('permisos del dispositivo', () => {
   it('cada app del grupo recibe solo lo suyo', () => {
@@ -33,11 +34,31 @@ describe('permisos del dispositivo', () => {
       expect(permissionAllowed(svc('outlook'), 'notifications', origin as string), String(origin)).toBe(false);
     }
   });
-  it('las apps fuera del grupo y las páginas propias lo deniegan todo', () => {
+  it('las apps externas fuera del grupo y las páginas propias lo deniegan todo', () => {
     const wiki = customService({ id: 'custom-0a1b2c3d-aaaa', name: 'Wiki', url: 'https://wiki.com/' });
-    for (const service of [...SERVICES.filter(s => !s.group), wiki, undefined]) {
+    for (const service of [...SERVICES.filter(s => !s.group && !INTERNAL.includes(s.id)), wiki, undefined]) {
       for (const permission of TEAMS) expect(permissionAllowed(service, permission, origins[0])).toBe(false);
       expect(permissionsFor(service).size).toBe(0);
+    }
+  });
+});
+
+describe('apps del catálogo en la red interna (172.16.8.x)', () => {
+  it('pueden copiar al portapapeles desde su propio origen', () => {
+    for (const id of INTERNAL) {
+      expect([...permissionsFor(svc(id))], id).toEqual(['clipboard-sanitized-write']);
+      expect(permissionAllowed(svc(id), 'clipboard-sanitized-write', svc(id).url + 'c/agentes'), id).toBe(true);
+    }
+  });
+  it('una página propia alojada en la red interna también puede copiar desde su origen', () => {
+    const lan = customService({ id: 'custom-0a1b2c3d-bbbb', name: 'Interna', url: 'https://172.16.8.20/' });
+    expect(permissionAllowed(lan, 'clipboard-sanitized-write', 'https://172.16.8.20/x')).toBe(true);
+    expect(permissionAllowed(lan, 'clipboard-sanitized-write', 'https://172.16.8.21/x')).toBe(false);
+  });
+  it('desde otro origen o pidiendo otra cosa, nada', () => {
+    for (const id of INTERNAL) {
+      for (const origin of ['https://evil.com/', 'http://172.16.8.74:5678/', 'https://172.16.8.73:9999/', undefined]) expect(permissionAllowed(svc(id), 'clipboard-sanitized-write', origin as string), id + origin).toBe(false);
+      for (const permission of ['clipboard-read', 'media', 'notifications', 'geolocation']) expect(permissionAllowed(svc(id), permission, svc(id).url), id + permission).toBe(false);
     }
   });
 });

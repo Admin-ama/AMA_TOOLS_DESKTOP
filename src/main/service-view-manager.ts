@@ -302,7 +302,7 @@ export class ServiceViewManager {
     this.resize();
     const web = view.webContents;
     web.on('certificate-error', (event, destination, error, _certificate, callback) => {
-      if (!entry.disposed && allowInternalCertificate(service.id, destination, error)) {
+      if (!entry.disposed && allowInternalCertificate(destination, error)) {
         event.preventDefault();
         callback(true);
       } else callback(false);

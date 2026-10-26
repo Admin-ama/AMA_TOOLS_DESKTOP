@@ -28,12 +28,16 @@ import { DesktopApps } from './desktop-apps';
 import { InstalledApps, enumerateInstalled, systemScanDeps, START_APPS_SCRIPT, START_APPS_TIMEOUT_MS, type InstalledEntry } from './installed-apps';
 import { commandAllowedWhileBlocked, BLOCKED_MESSAGE } from './network-gate';
 import { SPLASH, splashReady } from './splash';
+import { insecureInternalOrigins } from './certificate-policy';
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 const taskbarDetails = windowsAppDetails(app.isPackaged, process.execPath, app.getAppPath(), process.resourcesPath, path.join(__dirname, '../assets/amatime.ico'));
 if (process.platform === 'win32') app.setAppUserModelId(taskbarDetails.appId!);
 const testing = !app.isPackaged && process.env.AMA_E2E === '1';
 if (testing && process.env.AMA_TEST_USER_DATA) app.setPath('userData', process.env.AMA_TEST_USER_DATA);
+// Huly, n8n y Stirling son http en la red interna: sin esto no hay contexto seguro y navigator.clipboard no existe.
+const internalHttp = insecureInternalOrigins(SERVICES);
+if (internalHttp.length) app.commandLine.appendSwitch('unsafely-treat-insecure-origin-as-secure', internalHttp.join(','));
 
 async function createWindow() {
   const preferencesFile = path.join(app.getPath('userData'), 'preferences.json');
