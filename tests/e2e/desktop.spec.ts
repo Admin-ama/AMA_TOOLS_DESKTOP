@@ -1376,3 +1376,24 @@ test('las apps fijadas configurables se reordenan arrastrando o con Alt+flechas 
   const rejects = await page.evaluate(async () => (window.portal.reorderPinned as (ids: unknown) => Promise<void>)(['huly']).then(() => false, () => true));
   expect(rejects).toBe(true);
 });
+
+test('descargas generadas por la página (blob: y data:) se permiten; las de otro origen no', async () => {
+  await waitForPage();
+  const id = await app.evaluate(({ webContents }) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/librechat'))!.id);
+  // Escucha después de la política de la app: registra si la bloqueó y guarda en temp para no abrir el diálogo nativo.
+  await app.evaluate(({ webContents }, [wid, dir]) => {
+    const record: { url: string; blocked: boolean }[] = (globalThis as any).downloads = [];
+    webContents.fromId(wid as number)!.session.on('will-download', (event, item) => {
+      record.push({ url: item.getURL().slice(0, 5), blocked: event.defaultPrevented });
+      if (!event.defaultPrevented) item.setSavePath(`${dir}\\${Date.now()}-${item.getFilename()}`);
+    });
+  }, [id, tmpdir()] as const);
+  const click = (href: string) => app.evaluate(({ webContents }, [wid, h]) => webContents.fromId(wid as number)!.executeJavaScript(`(() => { const a = document.createElement('a'); a.href = ${JSON.stringify(h)} === 'blob' ? URL.createObjectURL(new Blob(['{}'], { type: 'application/json' })) : ${JSON.stringify(h)}; a.download = 'export.json'; document.body.append(a); a.click(); })()`, true), [id, href] as const);
+  await click('blob');
+  await expect.poll(() => app.evaluate(() => (globalThis as any).downloads.length)).toBe(1);
+  await click('data:application/json;base64,e30=');
+  await expect.poll(() => app.evaluate(() => (globalThis as any).downloads.length)).toBe(2);
+  // Otro origen: la página navega/descarga desde fuera; la política la bloquea.
+  await app.evaluate(({ webContents }, wid) => webContents.fromId(wid)!.downloadURL('https://evil.example/x.json'), id);
+  await expect.poll(() => app.evaluate(() => (globalThis as any).downloads)).toEqual([{ url: 'blob:', blocked: false }, { url: 'data:', blocked: false }, { url: 'https', blocked: true }]);
+});

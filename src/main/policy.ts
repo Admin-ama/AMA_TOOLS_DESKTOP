@@ -1,4 +1,5 @@
 import { type AppAdmin, type AppId, type CustomApp, type Service } from '../shared/contracts';
+import { isInternalHost } from './certificate-policy';
 
 /** Navegación del grupo Microsoft (login, Teams, Office, SharePoint del tenant, Power Platform, Forms): una lista para todas las apps del grupo. */
 const MICROSOFT_HOSTS: readonly string[] = ['login.microsoftonline.com', 'login.live.com', 'outlook.office365.com', 'amatime.sharepoint.com', 'amatime-my.sharepoint.com'];
@@ -63,9 +64,21 @@ export function allowedNavigation(destination: string, service: Service): boolea
     return (service.authOrigins ?? []).includes(url.origin);
   } catch { return false; }
 }
-// Descargas: archivos del propio origen del servicio o, en el grupo Microsoft, de destinos permitidos del grupo (SharePoint, adjuntos).
+const internalWeb = (value: string) => {
+  try {
+    const url = new URL(value);
+    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password && isInternalHost(url.hostname);
+  } catch { return false; }
+};
+/**
+ * Descargas: archivos del propio origen del servicio o, en el grupo Microsoft, de destinos permitidos del grupo (SharePoint, adjuntos).
+ * También lo que genera la propia página (blob: de su origen, data:) y, si la app es de la red interna, cualquier servidor 172.16.8.x.
+ */
 export function allowedDownload(destination: string, service: Service): boolean {
-  return sameServiceOrigin(destination, service) || groupAllows(destination, service.group);
+  if (sameServiceOrigin(destination, service) || groupAllows(destination, service.group)) return true;
+  if (destination.startsWith('data:')) return true;
+  if (destination.startsWith('blob:')) { try { return new URL(destination).origin === new URL(service.url).origin; } catch { return false; } }
+  return internalWeb(service.url) && internalWeb(destination);
 }
 /** Apps que comparten sesión con el id (incluida ella); sin grupo, solo ella. */
 export function groupMembers(id: AppId, catalog: readonly Service[]): Service[] {

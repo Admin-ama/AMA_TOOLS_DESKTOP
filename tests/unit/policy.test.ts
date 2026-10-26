@@ -42,12 +42,26 @@ describe('registro y aislamiento', () => {
     }
     expect(allowedNavigation('https://login.microsoftonline.com/', SERVICES[0])).toBe(false);
   });
-  it('permite descargar solo archivos del mismo origen del servicio', () => {
+  it('permite descargar archivos del mismo origen del servicio', () => {
     const chat = SERVICES.find(s => s.id === 'librechat')!;
     expect(allowedDownload('https://172.16.8.73/pdf-out/abc/PDFs_unidos.pdf', chat)).toBe(true);
-    for (const url of ['https://evil.test/a.pdf', 'http://172.16.8.73/a.pdf', 'file:///a.pdf', 'not a url']) {
-      expect(allowedDownload(url, chat)).toBe(false);
+    for (const url of ['https://evil.test/a.pdf', 'file:///a.pdf', 'not a url', 'javascript:alert(1)']) {
+      expect(allowedDownload(url, chat), url).toBe(false);
     }
+  });
+  it('permite descargar lo que genera la propia página (blob del mismo origen y data:), p. ej. exportar en LibreChat o n8n', () => {
+    const chat = SERVICES.find(s => s.id === 'librechat')!, n8n = SERVICES.find(s => s.id === 'n8n')!, portal = SERVICES.find(s => s.id === 'portal')!;
+    expect(allowedDownload('blob:https://172.16.8.73/0f1e2d3c-aaaa-bbbb-cccc-000000000000', chat)).toBe(true);
+    expect(allowedDownload('blob:http://172.16.8.73:5678/0f1e2d3c', n8n)).toBe(true);
+    expect(allowedDownload('blob:https://app.amatime.com/0f1e2d3c', portal)).toBe(true);
+    expect(allowedDownload('data:application/json;base64,e30=', n8n)).toBe(true);
+    for (const url of ['blob:https://evil.test/0f1e', 'blob:null/0f1e', 'blob:not a url']) expect(allowedDownload(url, portal), url).toBe(false);
+  });
+  it('las apps de la red interna descargan de cualquier servidor 172.16.8.x; las externas no', () => {
+    const chat = SERVICES.find(s => s.id === 'librechat')!, portal = SERVICES.find(s => s.id === 'portal')!;
+    for (const url of ['http://172.16.8.73/a.pdf', 'https://172.16.8.20:8443/export.xlsx', 'http://172.16.8.5/files/x.zip']) expect(allowedDownload(url, chat), url).toBe(true);
+    for (const url of ['http://172.16.9.5/a.pdf', 'https://user:pw@172.16.8.20/a.pdf', 'https://172.16.8.73.evil.test/a.pdf']) expect(allowedDownload(url, chat), url).toBe(false);
+    expect(allowedDownload('https://172.16.8.20/a.pdf', portal)).toBe(false);
   });
   it('detecta enlaces a PDF para descargarlos en vez de abrir pestaña', () => {
     expect(isPdfUrl('https://172.16.8.73/pdf-out/abc/PDFs_unidos.pdf?x=1')).toBe(true);
