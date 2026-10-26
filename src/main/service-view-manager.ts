@@ -1,10 +1,11 @@
-import { WebContentsView, session, type BrowserWindow } from 'electron';
+import { WebContentsView, app, session, type BrowserWindow } from 'electron';
 import { type ApplicationTab, type Service, type AppId, type ServiceState, type Snapshot, type Preferences, type SplitCapture } from '../shared/contracts';
 import { permissionAllowed, sanitizeUserAgent } from './permissions';
 import { allowedNavigation, allowedDownload, isPdfUrl, sameServiceOrigin, contentBounds, splitBounds, partitionFor, remotePreferences, catalogOf, groupMembers, windowTarget } from './policy';
 import { ApplicationTabs } from './application-tabs';
 import { isZoomPercent, PAGE_ZOOM } from '../shared/zoom';
 import { allowInternalCertificate } from './certificate-policy';
+import { persistentCookie } from './session-cookies';
 
 interface Entry { view: WebContentsView; disposed: boolean; failed: boolean }
 /** Lo que cambia entre una pestaña y el panel lateral; el resto (guardas, sesión, descargas, certificados) es común. */
@@ -13,6 +14,15 @@ const securedSessions = new WeakSet<Electron.Session>();
 /** Las sesiones del grupo se comparten entre apps: permisos y descargas se resuelven por vista (webContents), no por sesión. */
 const viewServices = new WeakMap<Electron.WebContents, Service>();
 const sessionGroups = new WeakMap<Electron.Session, Service['group']>();
+/** Sesiones en disco ("recordar sesión"): al salir se fuerza el guardado de sus cookies, que Chromium escribe con retraso. */
+const storedSessions = new Set<Electron.Session>();
+let flushed = false;
+app.on('before-quit', event => {
+  if (flushed || storedSessions.size === 0) return;
+  event.preventDefault();
+  flushed = true;
+  void Promise.allSettled([...storedSessions].map(stored => stored.cookies.flushStore())).finally(() => app.quit());
+});
 
 export class ServiceViewManager {
   private views = new Map<string, Entry>();
@@ -323,6 +333,15 @@ export class ServiceViewManager {
         const owner = wc ? viewServices.get(wc) : undefined;
         if (!owner || !allowedDownload(item.getURL(), owner)) event.preventDefault();
       });
+      if (web.session.isPersistent()) {
+        // Las cookies de sesión (p. ej. el login de Buk) se borran al cerrar: se guardan con caducidad, como hace Chrome al restaurar la sesión.
+        const jar = web.session.cookies;
+        jar.on('changed', (_event, cookie, _cause, removed) => {
+          const details = removed ? null : persistentCookie(cookie, Date.now() / 1000);
+          if (details) void jar.set(details).catch(error => console.warn('No se pudo conservar una cookie de sesión:', cookie.name, String(error)));
+        });
+        storedSessions.add(web.session);
+      }
       sessionGroups.set(web.session, service.group);
       securedSessions.add(web.session);
     }

@@ -1397,3 +1397,17 @@ test('descargas generadas por la página (blob: y data:) se permiten; las de otr
   await app.evaluate(({ webContents }, wid) => webContents.fromId(wid)!.downloadURL('https://evil.example/x.json'), id);
   await expect.poll(() => app.evaluate(() => (globalThis as any).downloads)).toEqual([{ url: 'blob:', blocked: false }, { url: 'data:', blocked: false }, { url: 'https', blocked: true }]);
 });
+
+test('con "recordar sesión" las cookies de sesión (login sin "recordarme", como Buk) sobreviven al reiniciar la app', async () => {
+  await page.getByRole('button', { name: 'Abrir Buk', exact: true }).click();
+  await expect(page.getByTestId('buk-tab-1')).toHaveAttribute('aria-selected', 'true');
+  await waitForPage();
+  // La página fija una cookie de sesión (sin caducidad), como un login de Rails.
+  await app.evaluate(({ webContents }) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/buk'))!.executeJavaScript("document.cookie = 'sid=logged-in; path=/'"));
+  const env = await app.evaluate(() => ({ ...process.env }));
+  await app.close();
+  app = await electron.launch({ args: ['.'], env: env as Record<string, string> });
+  page = await app.firstWindow();
+  const cookies = await app.evaluate(async ({ session }) => (await session.fromPartition('persist:amatime-buk').cookies.get({ name: 'sid' })).map(c => ({ value: c.value, session: c.session })));
+  expect(cookies).toEqual([{ value: 'logged-in', session: false }]);
+});
