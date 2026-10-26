@@ -27,5 +27,11 @@ describe('nombre del producto', () => {
     expect(pkg.build.artifactName).toBe('Amatime-OS-Setup-${version}-${arch}.${ext}');
     expect(pkg.name).toBe('amatime-tools-desktop');
     expect(pkg.build.appId).toBe('com.amatime.tools.desktop');
+    // El release sube exactamente los archivos que genera artifactName (si no, gh release create falla).
+    const draft = readFileSync('.github/workflows/release.yml', 'utf8');
+    expect(draft).toContain('"release/Amatime-OS-Setup-${version}-x64.exe"');
+    expect(draft).toContain('"release/Amatime-OS-Setup-${version}-x64.exe.blockmap"');
+    expect(draft).toContain('--title "Amatime OS $GITHUB_REF_NAME"');
+    expect(draft).not.toMatch(/AMATIME[- ]Tools/);
   });
 });

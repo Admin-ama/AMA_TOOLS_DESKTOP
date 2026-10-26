@@ -35,9 +35,9 @@ jobs:
         run: |
           version="${GITHUB_REF_NAME#v}"
           gh release create "$GITHUB_REF_NAME" --draft --verify-tag \
-            --title "AMATIME Tools $GITHUB_REF_NAME" \
-            "release/AMATIME-Tools-Setup-${version}-x64.exe" \
-            "release/AMATIME-Tools-Setup-${version}-x64.exe.blockmap" \
+            --title "Amatime OS $GITHUB_REF_NAME" \
+            "release/Amatime-OS-Setup-${version}-x64.exe" \
+            "release/Amatime-OS-Setup-${version}-x64.exe.blockmap" \
             release/latest.yml
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
