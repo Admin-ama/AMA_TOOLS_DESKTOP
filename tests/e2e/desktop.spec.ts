@@ -65,16 +65,16 @@ test('[arranque] logo animado tapa la app hasta que el servicio de inicio carga'
   // Logo sobrio: sin círculo expansivo, chispas ni brillo neón.
   expect(await splash.locator('.splash-ring, .splash-spark, .splash-logo-glow').count()).toBe(0);
   // Mientras se ve el logo, ninguna vista nativa puede pintar encima.
-  expect(await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].contentView.children.some(view => (view as any).getVisible?.()))).toBe(false);
+  expect(await app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows().find(w => !w.getParentWindow())!.contentView.children.some(view => (view as any).getVisible?.()))).toBe(false);
   await page.screenshot({ path: testInfo.outputPath('splash.png') });
   await expect(splash).toHaveCount(0, { timeout: 15_000 });
   await expect.poll(() => page.evaluate(async () => (await window.portal.snapshot()).splash)).toBe('done');
-  await expect.poll(() => app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].contentView.children.some(view => (view as any).getVisible?.()))).toBe(true);
+  await expect.poll(() => app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows().find(w => !w.getParentWindow())!.contentView.children.some(view => (view as any).getVisible?.()))).toBe(true);
 });
 
 test('[updates] aviso nativo abajo a la derecha permite posponer sin descargar', async ({}, testInfo) => {
   await waitForPage();
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].focus());
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!.focus());
   const notice = await availableUpdate();
   await expect(notice.getByRole('button', { name: 'Descargar y actualizar' })).toBeVisible();
   const bounds = await app.evaluate(({ BrowserWindow, webContents }) => {
@@ -118,8 +118,8 @@ test('[updates] aviso sigue tamaño y minimización del padre y cerrar equivale 
 });
 
 test('[updates] aviso aparece al restaurar si la versión se encontró con la ventana minimizada', async () => {
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].minimize());
-  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isMinimized())).toBe(true);
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!.minimize());
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!.isMinimized())).toBe(true);
   await app.evaluate(({ app }) => app.emit('ama:test-update', 'update-available', { version: '0.3.0' }));
   await expect.poll(() => app.windows().some(w => w.url().endsWith('#update-notice'))).toBe(true);
   await new Promise(resolve => setTimeout(resolve, 1500));
@@ -161,7 +161,7 @@ test('zoom del header ajusta la aplicación sin ampliar el shell y permite resta
   await expect(page.getByRole('button', { name: 'Restablecer zoom' })).toHaveText('110%');
   const zooms = await app.evaluate(({ webContents, BrowserWindow }) => ({
     remote: webContents.getAllWebContents().find(w => w.getURL().endsWith('/huly'))!.getZoomFactor(),
-    shell: BrowserWindow.getAllWindows()[0].webContents.getZoomFactor(),
+    shell: BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!.webContents.getZoomFactor(),
   }));
   expect(zooms).toEqual({ remote: 1.1, shell: 1 });
   await page.getByRole('button', { name: 'Abrir nueva pestaña de Huly' }).click();
@@ -219,7 +219,7 @@ test('launcher agrupa por categorías, fija y desfija apps y abre apps no fijada
   await expect(launcher.getByRole('button', { name: 'Fijar Microsoft Teams en la barra lateral' })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Servicios' }).getByRole('button', { name: 'Abrir Microsoft Teams' })).toHaveCount(0);
   // Las vistas nativas no pueden pintar sobre el launcher.
-  const visibility = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children.map(v => v.getVisible()));
+  const visibility = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!.contentView.children.map(v => v.getVisible()));
   expect(visibility.every(v => !v)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('launcher.png') });
   // Buscar filtra.
@@ -283,9 +283,9 @@ test('navegación compacta alinea shell y vista nativa', async () => {
   await expect.poll(() => page.getByRole('banner').evaluate(el => el.getBoundingClientRect().height)).toBe(52);
   await expect.poll(() => page.getByRole('contentinfo').evaluate(el => el.getBoundingClientRect().height)).toBe(28);
   const content = await page.getByRole('tabpanel').boundingBox();
-  const view = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children.find(v => v.getVisible())!.getBounds());
+  const view = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!.contentView.children.find(v => v.getVisible())!.getBounds());
   expect(view).toEqual(content);
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(900, 600));
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!.setContentSize(900, 600));
   await expect(page.getByRole('button', { name: 'Abrir nueva pestaña de Huly' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Recargar servicio' })).toBeVisible();
 });
@@ -340,7 +340,7 @@ test('apps de escritorio: selector de apps instaladas vincula por id, oculta vis
   await writeFile(path.join(directory, 'installed.json'), JSON.stringify([{ name: 'Fake Installed', kind: 'path', path: exe }, { name: 'Other App', kind: 'path', path: other }, { name: 'Calculadora Falsa', kind: 'aumid', aumid }]));
   // Nada se lanza de verdad: ni shell.openPath ni explorer.
   await app.evaluate(({ shell }) => { shell.openPath = (async () => '') as never; });
-  const nativeVisible = () => app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows()[0].contentView.children.some(view => (view as any).getVisible?.()));
+  const nativeVisible = () => app.evaluate(({ BaseWindow }) => BaseWindow.getAllWindows().find(w => !w.getParentWindow())!.contentView.children.some(view => (view as any).getVisible?.()));
   const dock = page.getByRole('complementary', { name: 'Aplicaciones de escritorio' });
   const dialog = page.getByRole('dialog', { name: 'Vincular aplicación de escritorio' });
   const preferencesFile = path.join(directory, 'data', 'preferences.json');
@@ -396,10 +396,10 @@ test('barra de estado inferior muestra red, versión y reloj alineada con la vis
   await expect(bar.getByText(/^v\d+\.\d+\.\d+$/)).toBeVisible();
   await expect(bar.getByRole('timer')).toHaveText(/^\d{2}:\d{2}$/);
   const box = await bar.boundingBox();
-  const size = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getContentSize());
+  const size = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!.getContentSize());
   expect(box).toMatchObject({ x: 0, height: 28, width: size[0] });
   expect(box!.y + box!.height).toBe(size[1]);
-  const view = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children.find(v => v.getVisible())!.getBounds());
+  const view = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!.contentView.children.find(v => v.getVisible())!.getBounds());
   expect(view.y + view.height).toBe(box!.y);
   await page.screenshot({ path: testInfo.outputPath('shell-dark.png') });
   await page.getByRole('button', { name: 'Cambiar a tema claro' }).click();
@@ -410,9 +410,9 @@ test('barra de estado inferior muestra red, versión y reloj alineada con la vis
 test('ojos del bot siguen el cursor aunque esté sobre la vista remota', async () => {
   const eyes = page.getByRole('button', { name: 'Abrir LibreChat AI', exact: true }).locator('.bot-eyes');
   // El cursor real no llega al shell sobre la vista remota; main reenvía la posición global.
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('portal:cursor', { x: 1200, y: 120 }));
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!.webContents.send('portal:cursor', { x: 1200, y: 120 }));
   await expect.poll(() => eyes.evaluate(el => (el as SVGGElement).style.transform)).toMatch(/^translate\(\d+(\.\d+)?px, /);
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('portal:cursor', { x: 0, y: 120 }));
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!.webContents.send('portal:cursor', { x: 0, y: 120 }));
   await expect.poll(() => eyes.evaluate(el => (el as SVGGElement).style.transform)).toMatch(/^translate\(-\d+(\.\d+)?px, /);
 });
 
@@ -466,7 +466,7 @@ test('layout y pestañas sin formulario de login propio', async () => {
   await switchApplication('n8n Automations', 'n8n 1');
   await expect(page.getByTestId('n8n-tab-1')).toHaveAttribute('aria-selected', 'true');
   await waitForPage();
-  const views = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children.map(v => ({ visible: v.getVisible(), bounds: v.getBounds() })));
+  const views = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!.contentView.children.map(v => ({ visible: v.getVisible(), bounds: v.getBounds() })));
   expect(views).toHaveLength(3); // LibreChat de inicio + Huly + n8n. BrowserWindow no enumera el shell entre estas vistas hijas.
   expect(views.filter(v => v.visible)).toHaveLength(1);
   expect(views[views.length - 1].bounds.x).toBe(64);
@@ -477,7 +477,7 @@ test('ajustes oculta vista remota y cambia tema sin perder sesión', async () =>
   await waitForPage();
   await page.getByRole('button', { name: 'Ajustes', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Preferencias del portal' })).toBeVisible();
-  const visibility = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children.map(v => v.getVisible()));
+  const visibility = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!.contentView.children.map(v => v.getVisible()));
   expect(visibility).toHaveLength(2);
   expect(visibility.every(v => !v)).toBe(true);
   await page.getByRole('button', { name: 'Cambiar a tema claro' }).click();
@@ -535,8 +535,8 @@ test('cambiar pestañas preserva contexto y ajusta límites al redimensionar', a
   await waitForPage();
   const value = await app.evaluate(async ({ webContents }) => webContents.getAllWebContents().find(w => w.getURL().includes('/huly'))!.executeJavaScript("document.querySelector('input').value"));
   expect(value).toBe('contexto preservado');
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1000, 700));
-  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children[0].getBounds())).toEqual({ x: 64, y: 52, width: 880, height: 620 });
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!.setContentSize(1000, 700));
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!.contentView.children[0].getBounds())).toEqual({ x: 64, y: 52, width: 880, height: 620 });
 });
 
 test('sin red interna bloquea los servicios, rechaza comandos y se recupera al reintentar', async ({}, testInfo) => {
@@ -551,7 +551,7 @@ test('sin red interna bloquea los servicios, rechaza comandos y se recupera al r
   await expect(block.getByRole('button', { name: 'Reintentar' })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('network-block.png') });
   // Las vistas nativas no pueden pintar sobre la pantalla de bloqueo.
-  const visible = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children.map(v => v.getVisible()));
+  const visible = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!.contentView.children.map(v => v.getVisible()));
   expect(visible.length).toBeGreaterThan(0);
   expect(visible.every(v => !v)).toBe(true);
   // El proceso principal rechaza cargar o crear servicios aunque la UI no lo ofrezca.
@@ -572,7 +572,7 @@ test('sin red interna bloquea los servicios, rechaza comandos y se recupera al r
   await block.getByRole('button', { name: 'Reintentar' }).click();
   await expect(block).toHaveCount(0);
   await waitForPage();
-  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children.filter(v => v.getVisible()).length)).toBe(1);
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!.contentView.children.filter(v => v.getVisible()).length)).toBe(1);
   await page.getByRole('button', { name: 'Abrir n8n Automations', exact: true }).click();
   await expect(page.getByTestId('n8n-tab-1')).toHaveAttribute('aria-selected', 'true');
 });
@@ -617,7 +617,7 @@ test('carga directa sin tarjetas, formularios ni gates intermedios', async () =>
   await expect(page.getByRole('textbox')).toHaveCount(0);
   // La ventana se ajusta al área de trabajo del runner; se compara con su tamaño real.
   const { visible, size } = await app.evaluate(({ BrowserWindow }) => {
-    const window = BrowserWindow.getAllWindows()[0];
+    const window = BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!;
     return { visible: window.contentView.children.filter(view => view.getVisible()).map(view => view.getBounds()), size: window.getContentSize() };
   });
   expect(visible).toEqual([{ x: 64, y: 52, width: size[0] - 64 - 56, height: size[1] - 52 - 28 }]);
@@ -682,7 +682,7 @@ test('cerrar la última pestaña crea reemplazo y libera la vista anterior', asy
   await expect(page.getByRole('tab')).toHaveCount(1);
   await expect(page.getByTestId('huly-tab-2')).toHaveAttribute('aria-selected', 'true');
   await waitForPage();
-  const count = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children.length);
+  const count = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!.contentView.children.length);
   expect(count).toBe(2); // Huly reemplazo + LibreChat de inicio
 });
 
@@ -697,7 +697,7 @@ test('borrar sesión cierra todas las vistas de esa aplicación sin afectar otra
   await page.getByRole('button', { name: 'Borrar sesión de Huly Workspace' }).click();
   await expect(page.getByText('Sesión local eliminada: Huly Workspace')).toBeVisible();
   // Las vistas se cierran tras limpiar el almacenamiento: en máquinas lentas (CI) llega después del aviso.
-  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children.length)).toBe(2); // n8n + LibreChat de inicio
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!.contentView.children.length)).toBe(2); // n8n + LibreChat de inicio
   await page.getByRole('button', { name: 'Abrir Huly Workspace' }).click();
   await expect(page.getByRole('tab')).toHaveCount(2);
   await expect(page.getByTestId('huly-tab-2')).toHaveAttribute('aria-selected', 'true');
@@ -705,7 +705,7 @@ test('borrar sesión cierra todas las vistas de esa aplicación sin afectar otra
 });
 
 // --- Vista dividida -------------------------------------------------------------------------
-const nativeViews = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children.map(v => ({ url: (v as any).webContents?.getURL() as string, visible: v.getVisible(), bounds: v.getBounds() })));
+const nativeViews = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!.contentView.children.map(v => ({ url: (v as any).webContents?.getURL() as string, visible: v.getVisible(), bounds: v.getBounds() })));
 const visibleViews = async () => (await nativeViews()).filter(v => v.visible);
 const visibleApps = async () => (await visibleViews()).map(v => v.url.split('/').pop()).sort();
 const splitState = () => page.evaluate(async () => { const s = await window.portal.snapshot(); return { split: s.split, preferences: s.preferences, panel: s.panel, active: s.active }; });
