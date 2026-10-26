@@ -696,8 +696,8 @@ test('borrar sesión cierra todas las vistas de esa aplicación sin afectar otra
   await page.getByRole('button', { name: 'Ajustes', exact: true }).click();
   await page.getByRole('button', { name: 'Borrar sesión de Huly Workspace' }).click();
   await expect(page.getByText('Sesión local eliminada: Huly Workspace')).toBeVisible();
-  const count = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children.length);
-  expect(count).toBe(2); // n8n + LibreChat de inicio
+  // Las vistas se cierran tras limpiar el almacenamiento: en máquinas lentas (CI) llega después del aviso.
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children.length)).toBe(2); // n8n + LibreChat de inicio
   await page.getByRole('button', { name: 'Abrir Huly Workspace' }).click();
   await expect(page.getByRole('tab')).toHaveCount(2);
   await expect(page.getByTestId('huly-tab-2')).toHaveAttribute('aria-selected', 'true');
@@ -713,6 +713,8 @@ async function openSplit() {
   await page.getByRole('button', { name: 'Abrir panel lateral', exact: true }).click();
   await expect.poll(async () => (await splitState()).split?.serviceId).toBe('librechat');
   await expect.poll(async () => (await visibleViews()).length).toBe(2);
+  // La vista nativa llega al hueco del DOM tras un viaje IPC: esperar a que estén alineados.
+  await expect.poll(async () => { const { panel, main } = await layoutNow(); return !!panel && !!main; }).toBe(true);
 }
 async function layoutNow() {
   const slot = (await page.getByTestId('split-panel-slot').boundingBox())!;
@@ -757,7 +759,7 @@ test('flechas sobre el separador redimensionan ambas vistas y persisten el ratio
   const ratioBefore = (await splitState()).split!.ratio;
   await page.getByRole('separator').focus();
   await page.keyboard.press('ArrowLeft');
-  await expect.poll(async () => (await layoutNow()).panel.bounds.width).toBeGreaterThan(before.panel.bounds.width);
+  await expect.poll(async () => (await layoutNow()).panel?.bounds.width ?? 0).toBeGreaterThan(before.panel.bounds.width);
   const after = await layoutNow();
   expect(after.main.bounds.width).toBeLessThan(before.main.bounds.width);
   expect(after.main.bounds.width + 6 + after.panel.bounds.width).toBe(before.main.bounds.width + 6 + before.panel.bounds.width);
@@ -766,7 +768,7 @@ test('flechas sobre el separador redimensionan ambas vistas y persisten el ratio
   expect(state.preferences.splitRatio).toBeCloseTo(state.split!.ratio, 10);
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('ArrowRight');
-  await expect.poll(async () => (await layoutNow()).panel.bounds.width).toBeLessThan(before.panel.bounds.width);
+  await expect.poll(async () => (await layoutNow()).panel?.bounds.width ?? Infinity).toBeLessThan(before.panel.bounds.width);
   await page.getByRole('separator').dblclick();
   await expect.poll(async () => (await splitState()).split!.ratio).toBeCloseTo(0.5, 2);
 });
@@ -803,7 +805,7 @@ test('el divisor respeta 320 px por lado y un clic sin mover no oculta las vista
   await page.mouse.down();
   await page.mouse.move(x - 2000, y, { steps: 5 });
   await page.mouse.up();
-  await expect.poll(async () => (await layoutNow()).main.bounds.width).toBe(320);
+  await expect.poll(async () => (await layoutNow()).main?.bounds.width).toBe(320);
 });
 
 test('abrir el panel como pestaña lo cierra y activa esa app en el área principal', async () => {
