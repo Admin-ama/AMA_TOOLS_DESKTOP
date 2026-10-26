@@ -253,14 +253,14 @@ async function createWindow() {
           manager.openTab('teams', accessRequestUrl(service.admin, service.name, new URL(teams.url).origin));
           break;
         }
-        case 'pin': {
-          const serviceId = id();
         case 'pin-order': {
           if (args.length !== 1) throw new Error('Orden inválido');
           preferences.pinned = reorderPinned(preferences.pinned, args[0]);
           await savePreferences(preferencesFile, preferences);
           break;
         }
+        case 'pin': {
+          const serviceId = id();
           if (typeof args[1] !== 'boolean') throw new Error('Preferencia inválida');
           if (!args[1] && FIXED_APPS.includes(serviceId)) throw new Error('Esta app siempre está fijada');
           preferences.pinned = args[1] ? (preferences.pinned.includes(serviceId) ? preferences.pinned : [...preferences.pinned, serviceId]) : preferences.pinned.filter(item => item !== serviceId);
