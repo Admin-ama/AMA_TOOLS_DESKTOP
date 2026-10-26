@@ -7,7 +7,10 @@ import { isZoomPercent, PAGE_ZOOM } from '../shared/zoom';
 import { allowInternalCertificate } from './certificate-policy';
 import { persistentCookie } from './session-cookies';
 
-interface Entry { view: WebContentsView; disposed: boolean; failed: boolean }
+/** `painted`: ya tuvo su primer dom-ready (o falló, o pasó el tope): hasta entonces el DOM muestra "Abriendo…" debajo. */
+interface Entry { view: WebContentsView; disposed: boolean; failed: boolean; painted: boolean }
+/** Tope para mostrar la vista aunque la página no llegue a dom-ready: nunca queda escondida. */
+export const FIRST_PAINT_MAX_MS = 12_000;
 /** Lo que cambia entre una pestaña y el panel lateral; el resto (guardas, sesión, descargas, certificados) es común. */
 interface Hooks { attach(entry: Entry): void; state(): ServiceState; set(state: ServiceState): void; title(title: string): void; openWindow(url: string, web: Electron.WebContents, target: AppId): void }
 const securedSessions = new WeakSet<Electron.Session>();
@@ -72,8 +75,8 @@ export class ServiceViewManager {
   }
 
   private visibility() {
-    for (const [id, entry] of this.views) entry.view.setVisible(this.shouldShow(id));
-    this.panelEntry?.view.setVisible(this.shouldShowPanel());
+    for (const [id, entry] of this.views) entry.view.setVisible(entry.painted && this.shouldShow(id));
+    this.panelEntry?.view.setVisible(this.panelEntry.painted && this.shouldShowPanel());
   }
 
   private splash = true;
@@ -305,7 +308,10 @@ export class ServiceViewManager {
   /** Vista remota de un servicio con todas las guardas (navegación, ventanas, descargas, certificados, permisos). */
   private build(service: Service, hooks: Hooks, url?: string) {
     const view = new WebContentsView({ webPreferences: remotePreferences(service.id, this.preferences.remember[service.id] ?? true, service.group) });
-    const entry: Entry = { view, disposed: false, failed: false };
+    const entry: Entry = { view, disposed: false, failed: false, painted: false };
+    // Sin esto la vista vacía (fondo oscuro) tapa el indicador de carga del DOM hasta que llega el sitio.
+    const reveal = () => { if (entry.painted || entry.disposed) return; entry.painted = true; clearTimeout(revealTimer); this.visibility(); };
+    const revealTimer = setTimeout(reveal, FIRST_PAINT_MAX_MS);
     hooks.attach(entry);
     view.setBackgroundColor('#020617');
     this.window.contentView.addChildView(view);
@@ -387,15 +393,18 @@ export class ServiceViewManager {
       if (!entry.disposed) web.setZoomFactor((this.zoomLevels.get(service.id) ?? PAGE_ZOOM.default) / 100);
       if (!entry.disposed) updateTitle(web.getTitle());
       if (!entry.disposed && !entry.failed) { this.loaded.add(service.id); hooks.set({ status: 'ready' }); }
+      reveal();
     });
     web.on('did-fail-load', (_event, code, _description, _url, mainFrame) => {
       if (!mainFrame || code === -3 || entry.disposed) return;
       entry.failed = true;
       this.loaded.add(service.id);
       hooks.set({ status: 'error', message: `No se pudo cargar el servicio (${code}). Revisa la red o VPN y vuelve a intentar.` });
+      reveal();
     });
     web.on('render-process-gone', () => {
       hooks.set({ status: 'error', message: 'La vista del servicio se cerró inesperadamente. Vuelve a intentar.' });
+      reveal();
     });
     hooks.set({ status: 'loading' });
     void web.loadURL(url ?? service.url).catch(() => undefined); // Sin tocar el login del servicio.

@@ -56,6 +56,8 @@ test.beforeEach(async ({}, testInfo) => {
   await expect(page.getByRole('status', { name: 'Iniciando Amatime OS' })).toHaveCount(0);
   await expect(page.getByTestId('librechat-tab-1')).toHaveAttribute('aria-selected', 'true');
   await switchApplication('Huly Workspace', 'huly 1');
+  // La vista se muestra tras su primer dom-ready: cada test arranca con Huly ya pintada.
+  await waitForPage();
 });
 
 test('[arranque] logo animado tapa la app hasta que el servicio de inicio carga', async ({}, testInfo) => {
@@ -608,14 +610,22 @@ test('DOM disponible no espera indefinidamente recursos secundarios', async () =
   await waitForPage();
 });
 
-test('carga directa sin tarjetas, formularios ni gates intermedios', async () => {
+test('mientras una app carga se ve su logo con un indicador (sin gates ni formularios); al cargar aparece la vista', async () => {
   slowDocument = true;
   await switchApplication('n8n Automations', 'n8n 1');
-  await expect(page.getByTestId('n8n-tab-1')).toHaveAttribute('aria-selected', 'true');
+  const loading = page.locator('#service-content').getByRole('status', { name: 'Abriendo n8n Automations…' });
+  await expect(loading).toBeVisible();
+  await expect(loading.locator('.service-logo')).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Continuar en red interna' })).toHaveCount(0);
-  await expect(page.getByText('Conectando con tu aplicación…')).toHaveCount(0);
   await expect(page.getByRole('textbox')).toHaveCount(0);
-  // La ventana se ajusta al área de trabajo del runner; se compara con su tamaño real.
+  // La vista nativa no tapa el indicador hasta que la página tenga algo que mostrar.
+  const n8nVisible = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!.contentView.children.some(view => view.getVisible() && ((view as any).webContents?.getURL() ?? '').endsWith('/n8n')));
+  expect(await n8nVisible()).toBe(false);
+  // Una app que carga normal: el indicador desaparece y la vista ocupa el área de trabajo.
+  slowDocument = false;
+  await switchApplication('Huly Workspace', 'huly 1');
+  await waitForPage();
+  await expect(page.locator('#service-content').getByRole('status')).toHaveCount(0);
   const { visible, size } = await app.evaluate(({ BrowserWindow }) => {
     const window = BrowserWindow.getAllWindows().find(w => !w.getParentWindow())!;
     return { visible: window.contentView.children.filter(view => view.getVisible()).map(view => view.getBounds()), size: window.getContentSize() };

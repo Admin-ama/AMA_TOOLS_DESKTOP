@@ -169,6 +169,14 @@ input[type=checkbox] { accent-color:var(--accent); width:1rem; height:1rem; }
 .network-block-icon { color:var(--danger); }
 .network-block-icon.spin { color:var(--teal); animation:network-spin 1.2s linear infinite; }
 @keyframes network-spin { to { transform:rotate(360deg); } }
+/* "Abriendo…": queda debajo de la vista nativa, que lo tapa en cuanto el sitio tiene contenido. Aparece tras un instante para no parpadear en cargas rápidas. */
+.app-opening { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1rem; color:var(--muted); animation:app-opening-in .25s ease .15s both; pointer-events:none; }
+.app-opening-logo { display:grid; place-items:center; width:72px; height:72px; border-radius:18px; background:var(--surface); border:1px solid var(--line); box-shadow:0 10px 30px #00000033; }
+.app-opening-logo .service-logo { transform:scale(1.35); }
+.app-opening-spinner { width:22px; height:22px; border-radius:50%; border:2px solid var(--line); border-top-color:var(--accent); animation:network-spin .8s linear infinite; }
+.app-opening p { margin:0; font-size:.85rem; }
+@keyframes app-opening-in { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+@media (prefers-reduced-motion: reduce) { .app-opening { animation:none; } .app-opening-spinner { animation-duration:2.4s; } }
 .network-block-actions { display:flex; flex-wrap:wrap; justify-content:center; gap:.6rem; margin-top:.6rem; }
 .secondary-button.primary { background:var(--primary); color:#fff; border-color:var(--teal); }
 .dock { grid-column:3; grid-row:2; position:relative; background:var(--surface); border-left:1px solid var(--line); display:flex; flex-direction:column; z-index:3; padding:.5rem 0; min-height:0; }

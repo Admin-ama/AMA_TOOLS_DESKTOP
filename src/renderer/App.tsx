@@ -56,10 +56,12 @@ export function App() {
 
   // Sin estado todavía, el logo ya ocupa la ventana: nunca se ve un fondo negro vacío.
   if (!state) return error ? <p role="alert">{error}</p> : <><Splash key="splash" /></>;
+  const blocked = state.network.status !== 'connected';
   const service = state.services.find(s => s.id === state.active)!;
   const activeTabs = state.tabs.filter(tab => tab.serviceId === state.active);
+  // La vista nativa se muestra al tener contenido; hasta entonces (y debajo de ella) se ve qué app se está abriendo.
+  const opening = !blocked && state.panel === 'service' && state.tabs.find(tab => tab.id === state.activeTabId)?.state.status === 'loading';
   const light = state.preferences.theme === 'light';
-  const blocked = state.network.status !== 'connected';
   // Fijadas por categoría; como en una barra de tareas, una app no fijada se muestra mientras tenga pestañas abiertas.
   const sidebarGroups = [...CATEGORIES, MINE_CATEGORY].map(category => ({
     label: category.label,
@@ -194,6 +196,11 @@ export function App() {
     <DesktopDock apps={state.desktopApps} office={state.officeApps} forticlient={state.network.forticlient} blocked={blocked} full={state.desktopApps.length >= 20} onForticlient={() => void action(() => window.portal.openForticlient())} onAdd={openPicker} onOpen={id => void action(() => window.portal.openDesktopApp(id))} onOffice={id => void action(() => window.portal.openOfficeApp(id))} onRemove={id => void action(() => window.portal.removeDesktopApp(id))} />
 
     <main id="service-content" className="content" role="tabpanel" aria-labelledby={state.activeTabId ? `tab-${state.activeTabId}` : undefined}>
+      {opening && <div className="app-opening" role="status" aria-label={`Abriendo ${service.name}…`}>
+        <span className="app-opening-logo"><ServiceLogo id={service.id} icon={service.icon} /></span>
+        <span className="app-opening-spinner" aria-hidden="true" />
+        <p>Abriendo {service.name}…</p>
+      </div>}
       {blocked && (state.panel === 'service' || state.panel === 'launcher') && <NetworkBlock network={state.network} onRetry={() => action(() => window.portal.reload())} onForticlient={() => action(() => window.portal.openForticlient())} />}
       {!blocked && state.panel === 'launcher' && <Launcher services={state.services} pinned={state.preferences.pinned} onOpen={activate} onSplit={id => void action(() => window.portal.splitOpen(id))} onRequestAccess={id => void action(() => window.portal.requestAccess(id))} onPin={(id, pinned) => void action(() => window.portal.pin(id, pinned))} onClose={() => panel('service')} onAdd={input => window.portal.customAdd(input)} onEdit={(id, input) => window.portal.customEdit(id, input)} onMenu={openMenu} editRequest={editRequest} onEditHandled={() => setEditRequest(null)} />}
       {state.panel === 'settings' && <section className="settings-page">
