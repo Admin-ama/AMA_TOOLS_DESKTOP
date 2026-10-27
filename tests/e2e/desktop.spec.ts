@@ -1142,6 +1142,8 @@ test('menú contextual: también funciona sobre las tarjetas del launcher', asyn
 
 test('menú contextual: overlay libera las vistas aunque el menú siga abierto y valida su argumento', async () => {
   await rightClick('n8n Automations');
+  // El menú oculta las vistas tras capturarlas: se espera a que lo haya hecho antes de liberarlas por IPC.
+  await expect.poll(async () => (await visibleViews()).length).toBe(0);
   await page.evaluate(() => window.portal.overlay(false));
   await expect.poll(async () => (await visibleViews()).length).toBe(1);
   const rejected = await page.evaluate(async () => { try { await (window.portal as any).overlay('yes'); return false; } catch { return true; } });
