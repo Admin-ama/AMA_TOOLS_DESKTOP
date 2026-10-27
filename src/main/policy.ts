@@ -8,7 +8,7 @@ const MICROSOFT_SUFFIXES: readonly string[] = ['msauth.net', 'msftauth.net', 'cl
 
 export const SERVICES: Service[] = [
   { id: 'huly', name: 'Huly Workspace', shortName: 'Huly', category: 'operacion', url: 'http://172.16.8.73:8087/' },
-  { id: 'n8n', name: 'n8n Automations', shortName: 'n8n', category: 'automatizacion', url: 'http://172.16.8.73:5678/' },
+  { id: 'n8n', name: 'n8n Automations', shortName: 'n8n', category: 'automatizacion', url: 'https://172.16.8.73:5443/', authOrigins: ['https://login.microsoftonline.com', 'https://login.live.com'] },
   { id: 'librechat', name: 'AMA IA', shortName: 'AMA IA', category: 'control', url: 'https://172.16.8.73/' },
   { id: 'portal', name: 'Portal de Operaciones', shortName: 'Portal Ops', category: 'amatime', url: 'https://app.amatime.com/' },
   { id: 'emailai', name: 'Email Category AI', shortName: 'Email AI', category: 'automatizacion', url: 'https://email-category-ai.vercel.app/', authOrigins: ['https://login.microsoftonline.com', 'https://login.live.com', 'https://mysignins.microsoft.com'] },

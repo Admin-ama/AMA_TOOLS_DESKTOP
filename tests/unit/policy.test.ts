@@ -5,7 +5,7 @@ import { SERVICES, validAdmin, accessRequestUrl, isAppId, allowedNavigation, all
 describe('registro y aislamiento', () => {
   it('registra las direcciones reales', () => {
     expect(SERVICES.map(s => s.url)).toEqual([
-      'http://172.16.8.73:8087/', 'http://172.16.8.73:5678/',
+      'http://172.16.8.73:8087/', 'https://172.16.8.73:5443/',
       'https://172.16.8.73/', 'https://app.amatime.com/',
       'https://email-category-ai.vercel.app/', 'http://172.16.8.73:8080/',
       'https://teams.microsoft.com/v2/',
@@ -52,7 +52,7 @@ describe('registro y aislamiento', () => {
   it('permite descargar lo que genera la propia página (blob del mismo origen y data:), p. ej. exportar en LibreChat o n8n', () => {
     const chat = SERVICES.find(s => s.id === 'librechat')!, n8n = SERVICES.find(s => s.id === 'n8n')!, portal = SERVICES.find(s => s.id === 'portal')!;
     expect(allowedDownload('blob:https://172.16.8.73/0f1e2d3c-aaaa-bbbb-cccc-000000000000', chat)).toBe(true);
-    expect(allowedDownload('blob:http://172.16.8.73:5678/0f1e2d3c', n8n)).toBe(true);
+    expect(allowedDownload('blob:https://172.16.8.73:5443/0f1e2d3c', n8n)).toBe(true);
     expect(allowedDownload('blob:https://app.amatime.com/0f1e2d3c', portal)).toBe(true);
     expect(allowedDownload('data:application/json;base64,e30=', n8n)).toBe(true);
     for (const url of ['blob:https://evil.test/0f1e', 'blob:null/0f1e', 'blob:not a url']) expect(allowedDownload(url, portal), url).toBe(false);
@@ -208,6 +208,15 @@ describe('páginas del usuario', () => {
     expect(partitionFor(app.id, true)).toBe('persist:amatime-custom-0a1b2c3d-aaaa');
     expect(partitionFor(app.id, false)).toBe('amatime-custom-0a1b2c3d-aaaa');
     expect(partitionFor(app.id, true)).not.toBe(partitionFor('custom-0a1b2c3d-bbbb', true));
+  });
+});
+
+describe('n8n (https en el puerto 5443)', () => {
+  const n8n = () => SERVICES.find(service => service.id === 'n8n')!;
+  it('usa la URL https nueva', () => { expect(n8n().url).toBe('https://172.16.8.73:5443/'); });
+  it('puede ir al login de Microsoft para conectar credenciales OAuth (Outlook, SharePoint…) y volver', () => {
+    for (const url of ['https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=x', 'https://login.live.com/oauth20_authorize.srf', 'https://172.16.8.73:5443/rest/oauth2-credential/callback?code=x']) expect(allowedNavigation(url, n8n()), url).toBe(true);
+    for (const url of ['http://login.microsoftonline.com/', 'https://login.microsoftonline.com.evil.test/', 'https://evil.test/', 'http://172.16.8.73:5678/']) expect(allowedNavigation(url, n8n()), url).toBe(false);
   });
 });
 

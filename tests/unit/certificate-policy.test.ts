@@ -30,7 +30,7 @@ describe('certificados de los sitios internos', () => {
 
 describe('sitios internos sin certificado (http)', () => {
   it('se tratan como seguros para que funcione el portapapeles: solo los http internos del catálogo', () => {
-    expect(insecureInternalOrigins(SERVICES)).toEqual(['http://172.16.8.73:8087', 'http://172.16.8.73:5678', 'http://172.16.8.73:8080']);
+    expect(insecureInternalOrigins(SERVICES)).toEqual(['http://172.16.8.73:8087', 'http://172.16.8.73:8080']);
   });
   it('ignora https, otras redes, credenciales y direcciones inválidas', () => {
     const service = (url: string) => ({ url });
