@@ -1,7 +1,7 @@
 import { WebContentsView, app, session, type BrowserWindow } from 'electron';
 import { type ApplicationTab, type Service, type AppId, type ServiceState, type Snapshot, type Preferences, type SplitCapture, type FrozenView } from '../shared/contracts';
 import { permissionAllowed, sanitizeUserAgent } from './permissions';
-import { allowedNavigation, allowedDownload, isPdfUrl, sameServiceOrigin, contentBounds, splitBounds, partitionFor, remotePreferences, catalogOf, groupMembers, windowTarget } from './policy';
+import { allowedNavigation, allowedDownload, isAuthPopup, isPdfUrl, sameServiceOrigin, contentBounds, splitBounds, partitionFor, remotePreferences, catalogOf, groupMembers, windowTarget } from './policy';
 import { ApplicationTabs } from './application-tabs';
 import { isZoomPercent, PAGE_ZOOM } from '../shared/zoom';
 import { allowInternalCertificate } from './certificate-policy';
@@ -378,6 +378,8 @@ export class ServiceViewManager {
     web.on('will-redirect', guard);
     web.setWindowOpenHandler(details => {
       if (entry.disposed) return { action: 'deny' };
+      // Login OAuth en ventana emergente (Connect de n8n, MSAL loginPopup): necesita ventana real con opener para avisar al terminar.
+      if (isAuthPopup(details.url, service)) return { action: 'allow', overrideBrowserWindowOptions: { parent: this.window, autoHideMenuBar: true, backgroundColor: '#ffffff', minimizable: false, title: service.name } };
       // Los enlaces internos que abren ventana crean otra pestaña de esta aplicación (o navegan el panel).
       // Enlaces "Descargar" a PDF (target=_blank): bajar el archivo en vez de abrir una pestaña vacía.
       const target = windowTarget(details.url, service, this.services);
@@ -390,6 +392,19 @@ export class ServiceViewManager {
         hooks.set({ ...hooks.state(), message: 'Ventana externa bloqueada. Consulta Ayuda.' });
       }
       return { action: 'deny' };
+    });
+    // La ventana de login hereda las guardas de la app: solo su origen, su login declarado o su grupo; sin más ventanas.
+    web.on('did-create-window', child => {
+      const popup = child.webContents;
+      child.setMenu(null);
+      const popupGuard = (event: Electron.Event, target: string) => { if (!allowedNavigation(target, service)) event.preventDefault(); };
+      popup.on('will-navigate', popupGuard);
+      popup.on('will-redirect', popupGuard);
+      popup.setWindowOpenHandler(() => ({ action: 'deny' }));
+      popup.on('certificate-error', (event, destination, error, _certificate, callback) => {
+        if (allowInternalCertificate(destination, error)) { event.preventDefault(); callback(true); } else callback(false);
+      });
+      if (service.group) popup.setUserAgent(sanitizeUserAgent(popup.getUserAgent()));
     });
     web.on('did-start-loading', () => {
       if (entry.disposed) return;

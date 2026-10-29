@@ -1453,3 +1453,35 @@ test('al abrir el menú contextual la app de atrás sigue viéndose (captura con
   await expect.poll(async () => (await visibleViews()).length).toBe(1);
   await expect(frozen).toHaveCount(0);
 });
+
+test('el login OAuth en ventana emergente (Connect de n8n) se abre como ventana real con opener; otras apps no pueden', async () => {
+  await switchApplication('n8n Automations', 'n8n 1');
+  await waitForPage();
+  const openFrom = (appId: string) => app.evaluate(({ webContents }, id) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/' + id))!
+    .executeJavaScript("(() => { const popup = window.open('https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=x', 'OAuth Authorization', 'width=500,height=650'); window.__popup = popup; return !!popup; })()", true), appId);
+  const popups = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter(w => w.getParentWindow() && !/#(tooltip|update-notice)$/.test(w.webContents.getURL())).map(w => ({ modal: w.isModal(), devtools: w.webContents.isDevToolsOpened() })));
+  expect(await openFrom('n8n')).toBe(true);
+  await expect.poll(async () => (await popups()).length).toBe(1);
+  // Misma sesión que n8n: el callback de vuelta valida la cookie de login de n8n.
+  expect(await app.evaluate(({ BrowserWindow, webContents }) => {
+    const popup = BrowserWindow.getAllWindows().find(w => w.getParentWindow() && !/#(tooltip|update-notice)$/.test(w.webContents.getURL()))!;
+    return popup.webContents.session === webContents.getAllWebContents().find(w => w.getURL().endsWith('/n8n'))!.session;
+  })).toBe(true);
+  // La ventana del login no puede salir del login declarado ni del propio n8n.
+  const blocked = await app.evaluate(async ({ BrowserWindow }) => {
+    const popup = BrowserWindow.getAllWindows().find(w => w.getParentWindow() && !/#(tooltip|update-notice)$/.test(w.webContents.getURL()))!;
+    let prevented = false;
+    popup.webContents.once('will-navigate', event => { setImmediate(() => { prevented = event.defaultPrevented; }); });
+    await popup.webContents.executeJavaScript("location.href = 'https://evil.example/'").catch(() => undefined);
+    await new Promise(resolve => setTimeout(resolve, 300));
+    return prevented;
+  });
+  expect(blocked).toBe(true);
+  // El opener puede cerrarla (así cierra n8n la ventana al terminar).
+  await app.evaluate(({ webContents }) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/n8n'))!.executeJavaScript('window.__popup.close()'));
+  await expect.poll(async () => (await popups()).length).toBe(0);
+  // Huly no declara ese login: sin ventana.
+  await switchApplication('Huly Workspace', 'huly 1');
+  expect(await openFrom('huly')).toBe(false);
+  expect(await popups()).toHaveLength(0);
+});

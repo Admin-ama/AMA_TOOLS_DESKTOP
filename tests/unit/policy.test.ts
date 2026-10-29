@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CATEGORIES, FIXED_APPS, GLOBAL_APP_IDS } from '../../src/shared/contracts';
-import { SERVICES, validAdmin, accessRequestUrl, isAppId, allowedNavigation, allowedDownload, isPdfUrl, partitionFor, contentBounds, remotePreferences, customService, catalogOf, sameServiceOrigin, groupMembers, windowTarget } from '../../src/main/policy';
+import { SERVICES, isAuthPopup, validAdmin, accessRequestUrl, isAppId, allowedNavigation, allowedDownload, isPdfUrl, partitionFor, contentBounds, remotePreferences, customService, catalogOf, sameServiceOrigin, groupMembers, windowTarget } from '../../src/main/policy';
 
 describe('registro y aislamiento', () => {
   it('registra las direcciones reales', () => {
@@ -217,6 +217,18 @@ describe('n8n (https en el puerto 5443)', () => {
   it('puede ir al login de Microsoft para conectar credenciales OAuth (Outlook, SharePoint…) y volver', () => {
     for (const url of ['https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=x', 'https://login.live.com/oauth20_authorize.srf', 'https://172.16.8.73:5443/rest/oauth2-credential/callback?code=x']) expect(allowedNavigation(url, n8n()), url).toBe(true);
     for (const url of ['http://login.microsoftonline.com/', 'https://login.microsoftonline.com.evil.test/', 'https://evil.test/', 'http://172.16.8.73:5678/']) expect(allowedNavigation(url, n8n()), url).toBe(false);
+  });
+});
+
+describe('ventanas emergentes de login (OAuth)', () => {
+  const n8n = SERVICES.find(service => service.id === 'n8n')!, emailai = SERVICES.find(service => service.id === 'emailai')!, huly = SERVICES.find(service => service.id === 'huly')!;
+  it('se abren como ventana real (con opener) solo hacia un origen de login declarado por la app', () => {
+    expect(isAuthPopup('https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=x', n8n)).toBe(true);
+    expect(isAuthPopup('https://login.microsoftonline.com/x', emailai)).toBe(true);
+  });
+  it('el resto sigue el camino normal (pestaña o bloqueo)', () => {
+    for (const url of ['https://172.16.8.73:5443/workflow/1', 'http://login.microsoftonline.com/x', 'https://login.microsoftonline.com.evil.test/x', 'https://user:pw@login.microsoftonline.com/x', 'https://evil.test/', 'javascript:alert(1)', 'not a url']) expect(isAuthPopup(url, n8n), url).toBe(false);
+    expect(isAuthPopup('https://login.microsoftonline.com/x', huly)).toBe(false);
   });
 });
 

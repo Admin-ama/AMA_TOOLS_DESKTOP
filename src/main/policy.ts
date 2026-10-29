@@ -55,6 +55,13 @@ export function groupAllows(destination: string, group: Service['group']): boole
     return MICROSOFT_HOSTS.includes(url.hostname) || hostMatchesSuffix(url.hostname, MICROSOFT_SUFFIXES);
   } catch { return false; }
 }
+/** window.open hacia el login externo declarado por la app (OAuth de n8n, MSAL loginPopup): necesita una ventana real con opener. */
+export function isAuthPopup(destination: string, service: Service): boolean {
+  try {
+    const url = new URL(destination);
+    return url.protocol === 'https:' && !url.username && !url.password && (service.authOrigins ?? []).includes(url.origin);
+  } catch { return false; }
+}
 // Navegación de la vista: su origen, el login externo declarado (p. ej. MSAL loginRedirect) o la lista de su grupo (https).
 export function allowedNavigation(destination: string, service: Service): boolean {
   if (sameServiceOrigin(destination, service) || groupAllows(destination, service.group)) return true;
