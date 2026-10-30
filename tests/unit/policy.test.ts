@@ -226,6 +226,12 @@ describe('ventanas emergentes de login (OAuth)', () => {
     expect(isAuthPopup('https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=x', n8n)).toBe(true);
     expect(isAuthPopup('https://login.microsoftonline.com/x', emailai)).toBe(true);
   });
+  it('n8n abre about:blank y después lo lleva al login (así evita los bloqueadores): se permite si la app declara un login', () => {
+    expect(isAuthPopup('about:blank', n8n)).toBe(true);
+    expect(isAuthPopup('', n8n)).toBe(true);
+    expect(isAuthPopup('about:blank', huly)).toBe(false);
+    expect(isAuthPopup('about:srcdoc', n8n)).toBe(false);
+  });
   it('el resto sigue el camino normal (pestaña o bloqueo)', () => {
     for (const url of ['https://172.16.8.73:5443/workflow/1', 'http://login.microsoftonline.com/x', 'https://login.microsoftonline.com.evil.test/x', 'https://user:pw@login.microsoftonline.com/x', 'https://evil.test/', 'javascript:alert(1)', 'not a url']) expect(isAuthPopup(url, n8n), url).toBe(false);
     expect(isAuthPopup('https://login.microsoftonline.com/x', huly)).toBe(false);

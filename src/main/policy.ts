@@ -57,6 +57,8 @@ export function groupAllows(destination: string, group: Service['group']): boole
 }
 /** window.open hacia el login externo declarado por la app (OAuth de n8n, MSAL loginPopup): necesita una ventana real con opener. */
 export function isAuthPopup(destination: string, service: Service): boolean {
+  // n8n abre la ventana vacía (evita bloqueadores) y después la lleva al login: el guardia de la ventana limita adónde puede ir.
+  if (destination === 'about:blank' || destination === '') return (service.authOrigins ?? []).length > 0;
   try {
     const url = new URL(destination);
     return url.protocol === 'https:' && !url.username && !url.password && (service.authOrigins ?? []).includes(url.origin);

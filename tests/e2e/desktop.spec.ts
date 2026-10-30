@@ -1460,6 +1460,14 @@ test('el login OAuth en ventana emergente (Connect de n8n) se abre como ventana 
   const openFrom = (appId: string) => app.evaluate(({ webContents }, id) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/' + id))!
     .executeJavaScript("(() => { const popup = window.open('https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=x', 'OAuth Authorization', 'width=500,height=650'); window.__popup = popup; return !!popup; })()", true), appId);
   const popups = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter(w => w.getParentWindow() && !/#(tooltip|update-notice)$/.test(w.webContents.getURL())).map(w => ({ modal: w.isModal(), devtools: w.webContents.isDevToolsOpened() })));
+  // Como el Connect real de n8n: abre about:blank y después lo lleva al login de Microsoft.
+  expect(await app.evaluate(({ webContents }) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/n8n'))!
+    .executeJavaScript("(() => { const popup = window.open('about:blank', 'OAuth Authorization', 'scrollbars=no,resizable=yes,width=500,height=700'); window.__popup = popup; if (popup) popup.location.href = 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=x'; return !!popup; })()", true))).toBe(true);
+  await expect.poll(async () => (await popups()).length).toBe(1);
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter(w => w.getParentWindow() && !/#(tooltip|update-notice)$/.test(w.webContents.getURL())).map(w => w.webContents.getURL())[0] ?? '')).toMatch(/^https:\/\/login\.microsoftonline\.com\//);
+  await app.evaluate(({ webContents }) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/n8n'))!.executeJavaScript('window.__popup.close()'));
+  await expect.poll(async () => (await popups()).length).toBe(0);
+  // Directo a la URL de login (otras versiones de n8n, MSAL loginPopup).
   expect(await openFrom('n8n')).toBe(true);
   await expect.poll(async () => (await popups()).length).toBe(1);
   // Misma sesión que n8n: el callback de vuelta valida la cookie de login de n8n.
