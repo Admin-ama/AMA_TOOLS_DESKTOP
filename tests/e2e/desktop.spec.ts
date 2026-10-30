@@ -1454,7 +1454,7 @@ test('al abrir el menú contextual la app de atrás sigue viéndose (captura con
   await expect(frozen).toHaveCount(0);
 });
 
-test('el login OAuth en ventana emergente (Connect de n8n) se abre como ventana real con opener; otras apps no pueden', async () => {
+test('el login OAuth en ventana emergente (Connect de n8n, MCP de LibreChat) se abre como ventana real en cualquier app', async () => {
   await switchApplication('n8n Automations', 'n8n 1');
   await waitForPage();
   const openFrom = (appId: string) => app.evaluate(({ webContents }, id) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/' + id))!
@@ -1480,7 +1480,7 @@ test('el login OAuth en ventana emergente (Connect de n8n) se abre como ventana 
     const popup = BrowserWindow.getAllWindows().find(w => w.getParentWindow() && !/#(tooltip|update-notice)$/.test(w.webContents.getURL()))!;
     let prevented = false;
     popup.webContents.once('will-navigate', event => { setImmediate(() => { prevented = event.defaultPrevented; }); });
-    await popup.webContents.executeJavaScript("location.href = 'https://evil.example/'").catch(() => undefined);
+    await popup.webContents.executeJavaScript("location.href = 'http://evil.example/'").catch(() => undefined);
     await new Promise(resolve => setTimeout(resolve, 300));
     return prevented;
   });
@@ -1488,8 +1488,17 @@ test('el login OAuth en ventana emergente (Connect de n8n) se abre como ventana 
   // El opener puede cerrarla (así cierra n8n la ventana al terminar).
   await app.evaluate(({ webContents }) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/n8n'))!.executeJavaScript('window.__popup.close()'));
   await expect.poll(async () => (await popups()).length).toBe(0);
-  // Huly no declara ese login: sin ventana.
+  // Cualquier otra app también: así abre LibreChat el "Continue with OAuth" de sus MCP (sin opener).
   await switchApplication('Huly Workspace', 'huly 1');
-  expect(await openFrom('huly')).toBe(false);
+  await app.evaluate(({ webContents }) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/huly'))!
+    .executeJavaScript("window.open('https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=mcp', '_blank', 'noopener,noreferrer')", true));
+  await expect.poll(async () => (await popups()).length).toBe(1);
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.getParentWindow() && !/#(tooltip|update-notice)$/.test(w.webContents.getURL()))!.close());
+  await expect.poll(async () => (await popups()).length).toBe(0);
+  // http externo o file: siguen sin ventana.
+  for (const url of ['http://evil.example/', 'file:///C:/Windows/']) {
+    await app.evaluate(({ webContents }, target) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/huly'))!.executeJavaScript(`!!window.open(${JSON.stringify(target)}, '_blank')`, true), url);
+  }
+  await page.waitForTimeout(300);
   expect(await popups()).toHaveLength(0);
 });

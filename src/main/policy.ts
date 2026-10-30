@@ -58,7 +58,7 @@ export function groupAllows(destination: string, group: Service['group']): boole
 /** window.open hacia el login externo declarado por la app (OAuth de n8n, MSAL loginPopup): necesita una ventana real con opener. */
 export function isAuthPopup(destination: string, service: Service): boolean {
   // n8n abre la ventana vacía (evita bloqueadores) y después la lleva al login: el guardia de la ventana limita adónde puede ir.
-  if (destination === 'about:blank' || destination === '') return (service.authOrigins ?? []).length > 0;
+  if (destination === 'about:blank' || destination === '') return true;
   try {
     const url = new URL(destination);
     return url.protocol === 'https:' && !url.username && !url.password && (service.authOrigins ?? []).includes(url.origin);
@@ -79,6 +79,17 @@ const internalWeb = (value: string) => {
     return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password && isInternalHost(url.hostname);
   } catch { return false; }
 };
+/**
+ * Ventana emergente fuera de la app (login OAuth de un MCP de LibreChat, de un proveedor cualquiera): vacía, https o la red interna.
+ * La ventana nunca puede abrir otras ni ir a file:, javascript: o http externo.
+ */
+export function popupAllowed(destination: string): boolean {
+  if (destination === 'about:blank' || destination === '') return true;
+  try {
+    const url = new URL(destination);
+    return !url.username && !url.password && (url.protocol === 'https:' || internalWeb(destination));
+  } catch { return false; }
+}
 /**
  * Descargas: archivos del propio origen del servicio o, en el grupo Microsoft, de destinos permitidos del grupo (SharePoint, adjuntos).
  * También lo que genera la propia página (blob: de su origen, data:) y, si la app es de la red interna, cualquier servidor 172.16.8.x.

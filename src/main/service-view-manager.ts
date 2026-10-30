@@ -1,7 +1,7 @@
 import { WebContentsView, app, session, type BrowserWindow } from 'electron';
 import { type ApplicationTab, type Service, type AppId, type ServiceState, type Snapshot, type Preferences, type SplitCapture, type FrozenView } from '../shared/contracts';
 import { permissionAllowed, sanitizeUserAgent } from './permissions';
-import { allowedNavigation, allowedDownload, isAuthPopup, isPdfUrl, sameServiceOrigin, contentBounds, splitBounds, partitionFor, remotePreferences, catalogOf, groupMembers, windowTarget } from './policy';
+import { allowedNavigation, allowedDownload, isAuthPopup, popupAllowed, isPdfUrl, sameServiceOrigin, contentBounds, splitBounds, partitionFor, remotePreferences, catalogOf, groupMembers, windowTarget } from './policy';
 import { ApplicationTabs } from './application-tabs';
 import { isZoomPercent, PAGE_ZOOM } from '../shared/zoom';
 import { allowInternalCertificate } from './certificate-policy';
@@ -379,12 +379,15 @@ export class ServiceViewManager {
     web.setWindowOpenHandler(details => {
       if (entry.disposed) return { action: 'deny' };
       // Login OAuth en ventana emergente (Connect de n8n, MSAL loginPopup): necesita ventana real con opener para avisar al terminar.
-      if (isAuthPopup(details.url, service)) return { action: 'allow', overrideBrowserWindowOptions: { parent: this.window, autoHideMenuBar: true, backgroundColor: '#ffffff', minimizable: false, title: service.name } };
+      const popupWindow = { action: 'allow' as const, overrideBrowserWindowOptions: { parent: this.window, autoHideMenuBar: true, backgroundColor: '#ffffff', minimizable: false, title: service.name } };
+      if (isAuthPopup(details.url, service)) return popupWindow;
       // Los enlaces internos que abren ventana crean otra pestaña de esta aplicación (o navegan el panel).
       // Enlaces "Descargar" a PDF (target=_blank): bajar el archivo en vez de abrir una pestaña vacía.
       const target = windowTarget(details.url, service, this.services);
       if (sameServiceOrigin(details.url, service) && isPdfUrl(details.url)) web.downloadURL(details.url);
       else if (target) hooks.openWindow(details.url, web, target);
+      // Fuera de la app (login OAuth de cualquier proveedor, p. ej. los MCP de LibreChat): ventana emergente, como en el navegador.
+      else if (popupAllowed(details.url)) return popupWindow;
       else {
         let origin = 'URL inválida';
         try { origin = new URL(details.url).origin; } catch { /* se registra como inválida */ }
@@ -393,11 +396,11 @@ export class ServiceViewManager {
       }
       return { action: 'deny' };
     });
-    // La ventana de login hereda las guardas de la app: solo su origen, su login declarado o su grupo; sin más ventanas.
+    // La ventana de login: la app, https o la red interna (el proveedor redirige por varios sitios); sin más ventanas.
     web.on('did-create-window', child => {
       const popup = child.webContents;
       child.setMenu(null);
-      const popupGuard = (event: Electron.Event, target: string) => { if (!allowedNavigation(target, service)) event.preventDefault(); };
+      const popupGuard = (event: Electron.Event, target: string) => { if (!allowedNavigation(target, service) && !popupAllowed(target)) event.preventDefault(); };
       popup.on('will-navigate', popupGuard);
       popup.on('will-redirect', popupGuard);
       popup.setWindowOpenHandler(() => ({ action: 'deny' }));

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CATEGORIES, FIXED_APPS, GLOBAL_APP_IDS } from '../../src/shared/contracts';
-import { SERVICES, isAuthPopup, validAdmin, accessRequestUrl, isAppId, allowedNavigation, allowedDownload, isPdfUrl, partitionFor, contentBounds, remotePreferences, customService, catalogOf, sameServiceOrigin, groupMembers, windowTarget } from '../../src/main/policy';
+import { SERVICES, isAuthPopup, popupAllowed, validAdmin, accessRequestUrl, isAppId, allowedNavigation, allowedDownload, isPdfUrl, partitionFor, contentBounds, remotePreferences, customService, catalogOf, sameServiceOrigin, groupMembers, windowTarget } from '../../src/main/policy';
 
 describe('registro y aislamiento', () => {
   it('registra las direcciones reales', () => {
@@ -226,11 +226,15 @@ describe('ventanas emergentes de login (OAuth)', () => {
     expect(isAuthPopup('https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=x', n8n)).toBe(true);
     expect(isAuthPopup('https://login.microsoftonline.com/x', emailai)).toBe(true);
   });
-  it('n8n abre about:blank y después lo lleva al login (así evita los bloqueadores): se permite si la app declara un login', () => {
+  it('cualquier app puede abrir una ventana vacía y después llevarla al login (así lo hace n8n para evitar los bloqueadores)', () => {
     expect(isAuthPopup('about:blank', n8n)).toBe(true);
     expect(isAuthPopup('', n8n)).toBe(true);
-    expect(isAuthPopup('about:blank', huly)).toBe(false);
+    expect(isAuthPopup('about:blank', huly)).toBe(true);
     expect(isAuthPopup('about:srcdoc', n8n)).toBe(false);
+  });
+  it('fuera de la app, cualquier app abre ventana emergente hacia https o la red interna (login OAuth de los MCP de LibreChat)', () => {
+    for (const url of ['https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=x', 'https://github.com/login/oauth/authorize', 'http://172.16.8.73:8000/authorize', 'about:blank']) expect(popupAllowed(url), url).toBe(true);
+    for (const url of ['http://evil.test/', 'https://user:pw@login.microsoftonline.com/x', 'http://u:p@172.16.8.73/', 'javascript:alert(1)', 'file:///C:/Windows/', 'data:text/html,x', 'about:srcdoc', 'not a url']) expect(popupAllowed(url), url).toBe(false);
   });
   it('el resto sigue el camino normal (pestaña o bloqueo)', () => {
     for (const url of ['https://172.16.8.73:5443/workflow/1', 'http://login.microsoftonline.com/x', 'https://login.microsoftonline.com.evil.test/x', 'https://user:pw@login.microsoftonline.com/x', 'https://evil.test/', 'javascript:alert(1)', 'not a url']) expect(isAuthPopup(url, n8n), url).toBe(false);
