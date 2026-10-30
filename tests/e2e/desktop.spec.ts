@@ -1459,12 +1459,12 @@ test('el login OAuth en ventana emergente (Connect de n8n, MCP de LibreChat) se 
   await waitForPage();
   const openFrom = (appId: string) => app.evaluate(({ webContents }, id) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/' + id))!
     .executeJavaScript("(() => { const popup = window.open('https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=x', 'OAuth Authorization', 'width=500,height=650'); window.__popup = popup; return !!popup; })()", true), appId);
-  const popups = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter(w => w.getParentWindow() && !/#(tooltip|update-notice)$/.test(w.webContents.getURL())).map(w => ({ modal: w.isModal(), devtools: w.webContents.isDevToolsOpened() })));
+  const popups = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter(w => !w.isDestroyed() && !w.webContents.isDestroyed() && w.getParentWindow() && !/#(tooltip|update-notice)$/.test(w.webContents.getURL())).map(w => ({ modal: w.isModal(), devtools: w.webContents.isDevToolsOpened() })));
   // Como el Connect real de n8n: abre about:blank y después lo lleva al login de Microsoft.
   expect(await app.evaluate(({ webContents }) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/n8n'))!
     .executeJavaScript("(() => { const popup = window.open('about:blank', 'OAuth Authorization', 'scrollbars=no,resizable=yes,width=500,height=700'); window.__popup = popup; if (popup) popup.location.href = 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=x'; return !!popup; })()", true))).toBe(true);
   await expect.poll(async () => (await popups()).length).toBe(1);
-  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter(w => w.getParentWindow() && !/#(tooltip|update-notice)$/.test(w.webContents.getURL())).map(w => w.webContents.getURL())[0] ?? '')).toMatch(/^https:\/\/login\.microsoftonline\.com\//);
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter(w => !w.isDestroyed() && !w.webContents.isDestroyed() && w.getParentWindow() && !/#(tooltip|update-notice)$/.test(w.webContents.getURL())).map(w => w.webContents.getURL())[0] ?? '')).toMatch(/^https:\/\/login\.microsoftonline\.com\//);
   await app.evaluate(({ webContents }) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/n8n'))!.executeJavaScript('window.__popup.close()'));
   await expect.poll(async () => (await popups()).length).toBe(0);
   // Directo a la URL de login (otras versiones de n8n, MSAL loginPopup).
@@ -1472,12 +1472,12 @@ test('el login OAuth en ventana emergente (Connect de n8n, MCP de LibreChat) se 
   await expect.poll(async () => (await popups()).length).toBe(1);
   // Misma sesión que n8n: el callback de vuelta valida la cookie de login de n8n.
   expect(await app.evaluate(({ BrowserWindow, webContents }) => {
-    const popup = BrowserWindow.getAllWindows().find(w => w.getParentWindow() && !/#(tooltip|update-notice)$/.test(w.webContents.getURL()))!;
+    const popup = BrowserWindow.getAllWindows().find(w => !w.isDestroyed() && !w.webContents.isDestroyed() && w.getParentWindow() && !/#(tooltip|update-notice)$/.test(w.webContents.getURL()))!;
     return popup.webContents.session === webContents.getAllWebContents().find(w => w.getURL().endsWith('/n8n'))!.session;
   })).toBe(true);
   // La ventana del login no puede salir del login declarado ni del propio n8n.
   const blocked = await app.evaluate(async ({ BrowserWindow }) => {
-    const popup = BrowserWindow.getAllWindows().find(w => w.getParentWindow() && !/#(tooltip|update-notice)$/.test(w.webContents.getURL()))!;
+    const popup = BrowserWindow.getAllWindows().find(w => !w.isDestroyed() && !w.webContents.isDestroyed() && w.getParentWindow() && !/#(tooltip|update-notice)$/.test(w.webContents.getURL()))!;
     let prevented = false;
     popup.webContents.once('will-navigate', event => { setImmediate(() => { prevented = event.defaultPrevented; }); });
     await popup.webContents.executeJavaScript("location.href = 'http://evil.example/'").catch(() => undefined);
@@ -1493,7 +1493,7 @@ test('el login OAuth en ventana emergente (Connect de n8n, MCP de LibreChat) se 
   await app.evaluate(({ webContents }) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/huly'))!
     .executeJavaScript("window.open('https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=mcp', '_blank', 'noopener,noreferrer')", true));
   await expect.poll(async () => (await popups()).length).toBe(1);
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.getParentWindow() && !/#(tooltip|update-notice)$/.test(w.webContents.getURL()))!.close());
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.isDestroyed() && !w.webContents.isDestroyed() && w.getParentWindow() && !/#(tooltip|update-notice)$/.test(w.webContents.getURL()))!.close());
   await expect.poll(async () => (await popups()).length).toBe(0);
   // http externo o file: siguen sin ventana.
   for (const url of ['http://evil.example/', 'file:///C:/Windows/']) {
