@@ -224,6 +224,7 @@ async function createWindow() {
         case 'zoom': {
           if (!isZoomPercent(args[0])) throw new Error('Zoom inválido');
           manager.zoom(args[0]);
+          await savePreferences(preferencesFile, preferences);
           break;
         }
         case 'panel': {

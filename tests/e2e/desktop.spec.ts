@@ -183,6 +183,24 @@ test('zoom del header ajusta la aplicación sin ampliar el shell y permite resta
   await expect(page.getByRole('button', { name: 'Restablecer zoom' })).toHaveText('90%');
 });
 
+test('el zoom de cada app se recuerda al cerrar y volver a abrir Amatime OS', async () => {
+  await waitForPage();
+  await page.getByRole('button', { name: 'Aumentar zoom' }).click();
+  await page.getByRole('button', { name: 'Aumentar zoom' }).click();
+  await expect(page.getByRole('button', { name: 'Restablecer zoom' })).toHaveText('120%');
+  const env = await app.evaluate(() => ({ ...process.env }));
+  await app.close();
+  app = await electron.launch({ args: ['.'], env: env as Record<string, string> });
+  page = await app.firstWindow();
+  await waitForPage();
+  // Al reabrir arranca en otra app: esa sigue al 100% y Huly vuelve con su 120%.
+  await expect(page.getByRole('button', { name: 'Restablecer zoom' })).toHaveText('100%');
+  await switchApplication('Huly Workspace', 'huly 1');
+  await waitForPage();
+  await expect(page.getByRole('button', { name: 'Restablecer zoom' })).toHaveText('120%');
+  await expect.poll(() => app.evaluate(({ webContents }) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/huly'))?.getZoomFactor())).toBe(1.2);
+});
+
 test('zoom valida IPC y respeta los límites', async () => {
   const rejected = await page.evaluate(async () => {
     const results = [];

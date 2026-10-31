@@ -4,6 +4,7 @@ import { GLOBAL_APP_IDS, DEFAULT_PINNED, FIXED_APPS, type DesktopApp, type Prefe
 import { normalizeCustomApps } from '../shared/custom-apps';
 import { SERVICES } from './policy';
 import { MAX_DESKTOP_APPS, MAX_DESKTOP_APP_NAME, validAumid } from './desktop-apps';
+import { isZoomPercent, PAGE_ZOOM } from '../shared/zoom';
 
 /** `ids`: catálogo vigente (globales + páginas propias); lo desconocido se descarta. Las fijas van siempre primero; el resto, en el orden del usuario. */
 export function normalizePinned(input: unknown, ids: readonly AppId[] = GLOBAL_APP_IDS): AppId[] {
@@ -33,6 +34,12 @@ export function normalizeSplitRatio(input: unknown): number {
 export function normalizeSplitService(input: unknown, ids: readonly AppId[] = GLOBAL_APP_IDS): AppId {
   return ids.find(id => id === input) ?? DEFAULT_SPLIT_SERVICE;
 }
+/** Zoom recordado por app: solo apps del catálogo y porcentajes válidos; el 100% es el valor por defecto y no se guarda. */
+export function normalizeZoom(input: unknown, ids: readonly AppId[] = GLOBAL_APP_IDS): Record<AppId, number> {
+  if (!input || typeof input !== 'object') return {};
+  const source = input as Record<string, unknown>;
+  return Object.fromEntries(ids.filter(id => Object.hasOwn(source, id) && isZoomPercent(source[id]) && source[id] !== PAGE_ZOOM.default).map(id => [id, source[id] as number]));
+}
 /** Nuevo orden pedido por el renderer: solo una permutación de las fijadas actuales (las fijas siguen primero). */
 export function reorderPinned(current: readonly AppId[], requested: unknown): AppId[] {
   const valid = Array.isArray(requested) && requested.length === current.length && new Set(requested).size === current.length && requested.every(id => current.includes(id));
@@ -61,6 +68,7 @@ export function normalizePreferences(input: unknown): Preferences {
     customApps,
     splitRatio: normalizeSplitRatio(source.splitRatio),
     splitService: normalizeSplitService(source.splitService, ids),
+    zoom: normalizeZoom(source.zoom, ids),
   };
 }
 export async function readPreferences(file: string): Promise<Preferences> {

@@ -30,7 +30,6 @@ app.on('before-quit', event => {
 export class ServiceViewManager {
   private views = new Map<string, Entry>();
   private tabs = new ApplicationTabs();
-  private zoomLevels = new Map<AppId, number>();
   get active(): AppId { return this.tabs.active; }
   panel: Snapshot['panel'] = 'service';
   private split: Snapshot['split'] = null;
@@ -53,7 +52,7 @@ export class ServiceViewManager {
   snapshot(): Omit<Snapshot, 'splash' | 'updates' | 'network' | 'desktopApps' | 'officeApps'> {
     // Las rutas de las apps de escritorio nunca salen del proceso principal.
     const { desktopApps: _paths, ...preferences } = this.preferences;
-    return { services: this.services, active: this.active, activeTabId: this.tabs.activeTabId, zoomPercent: this.zoomLevels.get(this.active) ?? PAGE_ZOOM.default, tabs: this.tabs.all, states: this.tabs.serviceStates(this.services.map(service => service.id)), preferences, panel: this.panel, split: this.split ? { ...this.split } : null };
+    return { services: this.services, active: this.active, activeTabId: this.tabs.activeTabId, zoomPercent: this.preferences.zoom[this.active] ?? PAGE_ZOOM.default, tabs: this.tabs.all, states: this.tabs.serviceStates(this.services.map(service => service.id)), preferences, panel: this.panel, split: this.split ? { ...this.split } : null };
   }
 
   private update(id: string, state: ServiceState) {
@@ -151,7 +150,7 @@ export class ServiceViewManager {
     const wasActive = this.tabs.active === id;
     for (const tab of this.tabs.all) if (tab.serviceId === id) this.destroyView(tab.id);
     this.tabs.removeApp(id);
-    this.zoomLevels.delete(id);
+    delete this.preferences.zoom[id];
     this.loaded.delete(id);
     if (wasActive) this.ensureView(this.tabs.switchApplication(fallback)); // El panel visible no cambia: puede ser el launcher.
     this.visibility();
@@ -296,7 +295,8 @@ export class ServiceViewManager {
 
   zoom(percent: number) {
     if (!isZoomPercent(percent)) throw new Error('Zoom inválido');
-    this.zoomLevels.set(this.active, percent);
+    if (percent === PAGE_ZOOM.default) delete this.preferences.zoom[this.active];
+    else this.preferences.zoom[this.active] = percent;
     for (const tab of this.tabs.all) {
       if (tab.serviceId === this.active) this.views.get(tab.id)?.view.webContents.setZoomFactor(percent / 100);
     }
@@ -420,7 +420,7 @@ export class ServiceViewManager {
     web.on('page-title-updated', (_event, title) => updateTitle(title));
     // Metadatos internos; la página permanece visible desde el inicio.
     web.on('dom-ready', () => {
-      if (!entry.disposed) web.setZoomFactor((this.zoomLevels.get(service.id) ?? PAGE_ZOOM.default) / 100);
+      if (!entry.disposed) web.setZoomFactor((this.preferences.zoom[service.id] ?? PAGE_ZOOM.default) / 100);
       if (!entry.disposed) updateTitle(web.getTitle());
       if (!entry.disposed && !entry.failed) { this.loaded.add(service.id); hooks.set({ status: 'ready' }); }
       reveal();

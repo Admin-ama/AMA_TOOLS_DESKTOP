@@ -50,7 +50,7 @@ export interface SplitState { serviceId: AppId; ratio: number }
 export interface SplitCapture { main: string | null; panel: string | null }
 /** Captura de una vista nativa visible y dónde está (coordenadas del contenido de la ventana = CSS del shell). */
 export interface FrozenView { image: string; bounds: { x: number; y: number; width: number; height: number } }
-export interface Preferences { theme: Theme; remember: Record<AppId, boolean>; pinned: AppId[]; desktopApps: DesktopApp[]; customApps: CustomApp[]; splitRatio: number; splitService: AppId }
+export interface Preferences { theme: Theme; remember: Record<AppId, boolean>; pinned: AppId[]; desktopApps: DesktopApp[]; customApps: CustomApp[]; splitRatio: number; splitService: AppId; /** Zoom por app en porcentaje; el 100% no se guarda. */ zoom: Record<AppId, number> }
 export type PublicPreferences = Omit<Preferences, 'desktopApps'>;
 export interface UpdateState {
   status: 'disabled' | 'idle' | 'checking' | 'available' | 'current' | 'downloading' | 'downloaded' | 'installing' | 'error';
