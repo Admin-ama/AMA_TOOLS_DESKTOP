@@ -24,6 +24,7 @@ import { windowsAppDetails } from './windows-identity';
 import { NetworkMonitor, probeTarget, tcpProbe } from './network-status';
 import { FortiClientLauncher, forticlientCandidates } from './forticlient';
 import { OfficeApps, officeCandidates } from './office-apps';
+import { fileIconReader } from './file-icon';
 import { DesktopApps } from './desktop-apps';
 import { InstalledApps, enumerateInstalled, systemScanDeps, START_APPS_SCRIPT, START_APPS_TIMEOUT_MS, type InstalledEntry } from './installed-apps';
 import { commandAllowedWhileBlocked, BLOCKED_MESSAGE } from './network-gate';
@@ -77,7 +78,9 @@ async function createWindow() {
 
   // Office fijo del dock. En e2e solo existe si el test apunta a una carpeta con ejecutables falsos.
   const testOffice = testing ? process.env.AMA_TEST_OFFICE_ROOT : undefined;
-  const officeApps = new OfficeApps({ roots: testing ? (testOffice ? [testOffice] : []) : officeCandidates(), exists: existsSync, open: file => shell.openPath(file), icon: async file => (await app.getFileIcon(file, { size: 'normal' })).toDataURL(), log: (message, detail) => console.error(message, detail) });
+  // Office Click-to-Run puede devolver una imagen vacía o el icono genérico de ejecutable: sin icono, el dock muestra la inicial.
+  const fileIcon = fileIconReader(file => app.getFileIcon(file, { size: 'normal' }));
+  const officeApps = new OfficeApps({ roots: testing ? (testOffice ? [testOffice] : []) : officeCandidates(), exists: existsSync, open: file => shell.openPath(file), icon: fileIcon, log: (message, detail) => console.error(message, detail) });
 
   // Apps instaladas: menú Inicio + Tienda. En e2e (nunca empaquetado) un JSON puede sustituir la enumeración real.
   const readShortcut = (lnk: string) => { try { const { target, args } = shell.readShortcutLink(lnk); return { target, args }; } catch { return undefined; } };
@@ -86,7 +89,7 @@ async function createWindow() {
   const testInstalled = testing ? process.env.AMA_TEST_INSTALLED_APPS : undefined;
   const installed = new InstalledApps({
     enumerate: testInstalled ? async () => JSON.parse(await readFile(testInstalled, 'utf8')) as InstalledEntry[] : () => enumerateInstalled(systemScanDeps(readShortcut), runStartApps),
-    icon: async file => (await app.getFileIcon(file, { size: 'normal' })).toDataURL(),
+    icon: fileIcon,
     now: () => Date.now(),
   });
   const desktopApps = new DesktopApps(preferences, {
@@ -95,7 +98,7 @@ async function createWindow() {
       return result.canceled ? undefined : result.filePaths[0];
     },
     open: file => shell.openPath(file),
-    icon: async file => (await app.getFileIcon(file, { size: 'normal' })).toDataURL(),
+    icon: fileIcon,
     save: next => savePreferences(preferencesFile, next),
     id: () => randomUUID(),
     openAumid: async aumid => { await new Promise<void>(resolve => execFile('explorer.exe', ['shell:AppsFolder\\' + aumid], { windowsHide: true }, () => resolve())); },

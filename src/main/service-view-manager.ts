@@ -1,7 +1,7 @@
-import { WebContentsView, app, session, type BrowserWindow } from 'electron';
+import { WebContentsView, app, session, shell, type BrowserWindow } from 'electron';
 import { type ApplicationTab, type Service, type AppId, type ServiceState, type Snapshot, type Preferences, type SplitCapture, type FrozenView } from '../shared/contracts';
 import { permissionAllowed, sanitizeUserAgent } from './permissions';
-import { allowedNavigation, allowedDownload, isAuthPopup, popupAllowed, isPdfUrl, sameServiceOrigin, contentBounds, splitBounds, partitionFor, remotePreferences, catalogOf, groupMembers, windowTarget } from './policy';
+import { allowedNavigation, allowedDownload, isAuthPopup, popupAllowed, isOAuthRequest, isPdfUrl, sameServiceOrigin, contentBounds, splitBounds, partitionFor, remotePreferences, catalogOf, groupMembers, windowTarget } from './policy';
 import { ApplicationTabs } from './application-tabs';
 import { isZoomPercent, PAGE_ZOOM } from '../shared/zoom';
 import { allowInternalCertificate } from './certificate-policy';
@@ -386,8 +386,12 @@ export class ServiceViewManager {
       const target = windowTarget(details.url, service, this.services);
       if (sameServiceOrigin(details.url, service) && isPdfUrl(details.url)) web.downloadURL(details.url);
       else if (target) hooks.openWindow(details.url, web, target);
-      // Fuera de la app (login OAuth de cualquier proveedor, p. ej. los MCP de LibreChat): ventana emergente, como en el navegador.
-      else if (popupAllowed(details.url)) return popupWindow;
+      // Fuera de la app: el login OAuth de cualquier proveedor (p. ej. los MCP de LibreChat) en ventana emergente, como en el navegador;
+      // cualquier otro enlace (un documento de SharePoint citado por AMA IA) en el navegador del usuario, que ya tiene su sesión.
+      else if (popupAllowed(details.url)) {
+        if (isOAuthRequest(details.url)) return popupWindow;
+        void shell.openExternal(details.url).catch(error => console.warn(`[${service.id}] no se pudo abrir el enlace en el navegador:`, String(error)));
+      }
       else {
         let origin = 'URL inválida';
         try { origin = new URL(details.url).origin; } catch { /* se registra como inválida */ }

@@ -4,7 +4,7 @@ import { permissionAllowed, permissionsFor, sanitizeUserAgent } from '../../src/
 
 const svc = (id: string) => SERVICES.find(s => s.id === id)!;
 const teams = svc('teams');
-const origins = ['https://teams.microsoft.com/v2/', 'https://teams.cloud.microsoft/', 'https://eu.teams.microsoft.com/', 'https://outlook.office.com/mail/', 'https://m365.cloud.microsoft/', 'https://amatime.sharepoint.com/', 'https://forms.office.com/'];
+const origins = ['https://teams.microsoft.com/v2/', 'https://teams.cloud.microsoft/', 'https://eu.teams.microsoft.com/', 'https://outlook.office.com/mail/', 'https://m365.cloud.microsoft/', 'https://amatime.sharepoint.com/', 'https://forms.cloud.microsoft/'];
 const TEAMS = ['clipboard-sanitized-write', 'fullscreen', 'media', 'notifications'];
 const INTERNAL = ['huly', 'n8n', 'librechat', 'stirling'];
 

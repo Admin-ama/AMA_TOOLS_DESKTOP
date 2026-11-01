@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
-import { IconAppWindow, IconPlus, IconShieldLock, IconTrash } from '@tabler/icons-react';
+import { IconPlus, IconShieldLock, IconTrash } from '@tabler/icons-react';
 import type { DesktopAppView } from '../shared/contracts';
+import { appInitial } from '../shared/app-initial';
 
 const MOTION = '(prefers-reduced-motion: no-preference)';
 
@@ -17,6 +18,13 @@ interface Props {
   onOpen(id: string): void;
   onOffice(id: string): void;
   onRemove(id: string): void;
+}
+
+/** Icono de la app o, si no hay o no carga, la inicial de su nombre. */
+function DockIcon({ app }: { app: DesktopAppView }) {
+  const [broken, setBroken] = useState<string>();
+  if (app.icon && broken !== app.icon) return <img className="dock-icon" src={app.icon} alt="" draggable={false} onError={() => setBroken(app.icon)} />;
+  return <span className="dock-initial" aria-hidden="true">{appInitial(app.name)}</span>;
 }
 
 /** Accesos directos a apps de escritorio del equipo; solo conoce id, nombre e icono, nunca rutas. */
@@ -46,12 +54,12 @@ export function DesktopDock({ apps, office, forticlient, blocked, full, onFortic
       {forticlient && <button className="nav-item dock-item" aria-label="Abrir FortiClient" data-tooltip="Abrir FortiClient" data-tooltip-side="left" onClick={onForticlient}><IconShieldLock size={24} stroke={1.65} /></button>}
       {office.length > 0 && <div className="dock-office" role="group" aria-label="Microsoft Office">
         {office.map(app => <button key={app.id} className="nav-item dock-item" aria-label={`Abrir ${app.name}`} data-tooltip={app.name} data-tooltip-side="left" onClick={() => onOffice(app.id)} onContextMenu={event => event.preventDefault()}>
-          {app.icon ? <img className="dock-icon" src={app.icon} alt="" draggable={false} /> : <IconAppWindow size={24} stroke={1.65} />}
+          <DockIcon app={app} />
         </button>)}
       </div>}
       {apps.map(app => <button key={app.id} ref={node => { if (node) nodes.current.set(app.id, node); else nodes.current.delete(app.id); }} className="nav-item dock-item" aria-label={`Abrir ${app.name} (escritorio)`} data-tooltip={app.name} data-tooltip-side="left" onClick={() => onOpen(app.id)}
         onContextMenu={event => { event.preventDefault(); const dock = event.currentTarget.closest('.dock')!.getBoundingClientRect(); setMenu({ id: app.id, top: event.clientY - dock.top }); }}>
-        {app.icon ? <img className="dock-icon" src={app.icon} alt="" draggable={false} /> : <IconAppWindow size={24} stroke={1.65} />}
+        <DockIcon app={app} />
       </button>)}
     </div>
     <button className="nav-item dock-add" aria-label="Vincular aplicación de escritorio" data-tooltip={full ? 'Máximo de aplicaciones alcanzado' : 'Vincular aplicación de escritorio'} data-tooltip-side="left" disabled={blocked || full} onClick={onAdd}><IconPlus size={22} stroke={1.65} /></button>

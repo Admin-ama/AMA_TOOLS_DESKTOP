@@ -185,6 +185,7 @@ input[type=checkbox] { accent-color:var(--accent); width:1rem; height:1rem; }
 .dock-office { display:flex; flex-direction:column; gap:.375rem; padding-bottom:.375rem; border-bottom:1px solid var(--line); }
 .dock-office:last-child { border-bottom:0; }
 .dock-icon { width:28px; height:28px; object-fit:contain; pointer-events:none; }
+.dock-initial { display:grid; place-items:center; width:28px; height:28px; border-radius:8px; background:var(--soft); color:var(--text); font-weight:700; font-size:15px; line-height:1; pointer-events:none; user-select:none; }
 .dock-add { margin-top:auto; border-top:1px solid var(--line); height:48px; }
 .dock-menu { position:absolute; left:4px; right:4px; transform:translateY(-50%); display:flex; justify-content:center; padding:.2rem; background:var(--surface); border:1px solid var(--line); border-radius:.6rem; box-shadow:0 8px 24px #00000040; z-index:10; }
 .status-bar { grid-column:1 / -1; grid-row:3; display:flex; align-items:center; gap:1rem; padding:0 .9rem; background:var(--surface); border-top:1px solid var(--line); font-size:.65rem; color:var(--muted); z-index:4; }

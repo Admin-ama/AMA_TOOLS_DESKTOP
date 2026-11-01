@@ -21,7 +21,7 @@ export const SERVICES: Service[] = [
   { id: 'outlook', name: 'Outlook', shortName: 'Outlook', category: 'comunicacion', url: 'https://outlook.office.com/mail/', group: 'microsoft' },
   { id: 'sharepoint', name: 'SharePoint', shortName: 'SharePoint', category: 'operacion', url: 'https://amatime.sharepoint.com/', group: 'microsoft' },
   { id: 'powerautomate', name: 'Power Automate', shortName: 'Power Automate', category: 'automatizacion', url: 'https://make.powerautomate.com/', group: 'microsoft' },
-  { id: 'forms', name: 'Microsoft Forms', shortName: 'Forms', category: 'automatizacion', url: 'https://forms.office.com/', group: 'microsoft' },
+  { id: 'forms', name: 'Microsoft Forms', shortName: 'Forms', category: 'automatizacion', url: 'https://forms.cloud.microsoft/', group: 'microsoft' },
   { id: 'costeador', name: 'Costeador', shortName: 'Costeador', category: 'amatime', url: 'https://julio-sepulveda-costeo-bulk-copacki.vercel.app/', admin: { name: 'Julio Sepúlveda', email: 'jsepulveda@amatime.com' } },
   { id: 'buk', name: 'Buk', shortName: 'Buk', category: 'control', url: 'https://amatime.buk.cl/users/sign_in' },
 ];
@@ -88,6 +88,13 @@ export function popupAllowed(destination: string): boolean {
   try {
     const url = new URL(destination);
     return !url.username && !url.password && (url.protocol === 'https:' || internalWeb(destination));
+  } catch { return false; }
+}
+/** Petición de autorización OAuth (RFC 6749 §4.1.1: response_type y client_id obligatorios); un enlace normal no las lleva. */
+export function isOAuthRequest(destination: string): boolean {
+  try {
+    const { searchParams } = new URL(destination);
+    return searchParams.has('response_type') && searchParams.has('client_id');
   } catch { return false; }
 }
 /**

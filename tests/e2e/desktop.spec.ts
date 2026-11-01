@@ -1509,7 +1509,7 @@ test('el login OAuth en ventana emergente (Connect de n8n, MCP de LibreChat) se 
   // Cualquier otra app también: así abre LibreChat el "Continue with OAuth" de sus MCP (sin opener).
   await switchApplication('Huly Workspace', 'huly 1');
   await app.evaluate(({ webContents }) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/huly'))!
-    .executeJavaScript("window.open('https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=mcp', '_blank', 'noopener,noreferrer')", true));
+    .executeJavaScript("window.open('https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=mcp&response_type=code', '_blank', 'noopener,noreferrer')", true));
   await expect.poll(async () => (await popups()).length).toBe(1);
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.isDestroyed() && !w.webContents.isDestroyed() && w.getParentWindow() && !/#(tooltip|update-notice)$/.test(w.webContents.getURL()))!.close());
   await expect.poll(async () => (await popups()).length).toBe(0);
@@ -1518,5 +1518,15 @@ test('el login OAuth en ventana emergente (Connect de n8n, MCP de LibreChat) se 
     await app.evaluate(({ webContents }, target) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/huly'))!.executeJavaScript(`!!window.open(${JSON.stringify(target)}, '_blank')`, true), url);
   }
   await page.waitForTimeout(300);
+  expect(await popups()).toHaveLength(0);
+  // Un enlace normal (el Excel de SharePoint que cita AMA IA) va al navegador del usuario, que ya tiene la sesión: sin ventana ni login.
+  await app.evaluate(({ shell }) => {
+    const opened: string[] = [];
+    (globalThis as { __opened?: string[] }).__opened = opened;
+    shell.openExternal = async (url: string) => { opened.push(url); };
+  });
+  const link = 'https://amatime.sharepoint.com/sites/IT/Shared%20Documents/FORMSSAVE/Registro.xlsx';
+  await app.evaluate(({ webContents }, target) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/huly'))!.executeJavaScript(`window.open(${JSON.stringify(target)}, '_blank')`, true), link);
+  await expect.poll(() => app.evaluate(() => (globalThis as { __opened?: string[] }).__opened)).toEqual([link]);
   expect(await popups()).toHaveLength(0);
 });

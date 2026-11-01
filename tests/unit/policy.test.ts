@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CATEGORIES, FIXED_APPS, GLOBAL_APP_IDS } from '../../src/shared/contracts';
-import { SERVICES, isAuthPopup, popupAllowed, validAdmin, accessRequestUrl, isAppId, allowedNavigation, allowedDownload, isPdfUrl, partitionFor, contentBounds, remotePreferences, customService, catalogOf, sameServiceOrigin, groupMembers, windowTarget } from '../../src/main/policy';
+import { SERVICES, isAuthPopup, popupAllowed, isOAuthRequest, validAdmin, accessRequestUrl, isAppId, allowedNavigation, allowedDownload, isPdfUrl, partitionFor, contentBounds, remotePreferences, customService, catalogOf, sameServiceOrigin, groupMembers, windowTarget } from '../../src/main/policy';
 
 describe('registro y aislamiento', () => {
   it('registra las direcciones reales', () => {
@@ -10,7 +10,7 @@ describe('registro y aislamiento', () => {
       'https://email-category-ai.vercel.app/', 'http://172.16.8.73:8080/',
       'https://teams.microsoft.com/v2/',
       'https://m365.cloud.microsoft/', 'https://outlook.office.com/mail/', 'https://amatime.sharepoint.com/',
-      'https://make.powerautomate.com/', 'https://forms.office.com/', 'https://julio-sepulveda-costeo-bulk-copacki.vercel.app/', 'https://amatime.buk.cl/users/sign_in'
+      'https://make.powerautomate.com/', 'https://forms.cloud.microsoft/', 'https://julio-sepulveda-costeo-bulk-copacki.vercel.app/', 'https://amatime.buk.cl/users/sign_in'
     ]);
   });
   it('cada servicio pertenece a una categoría válida y cada categoría tiene servicios', () => {
@@ -101,7 +101,7 @@ describe('catálogo de Microsoft 365', () => {
     ['outlook', 'Outlook', 'Outlook', 'comunicacion', 'https://outlook.office.com/mail/'],
     ['sharepoint', 'SharePoint', 'SharePoint', 'operacion', 'https://amatime.sharepoint.com/'],
     ['powerautomate', 'Power Automate', 'Power Automate', 'automatizacion', 'https://make.powerautomate.com/'],
-    ['forms', 'Microsoft Forms', 'Forms', 'automatizacion', 'https://forms.office.com/'],
+    ['forms', 'Microsoft Forms', 'Forms', 'automatizacion', 'https://forms.cloud.microsoft/'],
   ] as const;
   it('incluye las apps nuevas con su categoría y url', () => {
     for (const [id, name, shortName, category, url] of added) expect(byId(id), id).toMatchObject({ name, shortName, category, url, group: 'microsoft' });
@@ -165,7 +165,7 @@ describe('ventanas nuevas dentro del grupo Microsoft', () => {
   const source = (id: string) => SERVICES.find(s => s.id === id)!;
   it('un enlace al origen de otro miembro abre una pestaña de ese miembro', () => {
     expect(windowTarget('https://amatime.sharepoint.com/:w:/r/sites/x/doc.docx', source('outlook'), SERVICES)).toBe('sharepoint');
-    expect(windowTarget('https://forms.office.com/r/abc', source('teams'), SERVICES)).toBe('forms');
+    expect(windowTarget('https://forms.cloud.microsoft/r/abc', source('teams'), SERVICES)).toBe('forms');
     expect(windowTarget('https://teams.microsoft.com/l/meetup-join/x', source('outlook'), SERVICES)).toBe('teams');
   });
   it('sin origen exacto elige el miembro con el dominio más parecido', () => {
@@ -235,6 +235,10 @@ describe('ventanas emergentes de login (OAuth)', () => {
   it('fuera de la app, cualquier app abre ventana emergente hacia https o la red interna (login OAuth de los MCP de LibreChat)', () => {
     for (const url of ['https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=x', 'https://github.com/login/oauth/authorize', 'http://172.16.8.73:8000/authorize', 'about:blank']) expect(popupAllowed(url), url).toBe(true);
     for (const url of ['http://evil.test/', 'https://user:pw@login.microsoftonline.com/x', 'http://u:p@172.16.8.73/', 'javascript:alert(1)', 'file:///C:/Windows/', 'data:text/html,x', 'about:srcdoc', 'not a url']) expect(popupAllowed(url), url).toBe(false);
+  });
+  it('solo una petición OAuth (response_type y client_id) va a ventana emergente; los enlaces normales, al navegador del sistema', () => {
+    for (const url of ['https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=x&response_type=code', 'https://github.com/login/oauth/authorize?response_type=code&client_id=y&redirect_uri=z']) expect(isOAuthRequest(url), url).toBe(true);
+    for (const url of ['https://amatime.sharepoint.com/sites/IT/Shared%20Documents/x.xlsx', 'https://login.microsoftonline.com/x?client_id=x', 'https://github.com/login/oauth/authorize', 'not a url']) expect(isOAuthRequest(url), url).toBe(false);
   });
   it('el resto sigue el camino normal (pestaña o bloqueo)', () => {
     for (const url of ['https://172.16.8.73:5443/workflow/1', 'http://login.microsoftonline.com/x', 'https://login.microsoftonline.com.evil.test/x', 'https://user:pw@login.microsoftonline.com/x', 'https://evil.test/', 'javascript:alert(1)', 'not a url']) expect(isAuthPopup(url, n8n), url).toBe(false);
