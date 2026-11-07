@@ -1,4 +1,7 @@
-import { WebContentsView, app, session, shell, type BrowserWindow } from 'electron';
+import { WebContentsView, Notification, app, session, shell, type BrowserWindow } from 'electron';
+import { existsSync, mkdirSync } from 'node:fs';
+import { basename, dirname } from 'node:path';
+import { createDownloadOrganizer } from './download-organizer';
 import { type ApplicationTab, type Service, type AppId, type ServiceState, type Snapshot, type Preferences, type SplitCapture, type FrozenView } from '../shared/contracts';
 import { permissionAllowed, sanitizeUserAgent } from './permissions';
 import { allowedNavigation, allowedDownload, isAuthPopup, popupAllowed, isOAuthRequest, isPdfUrl, sameServiceOrigin, contentBounds, splitBounds, partitionFor, remotePreferences, catalogOf, groupMembers, windowTarget } from './policy';
@@ -14,6 +17,8 @@ export const FIRST_PAINT_MAX_MS = 12_000;
 /** Lo que cambia entre una pestaña y el panel lateral; el resto (guardas, sesión, descargas, certificados) es común. */
 interface Hooks { attach(entry: Entry): void; state(): ServiceState; set(state: ServiceState): void; title(title: string): void; openWindow(url: string, web: Electron.WebContents, target: AppId): void }
 const securedSessions = new WeakSet<Electron.Session>();
+/** Una sola instancia: las sesiones son comunes a todas las vistas, y las rutas reservadas deben verse entre sí. */
+const downloads = createDownloadOrganizer({ downloadsDir: () => app.getPath('downloads'), exists: existsSync });
 /** Las sesiones del grupo se comparten entre apps: permisos y descargas se resuelven por vista (webContents), no por sesión. */
 const viewServices = new WeakMap<Electron.WebContents, Service>();
 const sessionGroups = new WeakMap<Electron.Session, Service['group']>();
@@ -346,10 +351,26 @@ export class ServiceViewManager {
       web.session.setPermissionCheckHandler((wc, permission, requestingOrigin) => permissionAllowed(serviceOf(wc), permission, requestingOrigin));
       web.session.setDisplayMediaRequestHandler((_request, callback) => callback({})); // Compartir pantalla: no implementado.
       if (service.group) web.session.setUserAgent(sanitizeUserAgent(web.session.getUserAgent()));
-      // Solo se baja del origen de la app (o de destinos del grupo Microsoft); diálogo "Guardar como" nativo.
+      // Solo se baja del origen de la app (o de destinos del grupo Microsoft). Se guarda sin preguntar en Descargas/AMA Tools/<app>/<tipo>.
       web.session.on('will-download', (event, item, wc) => {
         const owner = wc ? viewServices.get(wc) : undefined;
-        if (!owner || !allowedDownload(item.getURL(), owner)) event.preventDefault();
+        if (!owner || !allowedDownload(item.getURL(), owner)) { event.preventDefault(); return; }
+        let target: string;
+        try {
+          target = downloads.resolve(owner.name, item.getFilename(), item.getMimeType());
+          mkdirSync(dirname(target), { recursive: true });
+        } catch (error) {
+          console.warn(`[${owner.id}] no se pudo ordenar la descarga; se pregunta dónde guardar:`, String(error));
+          return; // Sin savePath, Electron muestra el diálogo "Guardar como".
+        }
+        item.setSavePath(target);
+        item.once('done', (_event, state) => {
+          downloads.release(target);
+          if (state !== 'completed' || !Notification.isSupported()) return;
+          const notice = new Notification({ title: 'Descarga lista', body: `${basename(target)}\n${basename(dirname(dirname(target)))} › ${basename(dirname(target))}`, silent: true });
+          notice.on('click', () => shell.showItemInFolder(target));
+          notice.show();
+        });
       });
       if (web.session.isPersistent()) {
         // Las cookies de sesión (p. ej. el login de Buk) se borran al cerrar: se guardan con caducidad, como hace Chrome al restaurar la sesión.

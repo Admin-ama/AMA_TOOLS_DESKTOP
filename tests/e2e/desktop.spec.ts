@@ -1411,7 +1411,8 @@ test('descargas generadas por la página (blob: y data:) se permiten; las de otr
   await waitForPage();
   const id = await app.evaluate(({ webContents }) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/librechat'))!.id);
   // Escucha después de la política de la app: registra si la bloqueó y guarda en temp para no abrir el diálogo nativo.
-  await app.evaluate(({ webContents }, [wid, dir]) => {
+  await app.evaluate(({ app, webContents }, [wid, dir]) => {
+    app.setPath('downloads', dir as string); // El organizador crea carpetas: que sea en temp y no en las Descargas reales.
     const record: { url: string; blocked: boolean }[] = (globalThis as any).downloads = [];
     webContents.fromId(wid as number)!.session.on('will-download', (event, item) => {
       record.push({ url: item.getURL().slice(0, 5), blocked: event.defaultPrevented });
@@ -1426,6 +1427,37 @@ test('descargas generadas por la página (blob: y data:) se permiten; las de otr
   // Otro origen: la página navega/descarga desde fuera; la política la bloquea.
   await app.evaluate(({ webContents }, wid) => webContents.fromId(wid)!.downloadURL('https://evil.example/x.json'), id);
   await expect.poll(() => app.evaluate(() => (globalThis as any).downloads)).toEqual([{ url: 'blob:', blocked: false }, { url: 'data:', blocked: false }, { url: 'https', blocked: true }]);
+});
+
+test('las descargas se guardan sin diálogo en Descargas/AMA Tools/<app>/<tipo> y los nombres repetidos no se pisan', async () => {
+  await waitForPage();
+  const downloads = await mkdtemp(path.join(tmpdir(), 'ama-downloads-'));
+  const id = await app.evaluate(({ webContents }) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/librechat'))!.id);
+  // Escucha después de la política de la app: anota dónde quedó cada archivo cuando termina.
+  await app.evaluate(({ app, webContents }, [wid, dir]) => {
+    app.setPath('downloads', dir as string);
+    const saved: { path: string; state: string }[] = (globalThis as any).saved = [];
+    webContents.fromId(wid as number)!.session.on('will-download', (_event, item) => item.once('done', (_done, state) => saved.push({ path: item.getSavePath(), state })));
+  }, [id, downloads] as const);
+  const download = async (name: string, count: number) => {
+    await app.evaluate(({ webContents }, [wid, file]) => webContents.fromId(wid as number)!.executeJavaScript(`(() => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['x'])); a.download = ${JSON.stringify(file)}; document.body.append(a); a.click(); })()`, true), [id, name] as const);
+    await expect.poll(() => app.evaluate(() => (globalThis as any).saved.length)).toBe(count);
+  };
+  try {
+    await download('costos.csv', 1);
+    await download('costos.csv', 2);
+    await download('informe.pdf', 3);
+    const saved: { path: string; state: string }[] = await app.evaluate(() => (globalThis as any).saved);
+    const base = path.join(downloads, 'AMA Tools', 'AMA IA');
+    expect(saved).toEqual([
+      { path: path.join(base, 'Hojas de cálculo', 'costos.csv'), state: 'completed' },
+      { path: path.join(base, 'Hojas de cálculo', 'costos (1).csv'), state: 'completed' },
+      { path: path.join(base, 'Documentos', 'informe.pdf'), state: 'completed' },
+    ]);
+    for (const file of saved) expect(await readFile(file.path, 'utf8')).toBe('x');
+  } finally {
+    await rm(downloads, { recursive: true, force: true });
+  }
 });
 
 test('con "recordar sesión" las cookies de sesión de TODAS las apps (login sin "recordarme", como Buk) sobreviven al reiniciar', async () => {
