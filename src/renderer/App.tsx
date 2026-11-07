@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type CSSProperties } from 'react';
-import { IconSettings, IconHelpHexagon, IconMoon, IconSun, IconRefresh, IconShieldCheck, IconAlertTriangle, IconChevronLeft, IconTrash, IconActivity, IconPlus, IconMinus, IconX, IconLayoutGrid, IconLayoutSidebarRight } from '@tabler/icons-react';
+import { IconDownload, IconSettings, IconHelpHexagon, IconMoon, IconSun, IconRefresh, IconShieldCheck, IconAlertTriangle, IconChevronLeft, IconTrash, IconActivity, IconPlus, IconMinus, IconX, IconLayoutGrid, IconLayoutSidebarRight } from '@tabler/icons-react';
 import { CATEGORIES, FIXED_APPS, MINE_CATEGORY, type AppId, type FrozenView, type Snapshot } from '../shared/contracts';
 import { movePinned, stepPinned } from '../shared/pin-order';
 import { SHELL_LAYOUT } from '../shared/layout';
@@ -9,6 +9,7 @@ import { AppContextMenu, anchorOf, isMenuKey, type MenuAction, type MenuAnchor }
 import { NetworkBlock } from './NetworkBlock';
 import { DesktopDock } from './DesktopDock';
 import { DesktopPicker } from './DesktopPicker';
+import { DownloadsPopover, downloadsAnchorOf, type DownloadsAnchor } from './DownloadsPopover';
 import { StatusBar } from './StatusBar';
 import { Splash } from './Splash';
 import { SplitView } from './SplitView';
@@ -34,6 +35,9 @@ export function App() {
   const [drop, setDrop] = useState<{ id: AppId; place: 'before' | 'after' } | null>(null);
   const trigger = useRef<HTMLElement | null>(null);
   const [picker, setPicker] = useState(false);
+  const [downloadsAt, setDownloadsAt] = useState<DownloadsAnchor | null>(null);
+  /** Descargas ya vistas: el punto del botón avisa solo de las nuevas desde la última vez que se abrió la lista. */
+  const seenDownloads = useRef(new Set<string>());
   useEffect(() => {
     const unsubscribe = window.portal.onChange(setState);
     void window.portal.snapshot().then(setState).catch(() => setError('No se pudo conectar con el contenedor. Reinicia la aplicación.'));
@@ -44,7 +48,9 @@ export function App() {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
-  useTooltips(!!menu || picker || (!!state && state.panel !== 'service'));
+  useTooltips(!!menu || picker || !!downloadsAt || (!!state && state.panel !== 'service'));
+  // Con la lista abierta lo que llega ya se ve: no cuenta como nuevo.
+  useEffect(() => { if (downloadsAt) for (const item of state?.downloads ?? []) seenDownloads.current.add(item.id); }, [downloadsAt, state?.downloads]);
   useEffect(() => { if (state) document.documentElement.dataset.theme = state.preferences.theme; }, [state?.preferences.theme]);
   // Sin red las vistas ya están ocultas y los botones deshabilitados: el menú no debe quedar flotando.
   useEffect(() => { if (menu && state && state.network.status !== 'connected') { setMenu(null); showViews(); } }, [menu, state?.network.status]);
@@ -111,6 +117,17 @@ export function App() {
     setPicker(false);
     showViews();
     document.querySelector<HTMLElement>('.dock-add')?.focus();
+  }
+  // Lista de descargas: mismo mecanismo; se abre bajo el botón de la barra.
+  function openDownloads(source: HTMLElement) {
+    trigger.current = source;
+    setDownloadsAt(downloadsAnchorOf(source));
+    hideViews();
+  }
+  function closeDownloads(restoreFocus: boolean) {
+    setDownloadsAt(null);
+    showViews();
+    if (restoreFocus) trigger.current?.focus();
   }
   function runMenu(choice: MenuAction) {
     if (!menu) return;
@@ -205,6 +222,7 @@ export function App() {
           <button className="zoom-percent" aria-label="Restablecer zoom" data-tooltip="Restablecer zoom al 100%" data-tooltip-side="bottom" disabled={blocked || state.panel !== 'service'} onClick={() => void action(() => window.portal.zoom(PAGE_ZOOM.default))}>{state.zoomPercent}%</button>
           <button className="icon-button" aria-label="Aumentar zoom" data-tooltip="Aumentar zoom" data-tooltip-side="bottom" disabled={blocked || state.panel !== 'service' || state.zoomPercent >= PAGE_ZOOM.max} onClick={() => void action(() => window.portal.zoom(Math.min(PAGE_ZOOM.max, state.zoomPercent + PAGE_ZOOM.step)))}><IconPlus size={15} /></button>
         </div>
+        <button className={`icon-button has-badge ${downloadsAt ? 'toggled' : ''}`} aria-label="Descargas" aria-haspopup="dialog" aria-expanded={!!downloadsAt} data-tooltip="Descargas" data-tooltip-side="bottom" onClick={event => downloadsAt ? closeDownloads(false) : openDownloads(event.currentTarget)}><IconDownload size={19} />{!downloadsAt && state.downloads.some(item => !seenDownloads.current.has(item.id)) && <span className="badge-dot" role="status" aria-label="Descargas nuevas" />}</button>
         <button className="icon-button" aria-label="Recargar servicio" data-tooltip="Recargar servicio" data-tooltip-side="bottom" onClick={() => void action(() => window.portal.reload())}><IconRefresh size={19} /></button>
         <button className={`icon-button ${state.split ? 'toggled' : ''}`} aria-label={state.split ? 'Cerrar panel lateral' : 'Abrir panel lateral'} aria-pressed={!!state.split} data-tooltip={state.split ? 'Cerrar panel lateral' : 'Abrir panel lateral'} data-tooltip-side="bottom" disabled={blocked && !state.split} onClick={() => void action(() => state.split ? window.portal.splitClose() : window.portal.splitOpen())}><IconLayoutSidebarRight size={19} /></button>
         <button className="icon-button" aria-label={light ? 'Cambiar a tema oscuro' : 'Cambiar a tema claro'} data-tooltip={light ? 'Cambiar a tema oscuro' : 'Cambiar a tema claro'} data-tooltip-side="bottom" onClick={toggleTheme}>{light ? <IconSun size={19} /> : <IconMoon size={19} />}</button>
@@ -257,7 +275,7 @@ export function App() {
     {!blocked && state.panel === 'service' && state.split && <SplitView services={state.services} split={state.split} width={size.width} height={size.height} onSet={id => void action(() => window.portal.splitSet(id))} onToTab={() => void action(() => window.portal.splitToTab())} onClose={() => void action(() => window.portal.splitClose())} onResize={(ratio, persist) => window.portal.splitResize(ratio, persist)} onCapture={() => window.portal.splitCapture()} onDrag={active => window.portal.splitDrag(active)} />}
 
     <StatusBar network={state.network.status} version={state.updates.currentVersion} />
-  </div>{picker && <DesktopPicker onClose={closePicker} onLink={id => { closePicker(); void action(() => window.portal.desktopLink(id)); }} onBrowse={() => { closePicker(); void action(() => window.portal.addDesktopApp()); }} />}{menu && state.services.some(item => item.id === menu.id) && <AppContextMenu service={state.services.find(item => item.id === menu.id)!} pinned={state.preferences.pinned.includes(menu.id)} anchor={menu.anchor} onAction={runMenu} onClose={closeMenu} />}{frozen && frozen.length > 0 && <div className="frozen-views" aria-hidden="true">{frozen.map((shot, index) => <img key={index} src={shot.image} alt="" draggable={false} style={{ left: shot.bounds.x, top: shot.bounds.y, width: shot.bounds.width, height: shot.bounds.height }} />)}</div>}{state.splash !== 'done' && <Splash key="splash" state={state} />}</>;
+  </div>{downloadsAt && <DownloadsPopover downloads={state.downloads} anchor={downloadsAt} onClose={closeDownloads} onOpen={id => void action(() => window.portal.downloadOpen(id))} onReveal={id => void action(() => window.portal.downloadReveal(id))} onFolder={() => void action(() => window.portal.downloadsFolder())} onClear={() => void action(() => window.portal.downloadsClear())} />}{picker && <DesktopPicker onClose={closePicker} onLink={id => { closePicker(); void action(() => window.portal.desktopLink(id)); }} onBrowse={() => { closePicker(); void action(() => window.portal.addDesktopApp()); }} />}{menu && state.services.some(item => item.id === menu.id) && <AppContextMenu service={state.services.find(item => item.id === menu.id)!} pinned={state.preferences.pinned.includes(menu.id)} anchor={menu.anchor} onAction={runMenu} onClose={closeMenu} />}{frozen && frozen.length > 0 && <div className="frozen-views" aria-hidden="true">{frozen.map((shot, index) => <img key={index} src={shot.image} alt="" draggable={false} style={{ left: shot.bounds.x, top: shot.bounds.y, width: shot.bounds.width, height: shot.bounds.height }} />)}</div>}{state.splash !== 'done' && <Splash key="splash" state={state} />}</>;
 }
 
 

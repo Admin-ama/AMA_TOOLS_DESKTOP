@@ -1,7 +1,8 @@
-import { WebContentsView, Notification, app, session, shell, type BrowserWindow } from 'electron';
+import { WebContentsView, app, session, shell, type BrowserWindow } from 'electron';
 import { existsSync, mkdirSync } from 'node:fs';
 import { basename, dirname } from 'node:path';
 import { createDownloadOrganizer } from './download-organizer';
+import { downloadHistory } from './download-history';
 import { type ApplicationTab, type Service, type AppId, type ServiceState, type Snapshot, type Preferences, type SplitCapture, type FrozenView } from '../shared/contracts';
 import { permissionAllowed, sanitizeUserAgent } from './permissions';
 import { allowedNavigation, allowedDownload, isAuthPopup, popupAllowed, isOAuthRequest, isPdfUrl, sameServiceOrigin, contentBounds, splitBounds, partitionFor, remotePreferences, catalogOf, groupMembers, windowTarget } from './policy';
@@ -54,7 +55,7 @@ export class ServiceViewManager {
   /** Catálogo vigente: globales + páginas del usuario (preferencias). */
   get services(): Service[] { return catalogOf(this.globals, this.preferences.customApps); }
 
-  snapshot(): Omit<Snapshot, 'splash' | 'updates' | 'network' | 'desktopApps' | 'officeApps'> {
+  snapshot(): Omit<Snapshot, 'splash' | 'updates' | 'network' | 'desktopApps' | 'officeApps' | 'downloads'> {
     // Las rutas de las apps de escritorio nunca salen del proceso principal.
     const { desktopApps: _paths, ...preferences } = this.preferences;
     return { services: this.services, active: this.active, activeTabId: this.tabs.activeTabId, zoomPercent: this.preferences.zoom[this.active] ?? PAGE_ZOOM.default, tabs: this.tabs.all, states: this.tabs.serviceStates(this.services.map(service => service.id)), preferences, panel: this.panel, split: this.split ? { ...this.split } : null };
@@ -364,12 +365,11 @@ export class ServiceViewManager {
           return; // Sin savePath, Electron muestra el diálogo "Guardar como".
         }
         item.setSavePath(target);
+        const entry = downloadHistory.add({ path: target, name: basename(target), app: owner.name });
         item.once('done', (_event, state) => {
           downloads.release(target);
-          if (state !== 'completed' || !Notification.isSupported()) return;
-          const notice = new Notification({ title: 'Descarga lista', body: `${basename(target)}\n${basename(dirname(dirname(target)))} › ${basename(dirname(target))}`, silent: true });
-          notice.on('click', () => shell.showItemInFolder(target));
-          notice.show();
+          if (state === 'completed') downloadHistory.finish(entry, item.getReceivedBytes() || item.getTotalBytes());
+          else downloadHistory.fail(entry);
         });
       });
       if (web.session.isPersistent()) {

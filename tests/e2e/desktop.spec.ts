@@ -1455,6 +1455,25 @@ test('las descargas se guardan sin diálogo en Descargas/AMA Tools/<app>/<tipo> 
       { path: path.join(base, 'Documentos', 'informe.pdf'), state: 'completed' },
     ]);
     for (const file of saved) expect(await readFile(file.path, 'utf8')).toBe('x');
+    // Lista de descargas en la barra: llega por snapshot, sin rutas reales.
+    const snapshot = await page.evaluate(() => window.portal.snapshot());
+    expect(snapshot.downloads.map(item => [item.name, item.app, item.state])).toEqual([['informe.pdf', 'AMA IA', 'completed'], ['costos (1).csv', 'AMA IA', 'completed'], ['costos.csv', 'AMA IA', 'completed']]);
+    expect(JSON.stringify(snapshot.downloads)).not.toContain(path.basename(downloads));
+    const button = page.getByRole('button', { name: 'Descargas', exact: true });
+    await expect(button.locator('.badge-dot')).toBeVisible();
+    await button.click();
+    const dialog = page.getByRole('dialog', { name: 'Descargas' });
+    await expect(dialog.getByRole('listitem')).toHaveCount(3);
+    await expect(dialog).toContainText('Se guardan en Descargas\\AMA Tools');
+    await expect(dialog.getByRole('button', { name: 'Abrir informe.pdf' })).toBeEnabled();
+    await expect(button.locator('.badge-dot')).toHaveCount(0);
+    // El renderer solo conoce ids: uno inventado se rechaza en main.
+    expect(await page.evaluate(() => window.portal.downloadOpen('inventado').then(() => false, () => true))).toBe(true);
+    await dialog.getByRole('button', { name: 'Limpiar lista' }).click();
+    await expect(dialog.getByText('Aún no hay descargas.')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    expect((await page.evaluate(() => window.portal.snapshot())).downloads).toEqual([]);
   } finally {
     await rm(downloads, { recursive: true, force: true });
   }

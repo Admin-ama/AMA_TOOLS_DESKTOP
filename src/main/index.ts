@@ -2,7 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { app, BrowserWindow, ipcMain, protocol, nativeTheme, Menu, dialog, screen, shell, net } from 'electron';
 import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
+import { downloadHistory, opensDirectly } from './download-history';
+import { ROOT_FOLDER } from './download-organizer';
 import path from 'node:path';
 import { SERVICES, isAppId, groupMembers, validAdmin, accessRequestUrl } from './policy';
 import { SHELL_LAYOUT } from '../shared/layout';
@@ -118,7 +120,7 @@ async function createWindow() {
     // Si el renderer no confirma su animación de salida, la app se muestra igual.
     splashTimers.push(setTimeout(() => { finishSplash(); publish(); }, SPLASH.exitGraceMs));
   };
-  const snapshot = () => ({ ...manager.snapshot(), splash, updates: updates.snapshot, network: { status: network.status, forticlient: forticlient.available }, desktopApps: desktopApps.views(), officeApps: officeApps.views() });
+  const snapshot = () => ({ ...manager.snapshot(), splash, updates: updates.snapshot, network: { status: network.status, forticlient: forticlient.available }, desktopApps: desktopApps.views(), officeApps: officeApps.views(), downloads: downloadHistory.views() });
   const publish = () => {
     if (!window.isDestroyed()) {
       evaluateSplash();
@@ -127,6 +129,7 @@ async function createWindow() {
       notice.update(state);
     }
   };
+  window.on('closed', downloadHistory.onChange(publish));
   const cursor = new CursorTracker({
     cursor: () => screen.getCursorScreenPoint(),
     bounds: () => window.getContentBounds(),
@@ -313,6 +316,24 @@ async function createWindow() {
           await savePreferences(preferencesFile, preferences);
           break;
         }
+        // Descargas: el renderer solo manda el id; la ruta real sale de la lista de main y debe seguir existiendo.
+        case 'download-open':
+        case 'download-reveal': {
+          const target = typeof args[0] === 'string' ? downloadHistory.pathOf(args[0]) : undefined;
+          if (!target || !existsSync(target)) throw new Error('El archivo ya no está en su carpeta');
+          if (command === 'download-open' && opensDirectly(target)) {
+            const failure = await shell.openPath(target);
+            if (failure) throw new Error('No se pudo abrir el archivo');
+          } else shell.showItemInFolder(target);
+          break;
+        }
+        case 'downloads-folder': {
+          const folder = path.join(app.getPath('downloads'), ROOT_FOLDER);
+          await mkdir(folder, { recursive: true });
+          if (await shell.openPath(folder)) throw new Error('No se pudo abrir la carpeta');
+          break;
+        }
+        case 'downloads-clear': downloadHistory.clear(); break;
         case 'overlay': {
           if (typeof args[0] !== 'boolean') throw new Error('Estado inválido');
           if (args[0]) tooltip.hide();

@@ -294,3 +294,29 @@ input[type=checkbox] { accent-color:var(--accent); width:1rem; height:1rem; }
 .launcher-access { display:inline-flex; align-items:center; gap:.35rem; margin:0 .8rem .75rem 4.4rem; padding:.3rem .65rem; border-radius:999px; border:1px solid #5b5fc755; background:#5b5fc71f; color:#a5a8f5; font-size:.68rem; font-weight:700; }
 .launcher-access:hover { background:#5b5fc733; border-color:#7b7fe8; color:#c7c9ff; }
 :root[data-theme='light'] .launcher-access { color:#4b4fc0; }
+/* Descargas: popover bajo la barra superior; misma mecánica de overlay que el menú de apps. */
+.downloads-popover { position:fixed; z-index:61; width:min(23rem, calc(100vw - 1rem)); max-height:min(30rem, calc(100vh - 5rem)); display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--line); border-radius:.9rem; box-shadow:0 14px 40px #00000066; overflow:hidden; }
+.downloads-head { display:flex; align-items:center; gap:.5rem; padding:.8rem .9rem .5rem; }
+.downloads-head h2 { flex:1; margin:0; font-size:.85rem; font-weight:700; color:var(--text); }
+.downloads-folder { padding:.4rem .75rem; border:1px solid var(--line); border-radius:.6rem; background:transparent; color:var(--text); font-size:.68rem; font-weight:600; }
+.downloads-folder:hover { background:#0ea5a016; }
+.downloads-hint { margin:0; padding:.35rem .9rem .55rem; border-bottom:1px solid var(--line); color:var(--soft); font-size:.62rem; }
+.downloads-empty { margin:0; padding:1.6rem .9rem; text-align:center; color:var(--muted); font-size:.72rem; }
+.downloads-list { list-style:none; margin:0; padding:.3rem 0; overflow-y:auto; }
+.download-row { display:flex; align-items:center; gap:.65rem; padding:.55rem .9rem; }
+.download-row:hover { background:#94a3b80a; }
+.download-text { flex:1; min-width:0; display:flex; flex-direction:column; gap:.15rem; }
+.download-text strong { font-size:.74rem; font-weight:700; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.download-text small { font-size:.62rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.download-row.failed .download-text small { color:var(--danger); }
+.download-row.downloading .download-text small { color:var(--teal); }
+.file-badge { flex-shrink:0; width:2.2rem; height:2.2rem; display:grid; place-items:center; border-radius:.55rem; color:#fff; font-size:.52rem; font-weight:800; letter-spacing:.02em; }
+.file-badge.tone-red { background:#dc2626; } .file-badge.tone-green { background:#16a34a; } .file-badge.tone-blue { background:#2563eb; }
+.file-badge.tone-orange { background:#ea580c; } .file-badge.tone-purple { background:#7c3aed; } .file-badge.tone-gray { background:#64748b; } .file-badge.tone-slate { background:#475569; }
+.downloads-foot { display:flex; justify-content:flex-end; padding:.55rem .9rem; border-top:1px solid var(--line); }
+.downloads-clear { background:transparent; color:var(--muted); font-size:.68rem; font-weight:600; text-decoration:underline; }
+.downloads-clear:hover:not(:disabled) { color:var(--text); }
+.downloads-clear:disabled { opacity:.4; text-decoration:none; cursor:default; }
+.icon-button.has-badge { position:relative; }
+.icon-button .badge-dot { position:absolute; top:.3rem; right:.3rem; width:.5rem; height:.5rem; border-radius:50%; background:var(--accent); box-shadow:0 0 0 2px var(--surface); }
+.downloads-popover:focus { outline:0; }

@@ -64,6 +64,8 @@ export type NetworkStatus = 'checking' | 'connected' | 'disconnected';
 export interface NetworkState { status: NetworkStatus; forticlient: boolean }
 /** loading: logo animado tapa la app · leaving: el renderer anima la salida · done: la app es visible. */
 export type SplashPhase = 'loading' | 'leaving' | 'done';
+/** Una descarga de la lista; sin ruta: main la conoce por id. app = nombre de la app de origen; at = ms epoch. size 0 = aún desconocido. */
+export interface DownloadView { id: string; name: string; app: string; ext: string; size: number; at: number; state: 'downloading' | 'completed' | 'failed' }
 export interface Snapshot {
   splash: SplashPhase;
   updates: UpdateState;
@@ -79,6 +81,8 @@ export interface Snapshot {
   desktopApps: DesktopAppView[];
   /** Office fijo del dock (solo los instalados); sin rutas. */
   officeApps: DesktopAppView[];
+  /** Descargas de esta sesión, la más reciente primero. */
+  downloads: DownloadView[];
   panel: 'service' | 'settings' | 'help' | 'launcher';
   split: SplitState | null;
 }
@@ -126,6 +130,14 @@ export interface PortalApi {
   customAdd(input: { name: string; url: string; pin: boolean }): Promise<string>;
   customEdit(id: AppId, input: { name: string; url: string }): Promise<void>;
   customRemove(id: AppId): Promise<void>;
+  /** Abre el archivo descargado (id de DownloadView) con su programa predeterminado. */
+  downloadOpen(id: string): Promise<void>;
+  /** Lo muestra en el Explorador. */
+  downloadReveal(id: string): Promise<void>;
+  /** Abre la carpeta Descargas/AMA Tools. */
+  downloadsFolder(): Promise<void>;
+  /** Vacía la lista (no borra archivos). */
+  downloadsClear(): Promise<void>;
   /** Oculta las vistas nativas mientras un menú o diálogo del DOM está abierto. */
   overlay(active: boolean): Promise<void>;
   /** Oculta las vistas nativas mientras se arrastra el divisor. */
