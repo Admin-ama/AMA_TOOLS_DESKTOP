@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import gsap from 'gsap';
 import { useGSAP } from '@gsap/react';
-import { IconCheck, IconDownload } from '@tabler/icons-react';
+import { IconCheck, IconDownload, IconEye, IconFolder } from '@tabler/icons-react';
 import type { DownloadView } from '../shared/contracts';
 import { badgeOf, newDownloads } from '../shared/download-format';
 
@@ -9,7 +9,7 @@ gsap.registerPlugin(useGSAP);
 
 const MOTION = '(prefers-reduced-motion: no-preference)';
 /** Cuánto sigue a la vista el aviso: tras terminar, lo justo para leerlo; si la descarga sigue, un tope. */
-const LINGER_MS = 3200;
+const LINGER_MS = 6500;
 const DOWNLOADING_MAX_MS = 15_000;
 
 interface Props {
@@ -19,6 +19,9 @@ interface Props {
   /** Hay descargas que no se han visto en la lista. */
   unseen: boolean;
   onToggle(event: MouseEvent<HTMLButtonElement>): void;
+  /** Atajos de la burbuja: siempre sobre la descarga más reciente. */
+  onOpen(id: string): void;
+  onReveal(id: string): void;
 }
 
 /**
@@ -26,10 +29,12 @@ interface Props {
  * pastilla con el nombre del archivo; al terminar confirma que quedó guardado. Todo vive dentro de la barra (DOM):
  * las vistas nativas pintan por encima de la página y taparían cualquier cosa que saliera de ahí.
  */
-export function DownloadButton({ downloads, open, unseen, onToggle }: Props) {
+export function DownloadButton({ downloads, open, unseen, onToggle, onOpen, onReveal }: Props) {
   const root = useRef<HTMLSpanElement>(null);
   const known = useRef<Set<string> | null>(null);
   const [announce, setAnnounce] = useState<{ id: string; extra: number } | null>(null);
+  /** Con el mouse o el foco sobre la burbuja no se retira: da tiempo de usar los atajos. */
+  const [engaged, setEngaged] = useState(false);
   const item = announce ? downloads.find(download => download.id === announce.id) : undefined;
   const phase = item?.state;
 
@@ -51,10 +56,18 @@ export function DownloadButton({ downloads, open, unseen, onToggle }: Props) {
     gsap.to(pill, { opacity: 0, ...(move ? { x: 10 } : {}), duration: 0.22, ease: 'power1.in', onComplete: () => setAnnounce(null) });
   }
   useEffect(() => {
-    if (!announce) return;
+    if (!announce) { setEngaged(false); return; }
+    if (engaged) return;
     const timer = setTimeout(dismiss, phase === 'downloading' ? DOWNLOADING_MAX_MS : LINGER_MS);
     return () => clearTimeout(timer);
-  }, [announce?.id, announce?.extra, phase]);
+  }, [announce?.id, announce?.extra, phase, engaged]);
+  /** Usar un atajo cumple el aviso: la burbuja se retira. */
+  function act(run: (id: string) => void) {
+    if (!item) return;
+    run(item.id);
+    setEngaged(false);
+    dismiss();
+  }
 
   // Entrada (nueva descarga) y "aterrizaje" (terminó): la flecha cae, la onda se abre y las burbujas suben.
   useGSAP(() => {
@@ -86,10 +99,14 @@ export function DownloadButton({ downloads, open, unseen, onToggle }: Props) {
       <span className="dl-bubbles" aria-hidden="true"><i className="dl-bubble" /><i className="dl-bubble" /><i className="dl-bubble" /></span>
       {unseen && !open && <span className="badge-dot" role="status" aria-label="Descargas nuevas" />}
     </button>
-    {item && badge && <span className={`dl-pill ${item.state}`} role="status" aria-live="polite">
+    {item && badge && <span className={`dl-pill ${item.state}`} role="group" aria-label="Última descarga" onMouseEnter={() => setEngaged(true)} onMouseLeave={() => setEngaged(false)} onFocus={() => setEngaged(true)} onBlur={() => setEngaged(false)} onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); dismiss(); } }}>
       <span className={`file-badge tone-${badge.tone}`} aria-hidden="true">{badge.label}</span>
-      <span className="dl-pill-text"><strong>{item.name}</strong><small>{item.state === 'completed' && <IconCheck size={11} aria-hidden="true" />}{message}</small></span>
+      <span className="dl-pill-text" role="status" aria-live="polite"><strong>{item.name}</strong><small>{item.state === 'completed' && <IconCheck size={11} aria-hidden="true" />}{message}</small></span>
       {announce && announce.extra > 0 && <span className="dl-pill-extra" aria-label={`y ${announce.extra} más`}>+{announce.extra}</span>}
+      <span className="dl-pill-actions">
+        <button className="icon-button" aria-label={`Abrir ${item.name}`} data-tooltip="Abrir" data-tooltip-side="bottom" disabled={item.state !== 'completed'} onClick={() => act(onOpen)}><IconEye size={17} /></button>
+        <button className="icon-button" aria-label={`Mostrar ${item.name} en la carpeta`} data-tooltip="Mostrar en la carpeta" data-tooltip-side="bottom" disabled={item.state !== 'completed'} onClick={() => act(onReveal)}><IconFolder size={17} /></button>
+      </span>
     </span>}
   </span>;
 }

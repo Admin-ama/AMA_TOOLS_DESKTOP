@@ -1484,6 +1484,42 @@ test('las descargas se guardan sin diálogo en Descargas/AMA Tools/<app>/<tipo> 
   }
 });
 
+test('la burbuja deja abrir y mostrar en la carpeta siempre el último archivo descargado', async () => {
+  await waitForPage();
+  const downloads = await mkdtemp(path.join(tmpdir(), 'ama-downloads-'));
+  const id = await app.evaluate(({ webContents }) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/librechat'))!.id);
+  // Sin abrir programas ni el Explorador de verdad: se anota qué ruta recibiría cada acción.
+  await app.evaluate(({ app, shell, webContents }, [wid, dir]) => {
+    app.setPath('downloads', dir as string);
+    const calls: [string, string][] = (globalThis as any).shellCalls = [];
+    shell.showItemInFolder = (target: string) => { calls.push(['reveal', target]); };
+    shell.openPath = async (target: string) => { calls.push(['open', target]); return ''; };
+    (globalThis as any).finished = 0;
+    webContents.fromId(wid as number)!.session.on('will-download', (_event, item) => item.once('done', () => { (globalThis as any).finished++; }));
+  }, [id, downloads] as const);
+  const download = async (name: string, count: number) => {
+    await app.evaluate(({ webContents }, [wid, file]) => webContents.fromId(wid as number)!.executeJavaScript(`(() => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['x'])); a.download = ${JSON.stringify(file)}; document.body.append(a); a.click(); })()`, true), [id, name] as const);
+    await expect.poll(() => app.evaluate(() => (globalThis as any).finished)).toBe(count);
+  };
+  try {
+    const pill = page.locator('.dl-pill');
+    await download('uno.pdf', 1);
+    await expect(pill).toContainText('uno.pdf');
+    // Llega otra: la burbuja y sus atajos pasan al archivo más reciente.
+    await download('dos.csv', 2);
+    await expect(pill).toContainText('dos.csv');
+    await expect(pill.getByRole('button', { name: 'Abrir uno.pdf' })).toHaveCount(0);    await pill.getByRole('button', { name: 'Abrir dos.csv' }).click();
+    await expect(pill).toBeHidden();
+    await download('tres.pdf', 3);
+    await expect(pill).toContainText('tres.pdf');
+    await pill.getByRole('button', { name: 'Mostrar tres.pdf en la carpeta' }).click();
+    const base = path.join(downloads, 'AMA Tools', 'AMA IA');
+    expect(await app.evaluate(() => (globalThis as any).shellCalls)).toEqual([['open', path.join(base, 'Hojas de cálculo', 'dos.csv')], ['reveal', path.join(base, 'Documentos', 'tres.pdf')]]);
+  } finally {
+    await rm(downloads, { recursive: true, force: true });
+  }
+});
+
 test('con "recordar sesión" las cookies de sesión de TODAS las apps (login sin "recordarme", como Buk) sobreviven al reiniciar', async () => {
   test.setTimeout(120_000);
   const ids = await page.evaluate(async () => (await window.portal.snapshot()).services.map(service => service.id));
