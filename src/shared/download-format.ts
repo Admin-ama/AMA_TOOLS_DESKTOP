@@ -1,3 +1,10 @@
+import type { DownloadView } from './contracts';
+
+/** Descargas que aún no se conocían (para animar el botón); respeta el orden de la lista, la más reciente primero. */
+export function newDownloads(known: ReadonlySet<string>, list: DownloadView[]): DownloadView[] {
+  return list.filter(item => !known.has(item.id));
+}
+
 export type BadgeTone = 'red' | 'green' | 'blue' | 'orange' | 'purple' | 'gray' | 'slate';
 
 const TONES: Record<BadgeTone, string[]> = {

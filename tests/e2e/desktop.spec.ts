@@ -1447,6 +1447,11 @@ test('las descargas se guardan sin diálogo en Descargas/AMA Tools/<app>/<tipo> 
     await download('costos.csv', 1);
     await download('costos.csv', 2);
     await download('informe.pdf', 3);
+    // Aviso animado en el botón: nombre del último archivo, estado y cuántos más llegaron.
+    const pill = page.locator('.dl-pill');
+    await expect(pill).toContainText('informe.pdf');
+    await expect(pill).toContainText('Guardado · AMA IA');
+    await expect(pill.locator('.dl-pill-extra')).toHaveText('+2');
     const saved: { path: string; state: string }[] = await app.evaluate(() => (globalThis as any).saved);
     const base = path.join(downloads, 'AMA Tools', 'AMA IA');
     expect(saved).toEqual([

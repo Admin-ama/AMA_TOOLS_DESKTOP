@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { badgeOf, formatSize, formatTime } from '../../src/shared/download-format';
+import { badgeOf, formatSize, formatTime, newDownloads } from '../../src/shared/download-format';
+
+const row = (id: string) => ({ id, name: `${id}.pdf`, app: 'n8n', ext: 'pdf', size: 1, at: 1, state: 'completed' as const });
+
+describe('descargas nuevas para animar', () => {
+  it('devuelve solo las que no se conocían, conservando el orden (la más reciente primero)', () => {
+    expect(newDownloads(new Set(['a']), [row('c'), row('b'), row('a')]).map(item => item.id)).toEqual(['c', 'b']);
+  });
+  it('nada nuevo: lista vacía', () => {
+    expect(newDownloads(new Set(['a', 'b']), [row('b'), row('a')])).toEqual([]);
+    expect(newDownloads(new Set(), [])).toEqual([]);
+  });
+});
 
 describe('tamaño legible', () => {
   it('escala B, KB, MB, GB sin decimales de más', () => {

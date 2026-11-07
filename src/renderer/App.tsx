@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type CSSProperties } from 'react';
-import { IconDownload, IconSettings, IconHelpHexagon, IconMoon, IconSun, IconRefresh, IconShieldCheck, IconAlertTriangle, IconChevronLeft, IconTrash, IconActivity, IconPlus, IconMinus, IconX, IconLayoutGrid, IconLayoutSidebarRight } from '@tabler/icons-react';
+import { IconSettings, IconHelpHexagon, IconMoon, IconSun, IconRefresh, IconShieldCheck, IconAlertTriangle, IconChevronLeft, IconTrash, IconActivity, IconPlus, IconMinus, IconX, IconLayoutGrid, IconLayoutSidebarRight } from '@tabler/icons-react';
 import { CATEGORIES, FIXED_APPS, MINE_CATEGORY, type AppId, type FrozenView, type Snapshot } from '../shared/contracts';
 import { movePinned, stepPinned } from '../shared/pin-order';
 import { SHELL_LAYOUT } from '../shared/layout';
@@ -9,6 +9,7 @@ import { AppContextMenu, anchorOf, isMenuKey, type MenuAction, type MenuAnchor }
 import { NetworkBlock } from './NetworkBlock';
 import { DesktopDock } from './DesktopDock';
 import { DesktopPicker } from './DesktopPicker';
+import { DownloadButton } from './DownloadButton';
 import { DownloadsPopover, downloadsAnchorOf, type DownloadsAnchor } from './DownloadsPopover';
 import { StatusBar } from './StatusBar';
 import { Splash } from './Splash';
@@ -222,7 +223,7 @@ export function App() {
           <button className="zoom-percent" aria-label="Restablecer zoom" data-tooltip="Restablecer zoom al 100%" data-tooltip-side="bottom" disabled={blocked || state.panel !== 'service'} onClick={() => void action(() => window.portal.zoom(PAGE_ZOOM.default))}>{state.zoomPercent}%</button>
           <button className="icon-button" aria-label="Aumentar zoom" data-tooltip="Aumentar zoom" data-tooltip-side="bottom" disabled={blocked || state.panel !== 'service' || state.zoomPercent >= PAGE_ZOOM.max} onClick={() => void action(() => window.portal.zoom(Math.min(PAGE_ZOOM.max, state.zoomPercent + PAGE_ZOOM.step)))}><IconPlus size={15} /></button>
         </div>
-        <button className={`icon-button has-badge ${downloadsAt ? 'toggled' : ''}`} aria-label="Descargas" aria-haspopup="dialog" aria-expanded={!!downloadsAt} data-tooltip="Descargas" data-tooltip-side="bottom" onClick={event => downloadsAt ? closeDownloads(false) : openDownloads(event.currentTarget)}><IconDownload size={19} />{!downloadsAt && state.downloads.some(item => !seenDownloads.current.has(item.id)) && <span className="badge-dot" role="status" aria-label="Descargas nuevas" />}</button>
+        <DownloadButton downloads={state.downloads} open={!!downloadsAt} unseen={state.downloads.some(item => !seenDownloads.current.has(item.id))} onToggle={event => downloadsAt ? closeDownloads(false) : openDownloads(event.currentTarget)} />
         <button className="icon-button" aria-label="Recargar servicio" data-tooltip="Recargar servicio" data-tooltip-side="bottom" onClick={() => void action(() => window.portal.reload())}><IconRefresh size={19} /></button>
         <button className={`icon-button ${state.split ? 'toggled' : ''}`} aria-label={state.split ? 'Cerrar panel lateral' : 'Abrir panel lateral'} aria-pressed={!!state.split} data-tooltip={state.split ? 'Cerrar panel lateral' : 'Abrir panel lateral'} data-tooltip-side="bottom" disabled={blocked && !state.split} onClick={() => void action(() => state.split ? window.portal.splitClose() : window.portal.splitOpen())}><IconLayoutSidebarRight size={19} /></button>
         <button className="icon-button" aria-label={light ? 'Cambiar a tema oscuro' : 'Cambiar a tema claro'} data-tooltip={light ? 'Cambiar a tema oscuro' : 'Cambiar a tema claro'} data-tooltip-side="bottom" onClick={toggleTheme}>{light ? <IconSun size={19} /> : <IconMoon size={19} />}</button>
