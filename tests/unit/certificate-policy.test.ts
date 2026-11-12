@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allowInternalCertificate, insecureInternalOrigins, isInternalHost } from '../../src/main/certificate-policy';
+import { allowInternalCertificate, ignoresCertificateErrors, insecureInternalOrigins, isInternalHost, originWithoutPort, pushSocketFilter } from '../../src/main/certificate-policy';
 import { SERVICES } from '../../src/main/policy';
 
 describe('red interna 172.16.8.0/24', () => {
@@ -25,6 +25,20 @@ describe('certificados de los sitios internos', () => {
     for (const error of ['net::ERR_CERT_DATE_INVALID', 'net::ERR_CERT_REVOKED', 'net::ERR_CERT_INVALID', 'net::ERR_CERT_WEAK_KEY', '']) {
       expect(allowInternalCertificate('https://172.16.8.73/', error), error).toBe(false);
     }
+  });
+});
+
+describe('workaround n8n tras nginx (wss + Invalid origin)', () => {
+  it('ignora errores de certificado solo en servicios https de la red interna', () => {
+    expect(ignoresCertificateErrors('https://172.16.8.73:5443/')).toBe(true);
+    for (const url of ['http://172.16.8.73:5678/', 'https://evil.test/', 'https://172.16.8.73.evil.test/', 'nope']) expect(ignoresCertificateErrors(url), url).toBe(false);
+  });
+  it('el filtro del push apunta al WebSocket del servicio', () => {
+    expect(pushSocketFilter('https://172.16.8.73:5443/')).toBe('wss://172.16.8.73:5443/rest/push*');
+  });
+  it('quita el puerto del Origin, como lo ve n8n detrás del nginx', () => {
+    expect(originWithoutPort('https://172.16.8.73:5443')).toBe('https://172.16.8.73');
+    expect(originWithoutPort('https://172.16.8.73')).toBe('https://172.16.8.73');
   });
 });
 

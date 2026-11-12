@@ -47,7 +47,7 @@ El instalador de desarrollo no tiene firma corporativa. Configurar certificado d
 | Pestaña | Dirección |
 |---|---|
 | Huly Workspace | `http://172.16.8.73:8087/` |
-| n8n Automations | `http://172.16.8.73:5678/` |
+| n8n Automations | `https://172.16.8.73:5443/` (nginx delante de n8n) |
 | LibreChat AI | `https://172.16.8.73/` |
 | Portal de Operaciones | `https://app.amatime.com/` |
 | Email Category AI | `https://email-category-ai.vercel.app/` |
@@ -57,6 +57,8 @@ Email Category AI puede navegar también a `https://login.microsoftonline.com`, 
 Las direcciones se definen en [`src/main/policy.ts`](src/main/policy.ts). Editarlas y volver a compilar; no se aceptan URLs arbitrarias desde la interfaz.
 
 **HTTP no cifra credenciales.** Configurar HTTPS antes de producción; el contenedor no cambia la infraestructura. Por petición explícita, LibreChat admite únicamente el error de autoridad no confiable en `https://172.16.8.73/`. Esta excepción reduce la protección frente a suplantación; úsala solo en la red interna de confianza y configura una CA confiable para producción. Los demás certificados y errores siguen validándose.
+
+**Workaround n8n (temporal).** El push de n8n (`wss://172.16.8.73:5443/rest/push`) no pasa por el evento `certificate-error`, y el nginx reenvía `Host` sin puerto, por lo que n8n cierra con `Invalid origin!` ("Lost connection to the server" al ejecutar). Solo la vista de n8n ignora errores de certificado de la red interna y envía el `Origin` del push sin puerto ([`src/main/certificate-policy.ts`](src/main/certificate-policy.ts)). Quitarlo cuando infraestructura distribuya "AMA Internal CA" como raíz de confianza y configure nginx con `proxy_set_header Host $http_host;`.
 
 ## Comportamiento
 

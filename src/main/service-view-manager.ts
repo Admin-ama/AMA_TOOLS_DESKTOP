@@ -8,7 +8,7 @@ import { permissionAllowed, sanitizeUserAgent } from './permissions';
 import { allowedNavigation, allowedDownload, isAuthPopup, popupAllowed, isOAuthRequest, isPdfUrl, sameServiceOrigin, contentBounds, splitBounds, partitionFor, remotePreferences, catalogOf, groupMembers, windowTarget } from './policy';
 import { ApplicationTabs } from './application-tabs';
 import { isZoomPercent, PAGE_ZOOM } from '../shared/zoom';
-import { allowInternalCertificate } from './certificate-policy';
+import { allowInternalCertificate, ignoresCertificateErrors, originWithoutPort, pushSocketFilter } from './certificate-policy';
 import { persistentCookie } from './session-cookies';
 
 /** `painted`: ya tuvo su primer dom-ready (o falló, o pasó el tope): hasta entonces el DOM muestra "Abriendo…" debajo. */
@@ -342,6 +342,18 @@ export class ServiceViewManager {
       } else callback(false);
     });
     viewServices.set(web, service);
+    // WORKAROUND n8n (ver certificate-policy.ts): el push wss:// no pasa por certificate-error ni el nginx acepta el Origin con puerto.
+    if (service.id === 'n8n' && ignoresCertificateErrors(service.url)) {
+      try {
+        web.debugger.attach('1.3');
+        void web.debugger.sendCommand('Security.setIgnoreCertificateErrors', { ignore: true }).catch(error => console.warn('[n8n] no se pudo relajar el certificado:', String(error)));
+      } catch (error) { console.warn('[n8n] no se pudo adjuntar el depurador:', String(error)); }
+      web.session.webRequest.onBeforeSendHeaders({ urls: [pushSocketFilter(service.url)] }, (details, callback) => {
+        const headers = { ...details.requestHeaders };
+        if (headers.Origin) headers.Origin = originWithoutPort(headers.Origin);
+        callback({ requestHeaders: headers });
+      });
+    }
     // Microsoft rechaza el UA de Electron. La sesión no basta: cada webContents copia su UA al crearse.
     if (service.group) web.setUserAgent(sanitizeUserAgent(web.getUserAgent()));
     if (!securedSessions.has(web.session)) {

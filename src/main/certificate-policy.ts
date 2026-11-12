@@ -20,6 +20,27 @@ export function allowInternalCertificate(destination: string, error: string): bo
   return TRUSTED_INTERNAL_ERRORS.has(error) && !!internalUrl(destination, 'https:');
 }
 
+// WORKAROUND n8n (https://172.16.8.73:5443 tras nginx). Quitar cuando infraestructura:
+// 1) distribuya "AMA Internal CA" como raíz de confianza (certificate-error no cubre wss:// y el push se corta: 1006);
+// 2) configure nginx con `proxy_set_header Host $http_host` (hoy n8n recibe Host sin puerto y cierra con "Invalid origin!").
+
+/** La vista ignora errores de certificado (vía depurador, cubre WebSockets): solo servicios https de la red interna. */
+export function ignoresCertificateErrors(serviceUrl: string): boolean {
+  return !!internalUrl(serviceUrl, 'https:');
+}
+
+/** Patrón de webRequest para el WebSocket push de n8n del servicio. */
+export function pushSocketFilter(serviceUrl: string): string {
+  const url = new URL(serviceUrl);
+  return `wss://${url.host}/rest/push*`;
+}
+
+/** Origin tal como n8n lo espera detrás del nginx: sin puerto. */
+export function originWithoutPort(origin: string): string {
+  const url = new URL(origin);
+  return `${url.protocol}//${url.hostname}`;
+}
+
 /** Orígenes http internos del catálogo: Chromium los trata como seguros (portapapeles y demás APIs de contexto seguro). */
 export function insecureInternalOrigins(services: readonly Pick<Service, 'url'>[]): string[] {
   return [...new Set(services.map(service => internalUrl(service.url, 'http:')?.origin).filter((origin): origin is string => !!origin))];
