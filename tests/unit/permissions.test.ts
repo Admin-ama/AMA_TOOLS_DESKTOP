@@ -11,17 +11,28 @@ const INTERNAL = ['huly', 'n8n', 'librechat', 'stirling'];
 describe('permisos del dispositivo', () => {
   it('cada app del grupo recibe solo lo suyo', () => {
     expect([...permissionsFor(teams)].sort()).toEqual(TEAMS);
-    for (const id of ['outlook', 'copilot']) expect([...permissionsFor(svc(id))].sort(), id).toEqual(['clipboard-sanitized-write', 'notifications']);
-    for (const id of ['sharepoint', 'powerautomate', 'forms']) expect([...permissionsFor(svc(id))], id).toEqual(['clipboard-sanitized-write']);
+    for (const id of ['outlook', 'copilot']) expect([...permissionsFor(svc(id))].sort(), id).toEqual(['clipboard-sanitized-write', 'media', 'notifications']);
+    for (const id of ['sharepoint', 'powerautomate', 'forms']) expect([...permissionsFor(svc(id))].sort(), id).toEqual(['clipboard-sanitized-write', 'media']);
   });
   it('concede esos permisos desde cualquier origen permitido del grupo', () => {
     for (const permission of TEAMS) for (const origin of origins) expect(permissionAllowed(teams, permission, origin), permission + ' ' + origin).toBe(true);
     for (const id of ['outlook', 'copilot']) for (const permission of ['notifications', 'clipboard-sanitized-write']) expect(permissionAllowed(svc(id), permission, origins[3]), id + permission).toBe(true);
     for (const id of ['sharepoint', 'powerautomate', 'forms']) expect(permissionAllowed(svc(id), 'clipboard-sanitized-write', origins[5]), id).toBe(true);
   });
-  it('Outlook, Copilot y el resto no reciben cámara, micrófono ni pantalla completa', () => {
-    for (const id of ['outlook', 'copilot']) for (const permission of ['media', 'fullscreen']) expect(permissionAllowed(svc(id), permission, origins[3]), id + permission).toBe(false);
-    for (const id of ['sharepoint', 'powerautomate', 'forms']) for (const permission of ['media', 'fullscreen', 'notifications']) expect(permissionAllowed(svc(id), permission, origins[5]), id + permission).toBe(false);
+  it('Teams recibe micrófono y cámara para las llamadas', () => {
+    for (const types of [['audio'], ['video'], ['audio', 'video']] as const) expect(permissionAllowed(teams, 'media', origins[0], types), types.join()).toBe(true);
+  });
+  it('Outlook, Copilot y el resto reciben micrófono, pero no cámara ni pantalla completa', () => {
+    for (const id of ['outlook', 'copilot', 'sharepoint', 'powerautomate', 'forms']) {
+      expect(permissionAllowed(svc(id), 'media', svc(id).url, ['audio']), id).toBe(true);
+      for (const types of [['video'], ['audio', 'video'], ['unknown'], [], undefined] as const) expect(permissionAllowed(svc(id), 'media', svc(id).url, types as readonly string[] | undefined), id + String(types)).toBe(false);
+      expect(permissionAllowed(svc(id), 'fullscreen', svc(id).url), id).toBe(false);
+    }
+    for (const id of ['sharepoint', 'powerautomate', 'forms']) expect(permissionAllowed(svc(id), 'notifications', origins[5]), id).toBe(false);
+  });
+  it('sin vista asociada (service worker) no hay micrófono', () => {
+    expect(permissionAllowed({ id: '', group: 'microsoft' }, 'media', origins[3], ['audio'])).toBe(false);
+    expect(permissionAllowed({ id: '', group: 'microsoft' }, 'clipboard-sanitized-write', origins[3])).toBe(true);
   });
   it('deniega todo lo demás, incluida la captura de pantalla', () => {
     for (const permission of ['display-capture', 'geolocation', 'midi', 'midiSysex', 'clipboard-read', 'openExternal', 'hid', 'usb', 'serial', 'pointerLock', 'idle-detection', 'window-management', 'unknown', '']) {
@@ -34,20 +45,32 @@ describe('permisos del dispositivo', () => {
       expect(permissionAllowed(svc('outlook'), 'notifications', origin as string), String(origin)).toBe(false);
     }
   });
-  it('las apps externas fuera del grupo y las páginas propias lo deniegan todo', () => {
+  it('las apps externas fuera del grupo y las páginas propias solo reciben micrófono, y solo desde su origen', () => {
     const wiki = customService({ id: 'custom-0a1b2c3d-aaaa', name: 'Wiki', url: 'https://wiki.com/' });
-    for (const service of [...SERVICES.filter(s => !s.group && !INTERNAL.includes(s.id)), wiki, undefined]) {
-      for (const permission of TEAMS) expect(permissionAllowed(service, permission, origins[0])).toBe(false);
-      expect(permissionsFor(service).size).toBe(0);
+    for (const service of [...SERVICES.filter(s => !s.group && !INTERNAL.includes(s.id)), wiki]) {
+      expect([...permissionsFor(service)], service.id).toEqual(['media']);
+      expect(permissionAllowed(service, 'media', service.url, ['audio']), service.id).toBe(true);
+      expect(permissionAllowed(service, 'media', service.url, ['video']), service.id).toBe(false);
+      expect(permissionAllowed(service, 'media', 'https://evil.com/', ['audio']), service.id).toBe(false);
+      for (const permission of TEAMS.filter(p => p !== 'media')) expect(permissionAllowed(service, permission, service.url), service.id + permission).toBe(false);
     }
+  });
+  it('sin app no hay ningún permiso', () => {
+    expect(permissionsFor(undefined).size).toBe(0);
+    expect(permissionAllowed(undefined, 'media', origins[0], ['audio'])).toBe(false);
+  });
+  it('cualquier app del catálogo puede usar el micrófono desde su propio origen', () => {
+    for (const service of SERVICES) expect(permissionAllowed(service, 'media', service.url, ['audio']), service.id).toBe(true);
   });
 });
 
 describe('apps del catálogo en la red interna (172.16.8.x)', () => {
-  it('pueden copiar al portapapeles desde su propio origen', () => {
+  it('pueden copiar al portapapeles y usar el micrófono desde su propio origen', () => {
     for (const id of INTERNAL) {
-      expect([...permissionsFor(svc(id))], id).toEqual(['clipboard-sanitized-write']);
+      expect([...permissionsFor(svc(id))].sort(), id).toEqual(['clipboard-sanitized-write', 'media']);
       expect(permissionAllowed(svc(id), 'clipboard-sanitized-write', svc(id).url + 'c/agentes'), id).toBe(true);
+      expect(permissionAllowed(svc(id), 'media', svc(id).url + 'c/new', ['audio']), id).toBe(true);
+      expect(permissionAllowed(svc(id), 'media', svc(id).url, ['video']), id).toBe(false);
     }
   });
   it('una página propia alojada en la red interna también puede copiar desde su origen', () => {
@@ -57,8 +80,11 @@ describe('apps del catálogo en la red interna (172.16.8.x)', () => {
   });
   it('desde otro origen o pidiendo otra cosa, nada', () => {
     for (const id of INTERNAL) {
-      for (const origin of ['https://evil.com/', 'http://172.16.8.74:5678/', 'https://172.16.8.73:9999/', undefined]) expect(permissionAllowed(svc(id), 'clipboard-sanitized-write', origin as string), id + origin).toBe(false);
-      for (const permission of ['clipboard-read', 'media', 'notifications', 'geolocation']) expect(permissionAllowed(svc(id), permission, svc(id).url), id + permission).toBe(false);
+      for (const origin of ['https://evil.com/', 'http://172.16.8.74:5678/', 'https://172.16.8.73:9999/', undefined]) {
+        expect(permissionAllowed(svc(id), 'clipboard-sanitized-write', origin as string), id + origin).toBe(false);
+        expect(permissionAllowed(svc(id), 'media', origin as string, ['audio']), id + origin).toBe(false);
+      }
+      for (const permission of ['clipboard-read', 'notifications', 'geolocation']) expect(permissionAllowed(svc(id), permission, svc(id).url), id + permission).toBe(false);
     }
   });
 });

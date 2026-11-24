@@ -357,11 +357,11 @@ export class ServiceViewManager {
     // Microsoft rechaza el UA de Electron. La sesión no basta: cada webContents copia su UA al crearse.
     if (service.group) web.setUserAgent(sanitizeUserAgent(web.getUserAgent()));
     if (!securedSessions.has(web.session)) {
-      // Todo denegado, salvo lo que el grupo Microsoft concede a cada app y solo desde orígenes del grupo.
-      // Sin vista asociada (service worker) solo rige el mínimo del grupo: copiar.
+      // Todo denegado, salvo lo que permissions.ts concede a cada app (micrófono a todas) y solo desde su origen o los del grupo.
+      // Sin vista asociada (service worker) solo rige el mínimo del grupo: copiar, sin micrófono.
       const serviceOf = (wc: Electron.WebContents | null) => (wc ? viewServices.get(wc) : undefined) ?? { id: '', group: sessionGroups.get(web.session) };
-      web.session.setPermissionRequestHandler((wc, permission, callback, details) => callback(permissionAllowed(serviceOf(wc), permission, details.requestingUrl)));
-      web.session.setPermissionCheckHandler((wc, permission, requestingOrigin) => permissionAllowed(serviceOf(wc), permission, requestingOrigin));
+      web.session.setPermissionRequestHandler((wc, permission, callback, details) => callback(permissionAllowed(serviceOf(wc), permission, details.requestingUrl, 'mediaTypes' in details ? details.mediaTypes : undefined)));
+      web.session.setPermissionCheckHandler((wc, permission, requestingOrigin, details) => permissionAllowed(serviceOf(wc), permission, requestingOrigin, details.mediaType ? [details.mediaType] : undefined));
       web.session.setDisplayMediaRequestHandler((_request, callback) => callback({})); // Compartir pantalla: no implementado.
       if (service.group) web.session.setUserAgent(sanitizeUserAgent(web.session.getUserAgent()));
       // Solo se baja del origen de la app (o de destinos del grupo Microsoft). Se guarda sin preguntar en Descargas/AMA Tools/<app>/<tipo>.
