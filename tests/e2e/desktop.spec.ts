@@ -1605,6 +1605,12 @@ test('el login OAuth en ventana emergente (Connect de n8n, MCP de LibreChat) se 
   await expect.poll(async () => (await popups()).length).toBe(1);
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.isDestroyed() && !w.webContents.isDestroyed() && w.getParentWindow() && !/#(tooltip|update-notice)$/.test(w.webContents.getURL()))!.close());
   await expect.poll(async () => (await popups()).length).toBe(0);
+  // El MCP de Metabase (Dokploy) autoriza en http con un nombre sslip.io que apunta a la red interna: también abre ventana.
+  await app.evaluate(({ webContents }) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/huly'))!
+    .executeJavaScript("window.open('http://metabase.172.16.8.73.sslip.io/oauth/authorize?response_type=code&client_id=mcp', '_blank', 'noopener,noreferrer')", true));
+  await expect.poll(async () => (await popups()).length).toBe(1);
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.isDestroyed() && !w.webContents.isDestroyed() && w.getParentWindow() && !/#(tooltip|update-notice)$/.test(w.webContents.getURL()))!.close());
+  await expect.poll(async () => (await popups()).length).toBe(0);
   // http externo o file: siguen sin ventana.
   for (const url of ['http://evil.example/', 'file:///C:/Windows/']) {
     await app.evaluate(({ webContents }, target) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/huly'))!.executeJavaScript(`!!window.open(${JSON.stringify(target)}, '_blank')`, true), url);

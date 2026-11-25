@@ -80,6 +80,13 @@ const internalWeb = (value: string) => {
   } catch { return false; }
 };
 /**
+ * Nombre de DNS comodín (sslip.io, nip.io) que resuelve a una IP de la red interna, como el Metabase publicado en Dokploy:
+ * `metabase.172.16.8.73.sslip.io` o `metabase-172-16-8-73.sslip.io`. Solo cuenta para ventanas emergentes;
+ * certificados y descargas siguen exigiendo la IP literal.
+ */
+const INTERNAL_ALIAS = /^(?:[a-z0-9.-]*[.-])?172([.-])16\1[8]\1(\d{1,3})\.(?:sslip|nip)\.io$/;
+const internalAlias = (hostname: string) => { const match = INTERNAL_ALIAS.exec(hostname); return !!match && Number(match[2]) <= 255; };
+/**
  * Ventana emergente fuera de la app (login OAuth de un MCP de LibreChat, de un proveedor cualquiera): vacía, https o la red interna.
  * La ventana nunca puede abrir otras ni ir a file:, javascript: o http externo.
  */
@@ -87,7 +94,8 @@ export function popupAllowed(destination: string): boolean {
   if (destination === 'about:blank' || destination === '') return true;
   try {
     const url = new URL(destination);
-    return !url.username && !url.password && (url.protocol === 'https:' || internalWeb(destination));
+    if (url.username || url.password) return false;
+    return url.protocol === 'https:' || internalWeb(destination) || (url.protocol === 'http:' && internalAlias(url.hostname));
   } catch { return false; }
 }
 /** Petición de autorización OAuth (RFC 6749 §4.1.1: response_type y client_id obligatorios); un enlace normal no las lleva. */

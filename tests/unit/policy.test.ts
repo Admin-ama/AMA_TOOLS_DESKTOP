@@ -236,6 +236,10 @@ describe('ventanas emergentes de login (OAuth)', () => {
     for (const url of ['https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=x', 'https://github.com/login/oauth/authorize', 'http://172.16.8.73:8000/authorize', 'about:blank']) expect(popupAllowed(url), url).toBe(true);
     for (const url of ['http://evil.test/', 'https://user:pw@login.microsoftonline.com/x', 'http://u:p@172.16.8.73/', 'javascript:alert(1)', 'file:///C:/Windows/', 'data:text/html,x', 'about:srcdoc', 'not a url']) expect(popupAllowed(url), url).toBe(false);
   });
+  it('los nombres sslip.io/nip.io que apuntan a la red interna cuentan como red interna (login OAuth del MCP de Metabase en Dokploy)', () => {
+    for (const url of ['http://metabase.172.16.8.73.sslip.io/oauth/authorize?response_type=code&client_id=x', 'http://metabase-172-16-8-73.sslip.io/', 'http://172.16.8.73.nip.io:8080/login', 'http://a.b.172.16.8.20.sslip.io/', 'https://metabase.172.16.8.73.sslip.io/']) expect(popupAllowed(url), url).toBe(true);
+    for (const url of ['http://metabase.172.16.9.73.sslip.io/', 'http://metabase.172.16.8.256.sslip.io/', 'http://172.16.8.73.sslip.io.evil.test/', 'http://172.16.8.73.evil.test/', 'http://evil-1172-16-8-73.sslip.io/', 'http://evil.1172.16.8.73.sslip.io/', 'http://172-16.8-73.sslip.io/', 'http://u:p@metabase.172.16.8.73.sslip.io/', 'http://sslip.io/', 'http://172.16.8.73.example.io/']) expect(popupAllowed(url), url).toBe(false);
+  });
   it('solo una petición OAuth (response_type y client_id) va a ventana emergente; los enlaces normales, al navegador del sistema', () => {
     for (const url of ['https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=x&response_type=code', 'https://github.com/login/oauth/authorize?response_type=code&client_id=y&redirect_uri=z']) expect(isOAuthRequest(url), url).toBe(true);
     for (const url of ['https://amatime.sharepoint.com/sites/IT/Shared%20Documents/x.xlsx', 'https://login.microsoftonline.com/x?client_id=x', 'https://github.com/login/oauth/authorize', 'not a url']) expect(isOAuthRequest(url), url).toBe(false);
