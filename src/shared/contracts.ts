@@ -92,6 +92,10 @@ export interface PortalApi {
   openTab(): Promise<void>;
   selectTab(id: string): Promise<void>;
   closeTab(id: string): Promise<void>;
+  /** Copia al portapapeles la URL que muestra la pestaña. */
+  tabCopyUrl(id: string): Promise<void>;
+  /** Abre la URL de la pestaña en el navegador del sistema. */
+  tabOpenBrowser(id: string): Promise<void>;
   reload(): Promise<void>;
   openForticlient(): Promise<void>;
   addDesktopApp(): Promise<void>;

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { app, BrowserWindow, ipcMain, protocol, nativeTheme, Menu, dialog, screen, shell, net } from 'electron';
+import { app, BrowserWindow, ipcMain, protocol, nativeTheme, Menu, dialog, screen, shell, net, clipboard } from 'electron';
 import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { mkdir, readFile } from 'node:fs/promises';
@@ -196,6 +196,9 @@ async function createWindow() {
         case 'new-tab': manager.openTab(); break;
         case 'select-tab': manager.selectTab(tabId()); break;
         case 'close-tab': manager.closeTab(tabId()); break;
+        // Menú de la pestaña: su URL al portapapeles o al navegador del sistema (sin la sesión de la app).
+        case 'tab-copy-url': clipboard.writeText(manager.tabUrl(tabId())); break;
+        case 'tab-open-browser': await shell.openExternal(manager.tabUrl(tabId())); break;
         case 'reload': {
           // Reintentar: sondear primero; recargar solo si ya había red (si no, la recuperación activa las vistas).
           const wasConnected = network.status === 'connected';

@@ -138,6 +138,14 @@ export function windowTarget(destination: string, source: Service, catalog: read
   for (const member of members) if (score(member) > top) { best = member; top = score(member); }
   return top >= 2 ? best.id : source.id;
 }
+/** Dirección que se comparte de una pestaña (copiar URL, abrir en el navegador): la que muestra si es web sin credenciales; si no, la de la app. */
+export function shareableUrl(current: string | undefined, service: Pick<Service, 'url'>): string {
+  try {
+    const url = new URL(current ?? '');
+    if (['http:', 'https:'].includes(url.protocol) && !url.username && !url.password) return url.href;
+  } catch { /* aún sin cargar o inválida */ }
+  return service.url;
+}
 export function isPdfUrl(destination: string): boolean {
   try { return new URL(destination).pathname.toLowerCase().endsWith('.pdf'); } catch { return false; }
 }

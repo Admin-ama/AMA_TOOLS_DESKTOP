@@ -6,6 +6,7 @@ import { SHELL_LAYOUT } from '../shared/layout';
 import { PAGE_ZOOM } from '../shared/zoom';
 import { Launcher } from './Launcher';
 import { AppContextMenu, anchorOf, isMenuKey, type MenuAction, type MenuAnchor } from './AppContextMenu';
+import { TabContextMenu, type TabMenuAction } from './TabContextMenu';
 import { NetworkBlock } from './NetworkBlock';
 import { DesktopDock } from './DesktopDock';
 import { DesktopPicker } from './DesktopPicker';
@@ -26,6 +27,7 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [size, setSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [menu, setMenu] = useState<{ id: AppId; anchor: MenuAnchor } | null>(null);
+  const [tabMenu, setTabMenu] = useState<{ id: string; label: string; anchor: MenuAnchor } | null>(null);
   // "Editar…" desde el menú abre el launcher con el formulario de esa página; cada petición es un objeto nuevo.
   const [editRequest, setEditRequest] = useState<{ id: AppId } | null>(null);
   // Capturas de las vistas nativas mientras un menú o diálogo DOM las oculta: la app de atrás sigue viéndose.
@@ -56,6 +58,7 @@ export function App() {
   // Sin red las vistas ya están ocultas y los botones deshabilitados: el menú no debe quedar flotando.
   useEffect(() => { if (menu && state && state.network.status !== 'connected') { setMenu(null); showViews(); } }, [menu, state?.network.status]);
   useEffect(() => { if (picker && state && state.network.status !== 'connected') { setPicker(false); showViews(); } }, [picker, state?.network.status]);
+  useEffect(() => { if (tabMenu && state && state.network.status !== 'connected') { setTabMenu(null); showViews(); } }, [tabMenu, state?.network.status]);
   useEffect(() => { if (state?.activeTabId) document.getElementById(`tab-${state.activeTabId}`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }, [state?.activeTabId]);
 
   async function action(task: () => Promise<void>, success = '') {
@@ -108,6 +111,24 @@ export function App() {
     setMenu(null);
     showViews();
     if (restoreFocus) trigger.current?.focus();
+  }
+  // Menú de una pestaña: mismo mecanismo. Con el ratón se abre donde se hizo clic; con el teclado, bajo la pestaña.
+  function openTabMenu(id: string, label: string, source: HTMLElement, at?: { x: number; y: number }) {
+    trigger.current = source;
+    const rect = source.getBoundingClientRect();
+    setTabMenu({ id, label, anchor: at ? { left: at.x, top: at.y } : { left: rect.left, top: rect.bottom + 4 } });
+    hideViews();
+  }
+  function closeTabMenu(restoreFocus: boolean) {
+    setTabMenu(null);
+    showViews();
+    if (restoreFocus) trigger.current?.focus();
+  }
+  function runTabMenu(choice: TabMenuAction) {
+    if (!tabMenu) return;
+    const { id } = tabMenu;
+    closeTabMenu(false);
+    void action(() => choice === 'copy-url' ? window.portal.tabCopyUrl(id) : window.portal.tabOpenBrowser(id));
   }
   // Selector de apps instaladas: mismo mecanismo que el menú, las vistas nativas se ocultan mientras está abierto.
   function openPicker() {
@@ -208,7 +229,9 @@ export function App() {
           const label = tab.title || service.shortName;
           const selected = state.activeTabId === tab.id;
           return <div key={tab.id} className={`tab-group ${selected ? 'selected' : ''}`}>
-            <button id={`tab-${tab.id}`} data-testid={`${tab.serviceId}-tab-${tab.number}`} role="tab" data-tooltip={label} data-tooltip-side="bottom" aria-selected={selected} disabled={blocked} aria-controls="service-content" tabIndex={selected ? 0 : -1} className={`app-tab ${selected ? 'selected' : ''}`} onClick={() => selectTab(tab.id)} onKeyDown={event => tabKey(event, index)}>
+            <button id={`tab-${tab.id}`} data-testid={`${tab.serviceId}-tab-${tab.number}`} role="tab" data-tooltip={label} data-tooltip-side="bottom" aria-selected={selected} disabled={blocked} aria-controls="service-content" aria-haspopup="menu" tabIndex={selected ? 0 : -1} className={`app-tab ${selected ? 'selected' : ''}`} onClick={() => selectTab(tab.id)}
+              onContextMenu={event => { event.preventDefault(); openTabMenu(tab.id, label, event.currentTarget, { x: event.clientX, y: event.clientY }); }}
+              onKeyDown={event => { if (isMenuKey(event)) { event.preventDefault(); openTabMenu(tab.id, label, event.currentTarget); return; } tabKey(event, index); }}>
               <AppIcon id={tab.serviceId} icon={service.icon} /><span>{label}</span>
             </button>
             <button className="close-tab" data-testid={`close-${tab.serviceId}-tab-${tab.number}`} aria-label={`Cerrar ${label}`} data-tooltip={`Cerrar ${label}`} data-tooltip-side="bottom" onClick={() => void action(() => window.portal.closeTab(tab.id))}><IconX size={13} /></button>
@@ -276,7 +299,7 @@ export function App() {
     {!blocked && state.panel === 'service' && state.split && <SplitView services={state.services} split={state.split} width={size.width} height={size.height} onSet={id => void action(() => window.portal.splitSet(id))} onToTab={() => void action(() => window.portal.splitToTab())} onClose={() => void action(() => window.portal.splitClose())} onResize={(ratio, persist) => window.portal.splitResize(ratio, persist)} onCapture={() => window.portal.splitCapture()} onDrag={active => window.portal.splitDrag(active)} />}
 
     <StatusBar network={state.network.status} version={state.updates.currentVersion} />
-  </div>{downloadsAt && <DownloadsPopover downloads={state.downloads} anchor={downloadsAt} onClose={closeDownloads} onOpen={id => void action(() => window.portal.downloadOpen(id))} onReveal={id => void action(() => window.portal.downloadReveal(id))} onFolder={() => void action(() => window.portal.downloadsFolder())} onClear={() => void action(() => window.portal.downloadsClear())} />}{picker && <DesktopPicker onClose={closePicker} onLink={id => { closePicker(); void action(() => window.portal.desktopLink(id)); }} onBrowse={() => { closePicker(); void action(() => window.portal.addDesktopApp()); }} />}{menu && state.services.some(item => item.id === menu.id) && <AppContextMenu service={state.services.find(item => item.id === menu.id)!} pinned={state.preferences.pinned.includes(menu.id)} anchor={menu.anchor} onAction={runMenu} onClose={closeMenu} />}{frozen && frozen.length > 0 && <div className="frozen-views" aria-hidden="true">{frozen.map((shot, index) => <img key={index} src={shot.image} alt="" draggable={false} style={{ left: shot.bounds.x, top: shot.bounds.y, width: shot.bounds.width, height: shot.bounds.height }} />)}</div>}{state.splash !== 'done' && <Splash key="splash" state={state} />}</>;
+  </div>{downloadsAt && <DownloadsPopover downloads={state.downloads} anchor={downloadsAt} onClose={closeDownloads} onOpen={id => void action(() => window.portal.downloadOpen(id))} onReveal={id => void action(() => window.portal.downloadReveal(id))} onFolder={() => void action(() => window.portal.downloadsFolder())} onClear={() => void action(() => window.portal.downloadsClear())} />}{picker && <DesktopPicker onClose={closePicker} onLink={id => { closePicker(); void action(() => window.portal.desktopLink(id)); }} onBrowse={() => { closePicker(); void action(() => window.portal.addDesktopApp()); }} />}{menu && state.services.some(item => item.id === menu.id) && <AppContextMenu service={state.services.find(item => item.id === menu.id)!} pinned={state.preferences.pinned.includes(menu.id)} anchor={menu.anchor} onAction={runMenu} onClose={closeMenu} />}{tabMenu && <TabContextMenu label={tabMenu.label} anchor={tabMenu.anchor} onAction={runTabMenu} onClose={closeTabMenu} />}{frozen && frozen.length > 0 && <div className="frozen-views" aria-hidden="true">{frozen.map((shot, index) => <img key={index} src={shot.image} alt="" draggable={false} style={{ left: shot.bounds.x, top: shot.bounds.y, width: shot.bounds.width, height: shot.bounds.height }} />)}</div>}{state.splash !== 'done' && <Splash key="splash" state={state} />}</>;
 }
 
 

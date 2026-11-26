@@ -5,7 +5,7 @@ import { createDownloadOrganizer } from './download-organizer';
 import { downloadHistory } from './download-history';
 import { type ApplicationTab, type Service, type AppId, type ServiceState, type Snapshot, type Preferences, type SplitCapture, type FrozenView } from '../shared/contracts';
 import { permissionAllowed, sanitizeUserAgent } from './permissions';
-import { allowedNavigation, allowedDownload, isAuthPopup, popupAllowed, isOAuthRequest, isPdfUrl, sameServiceOrigin, contentBounds, splitBounds, partitionFor, remotePreferences, catalogOf, groupMembers, windowTarget } from './policy';
+import { allowedNavigation, allowedDownload, isAuthPopup, popupAllowed, isOAuthRequest, isPdfUrl, sameServiceOrigin, shareableUrl, contentBounds, splitBounds, partitionFor, remotePreferences, catalogOf, groupMembers, windowTarget } from './policy';
 import { ApplicationTabs } from './application-tabs';
 import { isZoomPercent, PAGE_ZOOM } from '../shared/zoom';
 import { allowInternalCertificate, ignoresCertificateErrors, originWithoutPort, pushSocketFilter } from './certificate-policy';
@@ -281,6 +281,14 @@ export class ServiceViewManager {
     this.ensureView(this.tabs.current);
     this.visibility();
     this.changed();
+  }
+
+  /** URL que muestra la pestaña, para copiarla o abrirla en el navegador; sin cargar aún, la de su app. */
+  tabUrl(id: string): string {
+    const tab = this.tabs.all.find(item => item.id === id);
+    const service = tab && this.services.find(item => item.id === tab.serviceId);
+    if (!tab || !service) throw new Error('Pestaña inválida');
+    return shareableUrl(this.views.get(id)?.view.webContents.getURL(), service);
   }
 
   private ensureView(tab: ApplicationTab, url?: string) {

@@ -1564,6 +1564,35 @@ test('al abrir el menú contextual la app de atrás sigue viéndose (captura con
   await expect(frozen).toHaveCount(0);
 });
 
+test('clic derecho en una pestaña permite copiar su URL y abrirla en el navegador', async () => {
+  await switchApplication('Huly Workspace', 'huly 1');
+  await waitForPage();
+  const url = await app.evaluate(({ webContents }) => webContents.getAllWebContents().find(w => w.getURL().endsWith('/huly'))!.getURL());
+  const tab = page.getByTestId('huly-tab-1');
+  await tab.click({ button: 'right' });
+  const menu = page.getByRole('menu', { name: /pestaña/ });
+  await expect(menu).toBeVisible();
+  // Igual que el menú de las apps: la vista nativa se oculta para que no tape el menú.
+  await expect.poll(async () => (await visibleViews()).length).toBe(0);
+  await menu.getByRole('menuitem', { name: 'Copiar URL' }).click();
+  await expect(menu).toHaveCount(0);
+  await expect.poll(async () => (await visibleViews()).length).toBe(1);
+  await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe(url);
+  // Con el teclado (Shift+F10) también; abrir en el navegador usa el del sistema.
+  await app.evaluate(({ shell }) => {
+    const opened: string[] = [];
+    (globalThis as { __opened?: string[] }).__opened = opened;
+    shell.openExternal = async (target: string) => { opened.push(target); };
+  });
+  await tab.focus();
+  await page.keyboard.press('Shift+F10');
+  await expect(menu.getByRole('menuitem', { name: 'Copiar URL' })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await expect.poll(() => app.evaluate(() => (globalThis as { __opened?: string[] }).__opened)).toEqual([url]);
+  await expect(menu).toHaveCount(0);
+});
+
 test('el login OAuth en ventana emergente (Connect de n8n, MCP de LibreChat) se abre como ventana real en cualquier app', async () => {
   await switchApplication('n8n Automations', 'n8n 1');
   await waitForPage();

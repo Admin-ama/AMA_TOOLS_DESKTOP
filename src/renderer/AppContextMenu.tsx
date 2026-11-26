@@ -28,13 +28,10 @@ interface Props {
 }
 
 /**
- * Menú de acciones de una app. Vive en el DOM: mientras está abierto el proceso principal oculta las vistas
- * nativas (comando overlay), que de otro modo pintarían por encima de él.
+ * Lo común de los menús contextuales: aparece con una animación corta, no se sale de la ventana, enfoca el primer
+ * elemento y se maneja con flechas, Inicio/Fin, Escape y Tab. `content` cambia cuando el menú cambia de contenido.
  */
-export function AppContextMenu({ service, pinned, anchor, onAction, onClose }: Props) {
-  const root = useRef<HTMLDivElement>(null);
-  const [confirming, setConfirming] = useState(false);
-  const unpinnable = pinned && !FIXED_APPS.includes(service.id); // las fijas no se quitan
+export function useMenu(root: { current: HTMLDivElement | null }, anchor: MenuAnchor, onClose: (restoreFocus: boolean) => void, content?: unknown) {
   const items = () => [...(root.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? [])];
   useGSAP(() => {
     gsap.matchMedia().add(MOTION, () => { gsap.from(root.current, { opacity: 0, y: -4, scale: 0.97, duration: 0.12, ease: 'power2.out', clearProps: 'opacity,transform' }); });
@@ -46,10 +43,10 @@ export function AppContextMenu({ service, pinned, anchor, onAction, onClose }: P
     const { width, height } = element.getBoundingClientRect();
     element.style.left = `${Math.max(8, Math.min(anchor.left, window.innerWidth - width - 8))}px`;
     element.style.top = `${Math.max(8, Math.min(anchor.top, window.innerHeight - height - 8))}px`;
-  }, [anchor, confirming]);
-  useEffect(() => { items()[0]?.focus(); }, [confirming]);
+  }, [anchor, content]);
+  useEffect(() => { items()[0]?.focus(); }, [content]);
 
-  function key(event: KeyboardEvent<HTMLDivElement>) {
+  return function key(event: KeyboardEvent<HTMLDivElement>) {
     const list = items();
     const index = list.indexOf(document.activeElement as HTMLButtonElement);
     const move = (next: number) => { event.preventDefault(); list[(next + list.length) % list.length]?.focus(); };
@@ -59,7 +56,18 @@ export function AppContextMenu({ service, pinned, anchor, onAction, onClose }: P
     else if (event.key === 'End') move(list.length - 1);
     else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onClose(true); }
     else if (event.key === 'Tab') { event.preventDefault(); onClose(true); }
-  }
+  };
+}
+
+/**
+ * Menú de acciones de una app. Vive en el DOM: mientras está abierto el proceso principal oculta las vistas
+ * nativas (comando overlay), que de otro modo pintarían por encima de él.
+ */
+export function AppContextMenu({ service, pinned, anchor, onAction, onClose }: Props) {
+  const root = useRef<HTMLDivElement>(null);
+  const [confirming, setConfirming] = useState(false);
+  const unpinnable = pinned && !FIXED_APPS.includes(service.id); // las fijas no se quitan
+  const key = useMenu(root, anchor, onClose, confirming);
 
   const item = (action: MenuAction, label: string, danger = false) => <button role="menuitem" className={`app-menu-item ${danger ? 'danger' : ''}`} onClick={() => onAction(action)}>{label}</button>;
   return <>

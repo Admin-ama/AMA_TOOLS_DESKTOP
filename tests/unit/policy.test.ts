@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CATEGORIES, FIXED_APPS, GLOBAL_APP_IDS } from '../../src/shared/contracts';
-import { SERVICES, isAuthPopup, popupAllowed, isOAuthRequest, validAdmin, accessRequestUrl, isAppId, allowedNavigation, allowedDownload, isPdfUrl, partitionFor, contentBounds, remotePreferences, customService, catalogOf, sameServiceOrigin, groupMembers, windowTarget } from '../../src/main/policy';
+import { SERVICES, isAuthPopup, popupAllowed, isOAuthRequest, validAdmin, accessRequestUrl, isAppId, allowedNavigation, allowedDownload, isPdfUrl, shareableUrl, partitionFor, contentBounds, remotePreferences, customService, catalogOf, sameServiceOrigin, groupMembers, windowTarget } from '../../src/main/policy';
 
 describe('registro y aislamiento', () => {
   it('registra las direcciones reales', () => {
@@ -290,5 +290,16 @@ describe('Apps Amatime (internas, con administrador)', () => {
     expect(url.searchParams.get('users')).toBe('jsepulveda@amatime.com');
     expect(url.searchParams.get('message')).toBe('Hola Julio, quiero solicitar acceso a Costeador.');
     expect(() => accessRequestUrl({ name: 'X', email: 'a@b.cl?x=1' }, 'Costeador')).toThrow();
+  });
+});
+
+describe('dirección que se comparte de una pestaña (copiar URL, abrir en el navegador)', () => {
+  const huly = SERVICES.find(s => s.id === 'huly')!;
+  it('es la que muestra la pestaña, con su ruta y consulta', () => {
+    expect(shareableUrl('http://172.16.8.73:8087/workbench/amatime/tracker?issue=AMA-12#top', huly)).toBe('http://172.16.8.73:8087/workbench/amatime/tracker?issue=AMA-12#top');
+    expect(shareableUrl('https://amatime.buk.cl/empleados/1', SERVICES.find(s => s.id === 'buk')!)).toBe('https://amatime.buk.cl/empleados/1');
+  });
+  it('si la pestaña aún no cargó o muestra algo que no es web (about:, data:, credenciales), es la de la app', () => {
+    for (const current of [undefined, '', 'about:blank', 'data:text/html,x', 'file:///C:/Windows/', 'javascript:alert(1)', 'http://u:p@172.16.8.73:8087/', 'not a url']) expect(shareableUrl(current, huly), String(current)).toBe(huly.url);
   });
 });
