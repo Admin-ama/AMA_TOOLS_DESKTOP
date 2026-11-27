@@ -25,8 +25,19 @@ export const SERVICES: Service[] = [
   { id: 'costeador', name: 'Costeador', shortName: 'Costeador', category: 'amatime', url: 'https://julio-sepulveda-costeo-bulk-copacki.vercel.app/', admin: { name: 'Julio Sepúlveda', email: 'jsepulveda@amatime.com' } },
   { id: 'buk', name: 'Buk', shortName: 'Buk', category: 'control', url: 'https://amatime.buk.cl/users/sign_in' },
   // Metabase publicado en Dokploy: nombre sslip.io que resuelve a 172.16.8.73 (solo red interna o VPN).
-  { id: 'metabase', name: 'Metabase', shortName: 'Metabase', category: 'operacion', url: 'http://metabase.172.16.8.73.sslip.io/' },
+  // El MCP de Metabase en AMA IA inicia sesión por OAuth con la cuenta abierta en esta pestaña.
+  { id: 'metabase', name: 'Metabase', shortName: 'Metabase', category: 'operacion', url: 'http://metabase.172.16.8.73.sslip.io/', sessionSharedWith: ['librechat'] },
 ];
+/**
+ * Pares de sesión compartida: las cookies del host de `source` se reflejan en la sesión de `target`, donde corre su ventana OAuth
+ * (una ventana con opener siempre usa la sesión de quien la abre). En el mismo host no aplica: se mezclarían las sesiones de ambas apps.
+ */
+export function sessionBridges(catalog: readonly Service[]): { source: Service; target: Service }[] {
+  return catalog.flatMap(source => (source.sessionSharedWith ?? []).flatMap(id => {
+    const target = catalog.find(service => service.id === id);
+    return target && new URL(target.url).hostname !== new URL(source.url).hostname ? [{ source, target }] : [];
+  }));
+}
 /** Una página del usuario es una app más del catálogo: solo su origen, sin login externo. */
 export function customService(app: CustomApp): Service {
   return { id: app.id, name: app.name, shortName: app.name, category: 'mine', url: app.url, custom: true, ...(app.icon ? { icon: app.icon } : {}) };

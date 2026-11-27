@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CATEGORIES, FIXED_APPS, GLOBAL_APP_IDS } from '../../src/shared/contracts';
-import { SERVICES, isAuthPopup, popupAllowed, isOAuthRequest, validAdmin, accessRequestUrl, isAppId, allowedNavigation, allowedDownload, isPdfUrl, shareableUrl, partitionFor, contentBounds, remotePreferences, customService, catalogOf, sameServiceOrigin, groupMembers, windowTarget } from '../../src/main/policy';
+import { SERVICES, isAuthPopup, popupAllowed, isOAuthRequest, validAdmin, accessRequestUrl, isAppId, allowedNavigation, allowedDownload, isPdfUrl, shareableUrl, partitionFor, contentBounds, remotePreferences, customService, catalogOf, sameServiceOrigin, groupMembers, windowTarget, sessionBridges } from '../../src/main/policy';
 
 describe('registro y aislamiento', () => {
   it('registra las direcciones reales', () => {
@@ -267,8 +267,16 @@ describe('Buk (RRHH)', () => {
 describe('Metabase (BI en Dokploy)', () => {
   const metabase = () => SERVICES.find(service => service.id === 'metabase')!;
   it('es una app de Operación en su nombre sslip.io de la red interna, sin grupo ni administrador', () => {
-    expect(metabase()).toEqual({ id: 'metabase', name: 'Metabase', shortName: 'Metabase', category: 'operacion', url: 'http://metabase.172.16.8.73.sslip.io/' });
+    expect(metabase()).toEqual({ id: 'metabase', name: 'Metabase', shortName: 'Metabase', category: 'operacion', url: 'http://metabase.172.16.8.73.sslip.io/', sessionSharedWith: ['librechat'] });
     expect(GLOBAL_APP_IDS).toContain('metabase');
+  });
+  it('comparte su sesión con AMA IA: el login OAuth del MCP de Metabase usa la cuenta de la pestaña', () => {
+    expect(sessionBridges(SERVICES).map(({ source, target }) => [source.id, target.id])).toEqual([['metabase', 'librechat']]);
+  });
+  it('sin puente si ambas apps viven en el mismo host (sus cookies se mezclarían) o el destino no existe', () => {
+    const same = SERVICES.map(service => ({ ...service, url: `http://127.0.0.1:9/${service.id}` }));
+    expect(sessionBridges(same)).toEqual([]);
+    expect(sessionBridges(SERVICES.filter(service => service.id !== 'librechat'))).toEqual([]);
   });
   it('navega solo dentro de su origen y tiene su propia partición', () => {
     expect(allowedNavigation('http://metabase.172.16.8.73.sslip.io/dashboard/1', metabase())).toBe(true);

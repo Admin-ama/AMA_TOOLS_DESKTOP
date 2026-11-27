@@ -29,6 +29,8 @@ export interface Service {
   /** Se fija en la barra lateral una vez (usuarios nuevos y existentes); después manda el usuario. */
   /** Apps Amatime: a quién pedir credenciales (chat de Teams desde la tarjeta). */
   admin?: AppAdmin;
+  /** Apps cuyo login OAuth hacia esta usa la cuenta de su pestaña: las cookies de su host se reflejan en la sesión de esas apps. */
+  sessionSharedWith?: AppId[];
   /** Solo páginas del usuario. */
   custom?: boolean; icon?: string;
 }

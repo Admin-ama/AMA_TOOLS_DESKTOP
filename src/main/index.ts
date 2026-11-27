@@ -139,6 +139,8 @@ async function createWindow() {
   const manager = new ServiceViewManager(window, services, preferences, () => {
     publish();
   });
+  // El login OAuth del MCP de Metabase (en AMA IA) usa la cuenta abierta en la pestaña de Metabase.
+  manager.shareSessions();
   const target = probeTarget(services);
   // Sin red interna la app no funciona: la sonda decide si las vistas pueden mostrarse o crearse.
   let started = false;

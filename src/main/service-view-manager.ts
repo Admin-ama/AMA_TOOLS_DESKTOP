@@ -5,11 +5,12 @@ import { createDownloadOrganizer } from './download-organizer';
 import { downloadHistory } from './download-history';
 import { type ApplicationTab, type Service, type AppId, type ServiceState, type Snapshot, type Preferences, type SplitCapture, type FrozenView } from '../shared/contracts';
 import { permissionAllowed, sanitizeUserAgent } from './permissions';
-import { allowedNavigation, allowedDownload, isAuthPopup, popupAllowed, isOAuthRequest, isPdfUrl, sameServiceOrigin, shareableUrl, contentBounds, splitBounds, partitionFor, remotePreferences, catalogOf, groupMembers, windowTarget } from './policy';
+import { allowedNavigation, allowedDownload, isAuthPopup, popupAllowed, isOAuthRequest, isPdfUrl, sameServiceOrigin, shareableUrl, contentBounds, splitBounds, partitionFor, remotePreferences, catalogOf, groupMembers, windowTarget, sessionBridges } from './policy';
 import { ApplicationTabs } from './application-tabs';
 import { isZoomPercent, PAGE_ZOOM } from '../shared/zoom';
 import { allowInternalCertificate, ignoresCertificateErrors, originWithoutPort, pushSocketFilter } from './certificate-policy';
 import { persistentCookie } from './session-cookies';
+import { mirrorChange, syncHost } from './cookie-bridge';
 
 /** `painted`: ya tuvo su primer dom-ready (o falló, o pasó el tope): hasta entonces el DOM muestra "Abriendo…" debajo. */
 interface Entry { view: WebContentsView; disposed: boolean; failed: boolean; painted: boolean }
@@ -161,6 +162,26 @@ export class ServiceViewManager {
     if (wasActive) this.ensureView(this.tabs.switchApplication(fallback)); // El panel visible no cambia: puede ser el launcher.
     this.visibility();
     this.changed();
+  }
+
+  /**
+   * Sesión compartida (cookie-bridge): la ventana OAuth que abre `target` (el MCP de Metabase en AMA IA) usa la cuenta de la pestaña de `source`.
+   * Al arrancar, `target` recibe las cookies del host que tiene la pestaña; después, la pestaña manda en altas y bajas
+   * y un login hecho en la ventana OAuth vuelve a la pestaña. Se escuchan ambas particiones (recordar sesión sí/no); solo actúa la vigente.
+   */
+  shareSessions() {
+    const current = (service: Service) => session.fromPartition(partitionFor(service.id, this.preferences.remember[service.id] ?? true, service.group));
+    const warn = (error: unknown) => console.warn('[sesión compartida] no se pudo reflejar una cookie:', String(error));
+    for (const { source, target } of sessionBridges(this.services)) {
+      const host = new URL(source.url).hostname;
+      void syncHost(current(source).cookies, current(target).cookies, host).catch(warn);
+      for (const persistent of [true, false]) {
+        const from = session.fromPartition(partitionFor(source.id, persistent, source.group));
+        const to = session.fromPartition(partitionFor(target.id, persistent, target.group));
+        from.cookies.on('changed', (_event, cookie, cause, removed) => { if (from === current(source)) void mirrorChange(current(target).cookies, host, cookie, cause, removed, true).catch(warn); });
+        to.cookies.on('changed', (_event, cookie, cause, removed) => { if (to === current(target)) void mirrorChange(current(source).cookies, host, cookie, cause, removed, false).catch(warn); });
+      }
+    }
   }
 
   /** Borra la sesión guardada (persistente y temporal) de una app sin tocar sus pestañas. */
