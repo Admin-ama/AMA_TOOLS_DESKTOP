@@ -1,4 +1,4 @@
-import { IconCalendarEvent, IconGitBranch, IconMessageCircle2, IconServerCog, IconMailAi, IconFileTypePdf, IconBrandTeams, IconWorld, IconCalculator, IconUsersGroup } from '@tabler/icons-react';
+import { IconCalendarEvent, IconGitBranch, IconMessageCircle2, IconServerCog, IconMailAi, IconFileTypePdf, IconBrandTeams, IconWorld, IconCalculator, IconUsersGroup, IconChartBar } from '@tabler/icons-react';
 import type { AppId } from '../shared/contracts';
 import hulyLogo from '../../images/Huly-logo.svg';
 import n8nLogo from '../../images/n8n-logo.svg';
@@ -6,12 +6,13 @@ import amaBotLogo from '../../images/ama-bot-cuadrado.svg';
 import amaAppLogo from '../../images/icon_144x144.png';
 import stirlingLogo from '../../images/stirling.png';
 import bukLogo from '../../images/buk_logo.jpg';
+import metabaseLogo from '../../images/metabase-logo.svg';
 import { AmaBot } from './AmaBot';
 import { EmailAiLogo } from './EmailAiLogo';
 import { MicrosoftLogo, isMicrosoftLogo } from './microsoft-logos';
 
-const icons = { huly: IconCalendarEvent, n8n: IconGitBranch, librechat: IconMessageCircle2, portal: IconServerCog, emailai: IconMailAi, stirling: IconFileTypePdf, teams: IconBrandTeams, costeador: IconCalculator, buk: IconUsersGroup } as const;
-const sidebarLogos: Record<string, string> = { huly: hulyLogo, n8n: n8nLogo, librechat: amaBotLogo, portal: amaAppLogo, stirling: stirlingLogo, buk: bukLogo };
+const icons = { huly: IconCalendarEvent, n8n: IconGitBranch, librechat: IconMessageCircle2, portal: IconServerCog, emailai: IconMailAi, stirling: IconFileTypePdf, teams: IconBrandTeams, costeador: IconCalculator, buk: IconUsersGroup, metabase: IconChartBar } as const;
+const sidebarLogos: Record<string, string> = { huly: hulyLogo, n8n: n8nLogo, librechat: amaBotLogo, portal: amaAppLogo, stirling: stirlingLogo, buk: bukLogo, metabase: metabaseLogo };
 const known = (id: AppId): id is keyof typeof icons => Object.hasOwn(icons, id);
 
 /** Icono pequeño (pestañas, ajustes): el de la app, la favicon de una página propia o un mundo genérico. */

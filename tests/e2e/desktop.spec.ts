@@ -44,9 +44,14 @@ test.beforeEach(async ({}, testInfo) => {
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('Missing server port');
-  const config = Object.fromEntries(['huly', 'n8n', 'librechat', 'portal', 'emailai', 'stirling', 'teams', 'copilot', 'outlook', 'sharepoint', 'powerautomate', 'forms', 'costeador', 'buk'].map(id => [id, `http://127.0.0.1:${address.port}/${id}`]));
+  const config = Object.fromEntries(['huly', 'n8n', 'librechat', 'portal', 'emailai', 'stirling', 'teams', 'copilot', 'outlook', 'sharepoint', 'powerautomate', 'forms', 'costeador', 'buk', 'metabase'].map(id => [id, `http://127.0.0.1:${address.port}/${id}`]));
   await writeFile(path.join(directory, 'services.json'), JSON.stringify(config));
   await writeFile(path.join(directory, 'installed.json'), '[]');
+  // La suite parte de una barra con Portal, n8n, Email AI y Stirling fijadas; [instalación] arranca sin preferencias (instalación nueva).
+  if (!testInfo.title.includes('[instalación]')) {
+    await mkdir(path.join(directory, 'data'), { recursive: true });
+    await writeFile(path.join(directory, 'data', 'preferences.json'), JSON.stringify({ pinned: ['portal', 'huly', 'n8n', 'emailai', 'stirling'] }));
+  }
   // [office]: Office falso (Word, Excel y Outlook; sin PowerPoint) en una carpeta temporal.
   const officeRoot = path.join(directory, 'office');
   if (testInfo.title.includes('[office]')) { await mkdir(officeRoot, { recursive: true }); for (const exe of ['WINWORD.EXE', 'EXCEL.EXE', 'OUTLOOK.EXE']) await writeFile(path.join(officeRoot, exe), 'x'); }
@@ -219,6 +224,14 @@ test('zoom valida IPC y respeta los límites', async () => {
   await expect(page.getByRole('button', { name: 'Restablecer zoom' })).toBeDisabled();
 });
 
+test('[instalación] una instalación nueva fija AMA IA, Copilot, Buk, Huly y Metabase en la barra lateral', async () => {
+  const nav = page.getByRole('navigation', { name: 'Servicios' });
+  const order = await nav.getByRole('button').evaluateAll(buttons => buttons.map(button => button.getAttribute('data-tooltip')));
+  expect(order).toEqual(['AMA IA', 'Copilot M365', 'Buk', 'Huly Workspace', 'Metabase']);
+  expect(await page.evaluate(async () => (await window.portal.snapshot()).preferences.pinned)).toEqual(['librechat', 'copilot', 'buk', 'huly', 'metabase']);
+  await expect(nav.getByRole('button', { name: 'Abrir Metabase' }).locator('img.service-logo-metabase')).toHaveCount(1);
+});
+
 test('el botón de aplicaciones reemplaza al logo en la parte superior de la sidebar', async () => {
   await expect(page.getByRole('img', { name: 'AMA Time Digital', exact: true })).toHaveCount(0);
   const launcher = page.getByRole('button', { name: 'Ver todas las aplicaciones', exact: true });
@@ -233,8 +246,8 @@ test('launcher agrupa por categorías, fija y desfija apps y abre apps no fijada
   const launcher = page.getByRole('region', { name: 'Todas las aplicaciones' });
   await expect(launcher).toBeVisible();
   for (const name of ['Control', 'Apps Amatime', 'Operación', 'Comunicación', 'Automatización y herramientas']) await expect(launcher.getByRole('heading', { name })).toBeVisible();
-  await expect(launcher.getByRole('button', { name: /^Abrir (?!.*a la derecha)/ })).toHaveCount(14);
-  await expect(launcher.getByRole('button', { name: /^Abrir .* a la derecha$/ })).toHaveCount(14);
+  await expect(launcher.getByRole('button', { name: /^Abrir (?!.*a la derecha)/ })).toHaveCount(15);
+  await expect(launcher.getByRole('button', { name: /^Abrir .* a la derecha$/ })).toHaveCount(15);
   // Teams es global pero no está fijado por defecto: solo vive en Comunicación.
   await expect(launcher.getByRole('button', { name: 'Fijar Microsoft Teams en la barra lateral' })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Servicios' }).getByRole('button', { name: 'Abrir Microsoft Teams' })).toHaveCount(0);
@@ -1006,7 +1019,7 @@ test('páginas propias: cambiar de origen cierra sus pestañas y reabre en el nu
   await expect(page.getByTestId(`${saved.id}-tab-1`)).toHaveCount(0);
   await expect.poll(async () => (await nativeViews()).length).toBe(before - 1);
   const state = await page.evaluate(async () => { const s = await window.portal.snapshot(); return { apps: s.preferences.customApps, pinned: s.preferences.pinned, remember: Object.keys(s.preferences.remember), services: s.services.length, active: s.active }; });
-  expect(state).toMatchObject({ apps: [], services: 14, active: 'librechat' });
+  expect(state).toMatchObject({ apps: [], services: 15, active: 'librechat' });
   expect(state.pinned.some(id => id.startsWith('custom-'))).toBe(false);
   expect(state.remember.some(id => id.startsWith('custom-'))).toBe(false);
 });
@@ -1025,7 +1038,7 @@ test('páginas propias: los comandos validan sus argumentos en el proceso princi
   });
   expect(Object.entries(outcome).filter(([, rejected]) => !rejected)).toEqual([]);
   expect(await customApps()).toEqual([]);
-  expect(await page.evaluate(async () => (await window.portal.snapshot()).services.length)).toBe(14);
+  expect(await page.evaluate(async () => (await window.portal.snapshot()).services.length)).toBe(15);
 });
 
 test('páginas propias: el límite de 30 se aplica en el proceso principal', async () => {
@@ -1184,7 +1197,7 @@ test('Microsoft 365: el launcher agrupa las apps nuevas por categoría y Copilot
   const launcher = page.getByRole('region', { name: 'Todas las aplicaciones' });
   const names = (heading: string) => launcher.locator('.launcher-category').filter({ has: page.getByRole('heading', { name: heading, exact: true }) }).locator('.launcher-name').allTextContents();
   expect(await names('Control')).toEqual(['AMA IA', 'Copilot M365', 'Buk']);
-  expect(await names('Operación')).toEqual(['Huly Workspace', 'SharePoint']);
+  expect(await names('Operación')).toEqual(['Huly Workspace', 'SharePoint', 'Metabase']);
   expect(await names('Comunicación')).toEqual(['Microsoft Teams', 'Outlook']);
   expect(await names('Automatización y herramientas')).toEqual(['n8n Automations', 'Email Category AI', 'Stirling PDF', 'Power Automate', 'Microsoft Forms']);
 });
@@ -1523,7 +1536,7 @@ test('la burbuja deja abrir y mostrar en la carpeta siempre el último archivo d
 test('con "recordar sesión" las cookies de sesión de TODAS las apps (login sin "recordarme", como Buk) sobreviven al reiniciar', async () => {
   test.setTimeout(120_000);
   const ids = await page.evaluate(async () => (await window.portal.snapshot()).services.map(service => service.id));
-  expect(ids).toHaveLength(14);
+  expect(ids).toHaveLength(15);
   // Cada app abre su vista y su página fija una cookie de sesión propia (sin caducidad), como un login de Rails.
   for (const id of ids) {
     await page.evaluate(appId => window.portal.activate(appId), id);

@@ -10,7 +10,8 @@ describe('registro y aislamiento', () => {
       'https://email-category-ai.vercel.app/', 'http://172.16.8.73:8080/',
       'https://teams.microsoft.com/v2/',
       'https://m365.cloud.microsoft/', 'https://outlook.office.com/mail/', 'https://amatime.sharepoint.com/',
-      'https://make.powerautomate.com/', 'https://forms.cloud.microsoft/', 'https://julio-sepulveda-costeo-bulk-copacki.vercel.app/', 'https://amatime.buk.cl/users/sign_in'
+      'https://make.powerautomate.com/', 'https://forms.cloud.microsoft/', 'https://julio-sepulveda-costeo-bulk-copacki.vercel.app/', 'https://amatime.buk.cl/users/sign_in',
+      'http://metabase.172.16.8.73.sslip.io/'
     ]);
   });
   it('cada servicio pertenece a una categoría válida y cada categoría tiene servicios', () => {
@@ -110,7 +111,7 @@ describe('catálogo de Microsoft 365', () => {
     const order = (category: string) => SERVICES.filter(s => s.category === category).map(s => s.id);
     expect(order('control')).toEqual(['librechat', 'copilot', 'buk']);
     expect(order('comunicacion')).toEqual(['teams', 'outlook']);
-    expect(order('operacion')).toEqual(['huly', 'sharepoint']);
+    expect(order('operacion')).toEqual(['huly', 'sharepoint', 'metabase']);
     expect(order('amatime')).toEqual(['portal', 'costeador']);
   });
   it('GLOBAL_APP_IDS coincide con el catálogo', () => { expect([...GLOBAL_APP_IDS]).toEqual(SERVICES.map(s => s.id)); });
@@ -260,6 +261,19 @@ describe('Buk (RRHH)', () => {
   it('es una app web de Control (pegada bajo Copilot) con su login de Amatime, sin grupo ni administrador', () => {
     expect(SERVICES.find(service => service.id === 'buk')).toEqual({ id: 'buk', name: 'Buk', shortName: 'Buk', category: 'control', url: 'https://amatime.buk.cl/users/sign_in' });
     expect(GLOBAL_APP_IDS).toContain('buk');
+  });
+});
+
+describe('Metabase (BI en Dokploy)', () => {
+  const metabase = () => SERVICES.find(service => service.id === 'metabase')!;
+  it('es una app de Operación en su nombre sslip.io de la red interna, sin grupo ni administrador', () => {
+    expect(metabase()).toEqual({ id: 'metabase', name: 'Metabase', shortName: 'Metabase', category: 'operacion', url: 'http://metabase.172.16.8.73.sslip.io/' });
+    expect(GLOBAL_APP_IDS).toContain('metabase');
+  });
+  it('navega solo dentro de su origen y tiene su propia partición', () => {
+    expect(allowedNavigation('http://metabase.172.16.8.73.sslip.io/dashboard/1', metabase())).toBe(true);
+    for (const url of ['https://metabase.172.16.8.73.sslip.io/', 'http://otro.172.16.8.73.sslip.io/', 'http://172.16.8.73:3000/', 'https://login.microsoftonline.com/']) expect(allowedNavigation(url, metabase()), url).toBe(false);
+    expect(partitionFor('metabase', true)).toBe('persist:amatime-metabase');
   });
 });
 

@@ -1,5 +1,5 @@
 /** Apps globales del catálogo (código); las páginas del usuario tienen ids `custom-<uuid>`. */
-export const GLOBAL_APP_IDS = ['huly', 'n8n', 'librechat', 'portal', 'emailai', 'stirling', 'teams', 'copilot', 'outlook', 'sharepoint', 'powerautomate', 'forms', 'costeador', 'buk'] as const;
+export const GLOBAL_APP_IDS = ['huly', 'n8n', 'librechat', 'portal', 'emailai', 'stirling', 'teams', 'copilot', 'outlook', 'sharepoint', 'powerautomate', 'forms', 'costeador', 'buk', 'metabase'] as const;
 export type AppId = string;
 export const STARTUP_SERVICE: AppId = 'librechat';
 export type Theme = 'dark' | 'light';
@@ -15,10 +15,10 @@ export const CATEGORIES = [
 export type CategoryId = typeof CATEGORIES[number]['id'] | 'mine';
 /** Sección del launcher y de la sidebar para las páginas definidas por el usuario. */
 export const MINE_CATEGORY = { id: 'mine', label: 'Mis páginas' } as const;
-/** Apps fijadas por defecto: LibreChat es el centro de mando; después operación y herramientas. */
 /** Siempre fijadas, primero y en este orden; el usuario no puede quitarlas. */
 export const FIXED_APPS: readonly AppId[] = ['librechat', 'copilot', 'buk'];
-export const DEFAULT_PINNED: readonly AppId[] = [...FIXED_APPS, 'portal', 'huly', 'n8n', 'emailai', 'stirling'];
+/** Fijadas en una instalación nueva (sin preferencias guardadas): las fijas, Huly y Metabase. Quien ya tiene preferencias conserva las suyas. */
+export const DEFAULT_PINNED: readonly AppId[] = [...FIXED_APPS, 'huly', 'metabase'];
 export interface AppAdmin { name: string; email: string }
 export interface Service {
   id: AppId; name: string; shortName: string; category: CategoryId; url: string;

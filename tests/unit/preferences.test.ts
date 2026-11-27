@@ -5,10 +5,10 @@ import path from 'node:path';
 
 describe('preferencias sin secretos', () => {
   it('usa tema oscuro y particiones persistentes por defecto', () => {
-    expect(normalizePreferences(null)).toEqual({ theme: 'dark', remember: { huly: true, n8n: true, librechat: true, portal: true, emailai: true, stirling: true, teams: true, copilot: true, outlook: true, sharepoint: true, powerautomate: true, forms: true, costeador: true, buk: true }, pinned: ['librechat', 'copilot', 'buk', 'portal', 'huly', 'n8n', 'emailai', 'stirling'], desktopApps: [], customApps: [], splitRatio: 0.38, splitService: 'librechat', zoom: {} });
+    expect(normalizePreferences(null)).toEqual({ theme: 'dark', remember: { huly: true, n8n: true, librechat: true, portal: true, emailai: true, stirling: true, teams: true, copilot: true, outlook: true, sharepoint: true, powerautomate: true, forms: true, costeador: true, buk: true, metabase: true }, pinned: ['librechat', 'copilot', 'buk', 'huly', 'metabase'], desktopApps: [], customApps: [], splitRatio: 0.38, splitService: 'librechat', zoom: {} });
   });
   it('acepta solo valores booleanos y temas conocidos', () => {
-    expect(normalizePreferences({ theme: 'light', remember: { huly: false, n8n: 'false' }, password: 'secret' })).toEqual({ theme: 'light', remember: { ...{ huly: true, n8n: true, librechat: true, portal: true, emailai: true, stirling: true, teams: true, copilot: true, outlook: true, sharepoint: true, powerautomate: true, forms: true, costeador: true, buk: true }, huly: false }, pinned: ['librechat', 'copilot', 'buk', 'portal', 'huly', 'n8n', 'emailai', 'stirling'], desktopApps: [], customApps: [], splitRatio: 0.38, splitService: 'librechat', zoom: {} });
+    expect(normalizePreferences({ theme: 'light', remember: { huly: false, n8n: 'false' }, password: 'secret' })).toEqual({ theme: 'light', remember: { ...{ huly: true, n8n: true, librechat: true, portal: true, emailai: true, stirling: true, teams: true, copilot: true, outlook: true, sharepoint: true, powerautomate: true, forms: true, costeador: true, buk: true, metabase: true }, huly: false }, pinned: ['librechat', 'copilot', 'buk', 'huly', 'metabase'], desktopApps: [], customApps: [], splitRatio: 0.38, splitService: 'librechat', zoom: {} });
     expect(normalizePreferences({ theme: 'injected' }).theme).toBe('dark');
   });
   it('recuerda el zoom de cada app: solo apps conocidas y porcentajes válidos (el 100% no se guarda)', () => {
@@ -20,7 +20,11 @@ describe('preferencias sin secretos', () => {
   });
   it('sin apps configurables quedan solo las fijas; si el campo no es una lista, el valor por defecto', () => {
     expect(normalizePreferences({ pinned: [] }).pinned).toEqual(['librechat', 'copilot', 'buk']);
-    expect(normalizePreferences({ pinned: 'huly' }).pinned).toEqual(['librechat', 'copilot', 'buk', 'portal', 'huly', 'n8n', 'emailai', 'stirling']);
+    expect(normalizePreferences({ pinned: 'huly' }).pinned).toEqual(['librechat', 'copilot', 'buk', 'huly', 'metabase']);
+  });
+  it('una instalación nueva fija AMA IA, Copilot, Buk, Huly y Metabase; quien ya tiene preferencias conserva las suyas', () => {
+    expect(normalizePreferences(null).pinned).toEqual(['librechat', 'copilot', 'buk', 'huly', 'metabase']);
+    expect(normalizePreferences({ pinned: ['portal', 'n8n'] }).pinned).toEqual(['librechat', 'copilot', 'buk', 'portal', 'n8n']);
   });
 });
 
@@ -91,7 +95,7 @@ describe('páginas del usuario en preferencias', () => {
     const ghost = 'custom-ffffffff-0000-0000-0000-000000000000';
     const result = normalizePreferences({ customApps: [app], pinned: [ghost, id, 'evil'], remember: { [ghost]: false, [id]: false, evil: false }, splitService: ghost });
     expect(result.pinned).toEqual(['librechat', 'copilot', 'buk', id]);
-    expect(Object.keys(result.remember)).toEqual(['huly', 'n8n', 'librechat', 'portal', 'emailai', 'stirling', 'teams', 'copilot', 'outlook', 'sharepoint', 'powerautomate', 'forms', 'costeador', 'buk', id]);
+    expect(Object.keys(result.remember)).toEqual(['huly', 'n8n', 'librechat', 'portal', 'emailai', 'stirling', 'teams', 'copilot', 'outlook', 'sharepoint', 'powerautomate', 'forms', 'costeador', 'buk', 'metabase', id]);
     expect(result.splitService).toBe('librechat');
   });
   it('Teams es una app global: se puede fijar y recordar', () => {
